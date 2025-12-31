@@ -24,18 +24,34 @@ app.use((req, res, next) => {
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
+// Helper function to strip quotes from environment variables
+const stripQuotes = (str) => {
+  if (!str) return str;
+  return str.replace(/^["']|["']$/g, '');
+};
+
 // Read secrets from environment
-const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
-const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
-const BUSINESS_CONTEXT = process.env.BUSINESS_CONTEXT || "";
+const CLAUDE_API_KEY = stripQuotes(process.env.CLAUDE_API_KEY);
+const TWILIO_ACCOUNT_SID = stripQuotes(process.env.TWILIO_ACCOUNT_SID);
+const TWILIO_AUTH_TOKEN = stripQuotes(process.env.TWILIO_AUTH_TOKEN);
+const TWILIO_PHONE_NUMBER = stripQuotes(process.env.TWILIO_PHONE_NUMBER);
+const BUSINESS_CONTEXT = stripQuotes(process.env.BUSINESS_CONTEXT) || "";
 const BYPASS_CLAUDE =
-  process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true";
+  process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true" || stripQuotes(process.env.BYPASS_CLAUDE) === "0";
+
+console.log("[config] Environment check:");
+console.log("- CLAUDE_API_KEY:", CLAUDE_API_KEY ? `Set (${CLAUDE_API_KEY.substring(0, 10)}...)` : "MISSING");
+console.log("- TWILIO_ACCOUNT_SID:", TWILIO_ACCOUNT_SID ? `Set (${TWILIO_ACCOUNT_SID.substring(0, 10)}...)` : "MISSING");
+console.log("- TWILIO_AUTH_TOKEN:", TWILIO_AUTH_TOKEN ? "Set" : "MISSING");
+console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
+console.log("- BYPASS_CLAUDE:", BYPASS_CLAUDE);
 
 let twilioClient = null;
 if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
   twilioClient = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+  console.log("[config] Twilio client initialized");
+} else {
+  console.log("[config] WARNING: Twilio client NOT initialized");
 }
 
 // Store conversation history per phone number
