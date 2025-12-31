@@ -1,0 +1,135 @@
+import express from "express";
+import bodyParser from "body-parser";
+import axios from "axios";
+import dotenv from "dotenv";
+import Twilio from "twilio";
+
+console.log("[startup] Loading env...");
+dotenv.config();
+console.log("[startup] Env loaded, initializing app...");
+
+const app = express();
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+
+// Read secrets from environment
+const CLAUDE_API_KEY = process.env.CLAUDE_API_KEY;
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN;
+const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER;
+const BYPASS_CLAUDE =
+  process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true";
+
+let twilioClient = null;
+if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
+  twilioClient = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
+}
+
+app.post("/webhook", async (req, res) => {
+  const incomingMsg = req.body.Body || req.body.body || "";
+  const from = req.body.From || req.body.from || "";
+
+  console.log("Message from WhatsApp:", incomingMsg);
+
+  if (BYPASS_CLAUDE) {
+    console.log("BYPASS_CLAUDE enabled — returning canned reply");
+    res.type("text/xml");
+    res.send(`
+      <Response>
+        <Message><![CDATA[Thanks! We received your message: ${incomingMsg}]]></Message>
+      </Response>
+    `);
+    return;
+  }
+
+  if (!CLAUDE_API_KEY) {
+    console.error("Missing CLAUDE_API_KEY in environment");
+
+    res.type("text/xml");
+    res.send(`
+      <Response>
+        <Message>Sorry, the server is not configured properly. Please contact support.</Message>
+      </Response>
+    `);
+    return;
+  }
+
+  try {
+    const claudeResponse = await axios.post(
+      "https://api.anthropic.com/v1/messages",
+      {
+        model: "claude-3-haiku-20240307",
+        max_tokens: 50,
+        messages: [{ role: "user", content: incomingMsg }],
+      },
+      {
+        headers: {
+          "x-api-key": CLAUDE_API_KEY,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const aiReply =
+      claudeResponse.data?.content?.[0]?.text ||
+      claudeResponse.data?.completion ||
+      (typeof claudeResponse.data === "string"
+        ? claudeResponse.data
+        : JSON.stringify(claudeResponse.data));
+
+    res.type("text/xml");
+    res.send(`
+      <Response>
+        <Message><![CDATA[${aiReply}]]></Message>
+      </Response>
+    `);
+  } catch (err) {
+    console.error("Error calling Claude:");
+
+    if (err?.response?.data) {
+      console.error("Response data:", JSON.stringify(err.response.data, null, 2));
+    }
+
+    console.error("Status:", err?.response?.status);
+    console.error("Message:", err?.message);
+    console.error("Full error:", err);
+
+    res.type("text/xml");
+    res.send(`
+      <Response>
+        <Message>Sorry, I'm having trouble processing that right now. Please try again later.</Message>
+      </Response>
+    `);
+  }
+});
+
+// Endpoint used by the Cart page to send an SMS/WhatsApp
+// Currently disabled - use /webhook to receive and respond to messages instead
+app.post("/send-sms", (req, res) => {
+  res.status(503).json({ error: "Send SMS endpoint temporarily disabled. Messages are received and responded to via the WhatsApp webhook." });
+});
+
+// Global error handlers
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+  // Don't exit - just log
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  // Don't exit - just log
+});
+
+console.log("[startup] About to call app.listen()...");
+
+const PORT = process.env.PORT || 3000;
+
+const server = app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
+
+server.on("error", (err) => {
+  console.error("[startup] Server error:", err);
+  process.exit(1);
+});
