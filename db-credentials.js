@@ -10,6 +10,11 @@ const DATA_DIR = path.join(__dirname, 'data');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const PHONE_MAPPING_FILE = path.join(DATA_DIR, 'phone-mapping.json');
 
+// In-memory storage for when filesystem is not available
+let inMemoryUsers = {};
+let inMemoryPhoneMapping = {};
+let useInMemory = false;
+
 // Encryption key from environment or random
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 const ALGORITHM = 'aes-256-cbc';
@@ -26,25 +31,34 @@ try {
 } catch (error) {
   console.error('[database-json] ERROR creating data directory:', error.message);
   console.error('[database-json] Will use in-memory storage as fallback');
+  useInMemory = true;
 }
 
 // Initialize files if they don't exist
-try {
-  if (!fs.existsSync(USERS_FILE)) {
-    fs.writeFileSync(USERS_FILE, '{}');
-    console.log('[database-json] Initialized users.json');
+if (!useInMemory) {
+  try {
+    if (!fs.existsSync(USERS_FILE)) {
+      fs.writeFileSync(USERS_FILE, '{}');
+      console.log('[database-json] Initialized users.json');
+    }
+  } catch (error) {
+    console.error('[database-json] ERROR creating users.json:', error.message);
+    useInMemory = true;
   }
-} catch (error) {
-  console.error('[database-json] ERROR creating users.json:', error.message);
+
+  try {
+    if (!fs.existsSync(PHONE_MAPPING_FILE)) {
+      fs.writeFileSync(PHONE_MAPPING_FILE, '{}');
+      console.log('[database-json] Initialized phone-mapping.json');
+    }
+  } catch (error) {
+    console.error('[database-json] ERROR creating phone-mapping.json:', error.message);
+    useInMemory = true;
+  }
 }
 
-try {
-  if (!fs.existsSync(PHONE_MAPPING_FILE)) {
-    fs.writeFileSync(PHONE_MAPPING_FILE, '{}');
-    console.log('[database-json] Initialized phone-mapping.json');
-  }
-} catch (error) {
-  console.error('[database-json] ERROR creating phone-mapping.json:', error.message);
+if (useInMemory) {
+  console.log('[database-json] Using IN-MEMORY storage (data will not persist between restarts)');
 }
 
 // Encryption functions
@@ -77,6 +91,9 @@ function decrypt(text) {
 
 // Read/Write functions
 function readUsers() {
+  if (useInMemory) {
+    return { ...inMemoryUsers };
+  }
   try {
     const data = fs.readFileSync(USERS_FILE, 'utf8');
     return JSON.parse(data);
@@ -87,6 +104,10 @@ function readUsers() {
 }
 
 function writeUsers(users) {
+  if (useInMemory) {
+    inMemoryUsers = { ...users };
+    return;
+  }
   try {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
   } catch (error) {
@@ -95,6 +116,9 @@ function writeUsers(users) {
 }
 
 function readPhoneMapping() {
+  if (useInMemory) {
+    return { ...inMemoryPhoneMapping };
+  }
   try {
     const data = fs.readFileSync(PHONE_MAPPING_FILE, 'utf8');
     return JSON.parse(data);
@@ -105,6 +129,10 @@ function readPhoneMapping() {
 }
 
 function writePhoneMapping(mapping) {
+  if (useInMemory) {
+    inMemoryPhoneMapping = { ...mapping };
+    return;
+  }
   try {
     fs.writeFileSync(PHONE_MAPPING_FILE, JSON.stringify(mapping, null, 2));
   } catch (error) {
