@@ -18,6 +18,10 @@ dist-ssr
 .env.*.local
 .env.backup
 
+# Database
+chati.db
+chati.db-journal
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

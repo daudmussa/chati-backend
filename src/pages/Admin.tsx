@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Users, Store, ShoppingCart, Calendar, TrendingUp, Phone, Settings, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface UserData {
   userId: string;
@@ -65,7 +66,7 @@ export default function Admin() {
     if (!user?.id || user.role !== 'admin') return;
 
     try {
-      const response = await fetch('http://localhost:3000/api/admin/users', {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USERS, {
         headers: {
           'x-user-id': user.id,
           'x-user-role': user.role,
@@ -96,7 +97,7 @@ export default function Admin() {
       : [...currentFeatures, featureId];
 
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/users/${userId}/features`, {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USER_FEATURES(userId), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -149,7 +150,7 @@ export default function Admin() {
     if (!newLimits) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/users/${userId}/limits`, {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USER_LIMITS(userId), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

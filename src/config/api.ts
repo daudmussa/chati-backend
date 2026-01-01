@@ -4,6 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 export const API_ENDPOINTS = {
   // Store
   STORE_SETTINGS: `${API_BASE_URL}/api/store/settings`,
+  STORE_BY_NAME: (name: string) => `${API_BASE_URL}/api/store/by-name/${encodeURIComponent(name)}`,
   ORDERS: `${API_BASE_URL}/api/orders`,
   
   // Admin

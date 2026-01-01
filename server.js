@@ -3,6 +3,7 @@ import bodyParser from "body-parser";
 import axios from "axios";
 import dotenv from "dotenv";
 import Twilio from "twilio";
+import { saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers } from "./database.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -88,6 +89,32 @@ app.post("/webhook", async (req, res) => {
   const from = req.body.From || req.body.from || "";
 
   console.log("Message from WhatsApp:", incomingMsg, "from:", from);
+
+  // Send immediate acknowledgment to Twilio
+  res.type("text/xml");
+  res.send(`<Response></Response>`);
+
+  // Process asynchronously with 33 second delay
+  setTimeout(async () => {
+    try {
+      // Get user credentials based on incoming phone number
+      const userCreds = getUserByPhoneNumber(from);
+      
+      // Fall back to environment variables if no user-specific credentials
+      const USER_CLAUDE_API_KEY = userCreds?.claudeApiKey || CLAUDE_API_KEY;
+      const USER_TWILIO_ACCOUNT_SID = userCreds?.twilioAccountSid || TWILIO_ACCOUNT_SID;
+      const USER_TWILIO_AUTH_TOKEN = userCreds?.twilioAuthToken || TWILIO_AUTH_TOKEN;
+      const USER_TWILIO_PHONE_NUMBER = userCreds?.twilioPhoneNumber || TWILIO_PHONE_NUMBER;
+      const USER_BUSINESS_CONTEXT = userCreds?.businessContext || BUSINESS_CONTEXT;
+      const USER_BYPASS_CLAUDE = userCreds?.bypassClaude ?? BYPASS_CLAUDE;
+
+      // Initialize user-specific Twilio client if credentials available
+      let userTwilioClient = null;
+      if (USER_TWILIO_ACCOUNT_SID && USER_TWILIO_AUTH_TOKEN) {
+        userTwilioClient = Twilio(USER_TWILIO_ACCOUNT_SID, USER_TWILIO_AUTH_TOKEN);
+      }
+
+      console.log(`[webhook] Using ${userCreds ? 'user-specific' : 'default'} credentials for ${from}`);
 
   // Send immediate acknowledgment to Twilio
   res.type("text/xml");
@@ -713,10 +740,10 @@ app.post("/webhook", async (req, res) => {
           } else {
             messageToSend = `I understand you need specialized assistance. Please contact ${businessSettings.supportName} on WhatsApp: ${businessSettings.supportPhone}`;
           }
-        } else if (BYPASS_CLAUDE) {
+        } else if (USER_BYPASS_CLAUDE) {
           console.log("BYPASS_CLAUDE enabled — sending canned reply");
           messageToSend = "Thanks for messaging us! We'll respond to you shortly.";
-        } else if (!CLAUDE_API_KEY) {
+        } else if (!USER_CLAUDE_API_KEY) {
           console.error("Missing CLAUDE_API_KEY in environment");
           const conversation = conversationHistory.get(from) || {};
           const lang = conversation.language || 'en';
@@ -759,7 +786,7 @@ app.post("/webhook", async (req, res) => {
             },
             {
               headers: {
-                "x-api-key": CLAUDE_API_KEY,
+                "x-api-key": USER_CLAUDE_API_KEY,
                 "anthropic-version": "2023-06-01",
                 "Content-Type": "application/json",
               },
@@ -786,14 +813,14 @@ app.post("/webhook", async (req, res) => {
       }
 
       // Send the message via Twilio
-      if (twilioClient && from) {
+      if (userTwilioClient && from) {
         try {
           const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
-          const fromNumber = `whatsapp:${TWILIO_PHONE_NUMBER}`;
+          const fromNumber = `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
           
           console.log(`Sending message from ${fromNumber} to ${toNumber}`);
           
-          await twilioClient.messages.create({
+          await userTwilioClient.messages.create({
             body: messageToSend,
             from: fromNumber,
             to: toNumber,
@@ -1230,6 +1257,120 @@ app.put("/api/admin/users/:userId/limits", (req, res) => {
 });
 
 // Health check endpoint
+// ========================================
+// USER CREDENTIALS MANAGEMENT API
+// ========================================
+
+// Save/Update user credentials
+app.put("/api/user/credentials", (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const {
+      claudeApiKey,
+      twilioAccountSid,
+      twilioAuthToken,
+      twilioPhoneNumber,
+      businessContext,
+      bypassClaude
+    } = req.body;
+
+    // Save credentials to database
+    saveUserCredentials(userId, {
+      claudeApiKey,
+      twilioAccountSid,
+      twilioAuthToken,
+      twilioPhoneNumber,
+      businessContext,
+      bypassClaude
+    });
+
+    // Map phone number to user if provided
+    if (twilioPhoneNumber) {
+      mapPhoneToUser(twilioPhoneNumber, userId);
+    }
+
+    res.json({ success: true, message: "Credentials saved successfully" });
+  } catch (error) {
+    console.error("Error saving credentials:", error);
+    res.status(500).json({ error: "Failed to save credentials" });
+  }
+});
+
+// Get user credentials
+app.get("/api/user/credentials", (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const credentials = getUserCredentials(userId);
+    
+    if (!credentials) {
+      return res.json({ 
+        hasCredentials: false,
+        message: "No credentials found. Please configure your API keys in Settings." 
+      });
+    }
+
+    // Return credentials (API keys are already decrypted by getUserCredentials)
+    res.json({
+      hasCredentials: true,
+      claudeApiKey: credentials.claudeApiKey ? '****' + credentials.claudeApiKey.slice(-4) : null,
+      twilioAccountSid: credentials.twilioAccountSid ? '****' + credentials.twilioAccountSid.slice(-4) : null,
+      twilioAuthToken: credentials.twilioAuthToken ? '********' : null,
+      twilioPhoneNumber: credentials.twilioPhoneNumber,
+      businessContext: credentials.businessContext,
+      bypassClaude: credentials.bypassClaude,
+      updatedAt: credentials.updatedAt
+    });
+  } catch (error) {
+    console.error("Error fetching credentials:", error);
+    res.status(500).json({ error: "Failed to fetch credentials" });
+  }
+});
+
+// Delete user credentials
+app.delete("/api/user/credentials", (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    deleteUserCredentials(userId);
+    res.json({ success: true, message: "Credentials deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting credentials:", error);
+    res.status(500).json({ error: "Failed to delete credentials" });
+  }
+});
+
+// Admin: Get all users with credentials
+app.get("/api/admin/users/credentials", (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    const userRole = req.headers['x-user-role'];
+    
+    if (!userId || userRole !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+
+    const users = getAllUsers();
+    res.json(users);
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
 app.get("/health", (req, res) => {
   res.status(200).json({ 
     status: "ok", 

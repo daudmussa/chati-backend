@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Save, Plus, X, Loader2 } from 'lucide-react';
+import { API_ENDPOINTS } from '@/config/api';
 
 export default function Settings() {
   const { toast } = useToast();
@@ -25,14 +26,45 @@ export default function Settings() {
   const [supportName, setSupportName] = useState('');
   const [supportPhone, setSupportPhone] = useState('');
 
+  // API Credentials
+  const [claudeApiKey, setClaudeApiKey] = useState('');
+  const [twilioAccountSid, setTwilioAccountSid] = useState('');
+  const [twilioAuthToken, setTwilioAuthToken] = useState('');
+  const [twilioPhoneNumber, setTwilioPhoneNumber] = useState('');
+  const [bypassClaude, setBypassClaude] = useState(false);
+  const [hasCredentials, setHasCredentials] = useState(false);
+
   // Fetch business settings on mount
   useEffect(() => {
     fetchBusinessSettings();
+    fetchUserCredentials();
   }, []);
+
+  const fetchUserCredentials = async () => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.BUSINESS_SETTINGS.replace('/business/settings', '')}/api/user/credentials`, {
+        headers: {
+          'x-user-id': localStorage.getItem('userId') || ''
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.hasCredentials) {
+          setHasCredentials(true);
+          setTwilioPhoneNumber(data.twilioPhoneNumber || '');
+          setBypassClaude(data.bypassClaude || false);
+          // Don't set API keys - they're masked
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch credentials:', error);
+    }
+  };
 
   const fetchBusinessSettings = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/business/settings');
+      const response = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS);
       if (response.ok) {
         const data = await response.json();
         setBusinessDescription(data.businessDescription || '');
@@ -70,10 +102,54 @@ export default function Settings() {
     }
   };
 
-  const handleSaveAI = async () => {
+  const handleSaveCredentials = async () => {
     setSaving(true);
     try {
-      const response = await fetch('http://localhost:3000/api/business/settings', {
+      const response = await fetch(`${API_ENDPOINTS.BUSINESS_SETTINGS.replace('/business/settings', '')}/api/user/credentials`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': localStorage.getItem('userId') || ''
+        },
+        body: JSON.stringify({
+          claudeApiKey,
+          twilioAccountSid,
+          twilioAuthToken,
+          twilioPhoneNumber,
+          businessContext: businessDescription,
+          bypassClaude
+        }),
+      });
+
+      if (response.ok) {
+        setHasCredentials(true);
+        toast({
+          title: "Success",
+          description: "API credentials saved successfully",
+        });
+        // Clear sensitive fields after saving
+        setClaudeApiKey('');
+        setTwilioAccountSid('');
+        setTwilioAuthToken('');
+      } else {
+        throw new Error('Failed to save credentials');
+      }
+    } catch (error) {
+      console.error('Failed to save credentials:', error);
+      toast({
+        title: "Error",
+        description: "Failed to save credentials",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveAI = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -223,6 +299,105 @@ export default function Settings() {
                 <p className="text-xs text-muted-foreground">
                   Include country code (e.g., +255 for Tanzania)
                 </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-blue-200 bg-blue-50/50">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    🔐 API Credentials
+                    {hasCredentials && (
+                      <Badge variant="default" className="bg-green-500">Configured</Badge>
+                    )}
+                  </CardTitle>
+                  <CardDescription>
+                    Configure your own Twilio and Claude AI API credentials for personalized service
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-100 border border-blue-300 rounded-lg p-4 mb-4">
+                <p className="text-sm text-blue-900">
+                  <strong>Multi-User Support:</strong> Each user can now configure their own API credentials. 
+                  Your credentials are encrypted and stored securely.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="claudeApiKey">Claude API Key</Label>
+                <Input
+                  id="claudeApiKey"
+                  type="password"
+                  value={claudeApiKey}
+                  onChange={(e) => setClaudeApiKey(e.target.value)}
+                  placeholder={hasCredentials ? "****...configured" : "sk-ant-api03-..."}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Get your API key from <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Anthropic Console</a>
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="twilioAccountSid">Twilio Account SID</Label>
+                <Input
+                  id="twilioAccountSid"
+                  type="password"
+                  value={twilioAccountSid}
+                  onChange={(e) => setTwilioAccountSid(e.target.value)}
+                  placeholder={hasCredentials ? "****...configured" : "AC..."}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="twilioAuthToken">Twilio Auth Token</Label>
+                <Input
+                  id="twilioAuthToken"
+                  type="password"
+                  value={twilioAuthToken}
+                  onChange={(e) => setTwilioAuthToken(e.target.value)}
+                  placeholder={hasCredentials ? "****...configured" : "Enter auth token"}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="twilioPhoneNumber">Twilio WhatsApp Number</Label>
+                <Input
+                  id="twilioPhoneNumber"
+                  value={twilioPhoneNumber}
+                  onChange={(e) => setTwilioPhoneNumber(e.target.value)}
+                  placeholder="+255793531101"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your Twilio WhatsApp-enabled phone number (with country code)
+                </p>
+              </div>
+
+              <div className="flex items-center space-x-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="bypassClaude"
+                  checked={bypassClaude}
+                  onChange={(e) => setBypassClaude(e.target.checked)}
+                  className="w-4 h-4 rounded"
+                />
+                <Label htmlFor="bypassClaude" className="font-normal cursor-pointer">
+                  Bypass Claude AI (send canned responses instead)
+                </Label>
+              </div>
+
+              <div className="pt-4">
+                <Button
+                  onClick={handleSaveCredentials}
+                  disabled={saving}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Save className="w-4 h-4 mr-2" />
+                  {saving ? 'Saving...' : hasCredentials ? 'Update Credentials' : 'Save Credentials'}
+                </Button>
               </div>
             </CardContent>
           </Card>

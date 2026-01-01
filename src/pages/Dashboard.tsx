@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Send, Users, Calendar, CheckCircle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { API_ENDPOINTS } from '@/config/api';
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -26,11 +27,11 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       // Fetch conversations
-      const conversationsRes = await fetch('http://localhost:3000/api/conversations');
+      const conversationsRes = await fetch(API_ENDPOINTS.CONVERSATIONS);
       const conversations = conversationsRes.ok ? await conversationsRes.json() : [];
 
       // Fetch bookings
-      const bookingsRes = await fetch('http://localhost:3000/api/bookings');
+      const bookingsRes = await fetch(API_ENDPOINTS.BOOKINGS);
       const bookings = bookingsRes.ok ? await bookingsRes.json() : [];
 
       // Calculate stats

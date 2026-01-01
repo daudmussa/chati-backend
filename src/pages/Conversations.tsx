@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, Bot, User, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface Message {
   id: string;
@@ -38,7 +39,7 @@ export default function Conversations() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('http://localhost:3000/api/conversations');
+      const response = await fetch(API_ENDPOINTS.CONVERSATIONS);
       
       if (!response.ok) {
         throw new Error('Failed to fetch conversations');

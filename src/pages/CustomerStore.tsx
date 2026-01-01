@@ -22,6 +22,7 @@ import {
   Check
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface Product {
   id: string;
@@ -199,9 +200,9 @@ export default function CustomerStore() {
       
       // If storeName param exists, fetch by name, otherwise fetch default
       if (storeNameParam) {
-        response = await fetch(`http://localhost:3000/api/store/by-name/${encodeURIComponent(storeNameParam)}`);
+        response = await fetch(API_ENDPOINTS.STORE_BY_NAME(storeNameParam));
       } else {
-        response = await fetch('http://localhost:3000/api/store/settings');
+        response = await fetch(API_ENDPOINTS.STORE_SETTINGS);
       }
       
       if (response.ok) {
@@ -251,7 +252,7 @@ export default function CustomerStore() {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/store/settings', {
+      const response = await fetch(API_ENDPOINTS.STORE_SETTINGS, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ storeName: normalizedName }),

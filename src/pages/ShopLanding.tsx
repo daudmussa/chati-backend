@@ -20,6 +20,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { API_ENDPOINTS } from '@/config/api';
 
 export default function ShopLanding() {
   const navigate = useNavigate();
@@ -41,7 +42,7 @@ export default function ShopLanding() {
     
     // Check if store exists
     try {
-      const response = await fetch(`http://localhost:3000/api/store/by-name/${encodeURIComponent(normalizedName)}`);
+      const response = await fetch(API_ENDPOINTS.STORE_BY_NAME(normalizedName));
       
       if (response.ok) {
         navigate(`/shop/${normalizedName}`);

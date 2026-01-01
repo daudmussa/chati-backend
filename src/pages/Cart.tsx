@@ -16,6 +16,7 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface CartItem {
   id: string;
@@ -48,7 +49,7 @@ export default function Cart() {
 
   const fetchStorePhone = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/store/settings');
+      const response = await fetch(API_ENDPOINTS.STORE_SETTINGS);
       if (response.ok) {
         const data = await response.json();
         setBusinessPhone(data.storePhone || '+255719958997');
@@ -180,7 +181,7 @@ export default function Cart() {
         totalItems: cartItemCount
       };
 
-      const response = await fetch('http://localhost:3000/api/orders', {
+      const response = await fetch(API_ENDPOINTS.ORDERS, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData),

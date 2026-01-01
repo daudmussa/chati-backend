@@ -13,6 +13,7 @@ import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
 import { Plus, Calendar, Clock, User, Phone, Search, CheckCircle2, XCircle, AlertCircle, Pencil, Trash2, Power, Download } from 'lucide-react';
 import { format } from 'date-fns';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface BookingService {
   id: string;
@@ -170,7 +171,7 @@ export default function Bookings() {
     };
 
     try {
-      const response = await fetch('http://localhost:3000/api/services', {
+      const response = await fetch(API_ENDPOINTS.SERVICES, {
         method: editingService ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(serviceData),
@@ -188,15 +189,15 @@ export default function Bookings() {
 
       setIsServiceDialogOpen(false);
       resetServiceForm();
-      fetchServices();
+      loadServices();
     } catch (error) {
       toast({ title: "Error", description: "Failed to save service", variant: "destructive" });
     }
   };
 
-  const fetchServices = async () => {
+  const loadServices = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/services');
+      const response = await fetch(API_ENDPOINTS.SERVICES);
       if (response.ok) {
         const data = await response.json();
         setServices(data);
@@ -206,9 +207,9 @@ export default function Bookings() {
     }
   };
 
-  const fetchBookings = async () => {
+  const loadBookings = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/bookings');
+      const response = await fetch(API_ENDPOINTS.BOOKINGS);
       if (response.ok) {
         const data = await response.json();
         setBookings(data);
@@ -218,9 +219,9 @@ export default function Bookings() {
     }
   };
 
-  const fetchBookingsStatus = async () => {
+  const loadBookingStatus = async () => {
     try {
-      const response = await fetch('http://localhost:3000/api/bookings/status');
+      const response = await fetch(API_ENDPOINTS.BOOKINGS_STATUS);
       if (response.ok) {
         const data = await response.json();
         setBookingsEnabled(data.enabled);
@@ -232,7 +233,7 @@ export default function Bookings() {
 
   const toggleBookings = async (enabled: boolean) => {
     try {
-      const response = await fetch('http://localhost:3000/api/bookings/toggle', {
+      const response = await fetch(API_ENDPOINTS.BOOKINGS_TOGGLE, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled }),
@@ -368,22 +369,22 @@ export default function Bookings() {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchServices(), fetchBookings(), fetchBookingsStatus()]);
+      await Promise.all([loadServices(), loadBookings(), loadBookingStatus()]);
       setLoading(false);
     };
     loadData();
 
     // Refresh every 10 seconds
     const interval = setInterval(() => {
-      fetchBookings();
+      loadBookings();
     }, 10000);
 
     return () => clearInterval(interval);
   }, []);
 
-  const handleDeleteService = async (id: string) => {
+  const deleteService = async (id: string) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/services/${id}`, {
+      const response = await fetch(API_ENDPOINTS.SERVICE_BY_ID(id), {
         method: 'DELETE',
       });
 
@@ -398,7 +399,7 @@ export default function Bookings() {
 
   const handleUpdateBookingStatus = async (bookingId: string, newStatus: Booking['status']) => {
     try {
-      const response = await fetch(`http://localhost:3000/api/bookings/${bookingId}/status`, {
+      const response = await fetch(API_ENDPOINTS.BOOKING_STATUS(bookingId), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -813,7 +814,7 @@ export default function Bookings() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDeleteService(service.id)}
+                          onClick={() => deleteService(service.id)}
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           <Trash2 className="w-4 h-4" />

@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Plus, Pencil, Trash2, Package, Search, Store as StoreIcon, Save, ShoppingCart, Clock, CheckCircle2, XCircle, ArrowUpDown } from 'lucide-react';
+import { API_ENDPOINTS } from '@/config/api';
 
 interface Product {
   id: string;
@@ -132,7 +133,7 @@ export default function Store() {
   const fetchOrders = async () => {
     if (!user?.id) return;
     try {
-      const response = await fetch('http://localhost:3000/api/orders', {
+      const response = await fetch(API_ENDPOINTS.ORDERS, {
         headers: {
           'x-user-id': user.id,
         },
@@ -149,7 +150,7 @@ export default function Store() {
   const fetchStoreSettings = async () => {
     if (!user?.id) return;
     try {
-      const response = await fetch('http://localhost:3000/api/store/settings', {
+      const response = await fetch(API_ENDPOINTS.STORE_SETTINGS, {
         headers: {
           'x-user-id': user.id,
         },
@@ -200,7 +201,7 @@ export default function Store() {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/store/settings', {
+      const response = await fetch(API_ENDPOINTS.STORE_SETTINGS, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -257,7 +258,7 @@ export default function Store() {
     }
 
     try {
-      const response = await fetch('http://localhost:3000/api/store/settings', {
+      const response = await fetch(API_ENDPOINTS.STORE_SETTINGS, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -297,7 +298,7 @@ export default function Store() {
 
   const updateOrderStatus = async (orderId: string, status: 'completed' | 'cancelled') => {
     try {
-      const response = await fetch(`http://localhost:3000/api/orders/${orderId}`, {
+      const response = await fetch(`${API_ENDPOINTS.ORDERS}/${orderId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',

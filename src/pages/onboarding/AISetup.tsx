@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { API_ENDPOINTS } from '@/config/api';
 
 export default function AISetup() {
   const [businessDescription, setBusinessDescription] = useState('');
@@ -31,7 +32,7 @@ export default function AISetup() {
     setLoading(true);
     try {
       // Save to backend business settings
-      const response = await fetch('http://localhost:3000/api/business/settings', {
+      const response = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
