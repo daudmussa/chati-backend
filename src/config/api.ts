@@ -26,6 +26,9 @@ export const API_ENDPOINTS = {
   // Settings
   BUSINESS_SETTINGS: `${API_BASE_URL}/api/business/settings`,
   
+  // User Credentials
+  USER_CREDENTIALS: `${API_BASE_URL}/api/user/credentials`,
+  
   // Health
   HEALTH: `${API_BASE_URL}/health`,
 };

@@ -10,8 +10,10 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Save, Plus, X, Loader2 } from 'lucide-react';
 import { API_ENDPOINTS } from '@/config/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Settings() {
+  const { user } = useAuth();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -42,10 +44,9 @@ export default function Settings() {
 
   const fetchUserCredentials = async () => {
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_BASE}/api/user/credentials`, {
+      const response = await fetch(API_ENDPOINTS.USER_CREDENTIALS, {
         headers: {
-          'x-user-id': localStorage.getItem('userId') || ''
+          'x-user-id': user?.id || ''
         }
       });
       
@@ -106,12 +107,11 @@ export default function Settings() {
   const handleSaveCredentials = async () => {
     setSaving(true);
     try {
-      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-      const response = await fetch(`${API_BASE}/api/user/credentials`, {
+      const response = await fetch(API_ENDPOINTS.USER_CREDENTIALS, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': localStorage.getItem('userId') || ''
+          'x-user-id': user?.id || ''
         },
         body: JSON.stringify({
           claudeApiKey,
