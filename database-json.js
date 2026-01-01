@@ -14,21 +14,37 @@ const PHONE_MAPPING_FILE = path.join(DATA_DIR, 'phone-mapping.json');
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 const ALGORITHM = 'aes-256-cbc';
 
+console.log('[database-json] Initializing...');
+console.log('[database-json] Data directory:', DATA_DIR);
+
 // Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  console.log('[database-json] Created data directory');
+try {
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    console.log('[database-json] Created data directory');
+  }
+} catch (error) {
+  console.error('[database-json] ERROR creating data directory:', error.message);
+  console.error('[database-json] Will use in-memory storage as fallback');
 }
 
 // Initialize files if they don't exist
-if (!fs.existsSync(USERS_FILE)) {
-  fs.writeFileSync(USERS_FILE, '{}');
-  console.log('[database-json] Initialized users.json');
+try {
+  if (!fs.existsSync(USERS_FILE)) {
+    fs.writeFileSync(USERS_FILE, '{}');
+    console.log('[database-json] Initialized users.json');
+  }
+} catch (error) {
+  console.error('[database-json] ERROR creating users.json:', error.message);
 }
 
-if (!fs.existsSync(PHONE_MAPPING_FILE)) {
-  fs.writeFileSync(PHONE_MAPPING_FILE, '{}');
-  console.log('[database-json] Initialized phone-mapping.json');
+try {
+  if (!fs.existsSync(PHONE_MAPPING_FILE)) {
+    fs.writeFileSync(PHONE_MAPPING_FILE, '{}');
+    console.log('[database-json] Initialized phone-mapping.json');
+  }
+} catch (error) {
+  console.error('[database-json] ERROR creating phone-mapping.json:', error.message);
 }
 
 // Encryption functions
