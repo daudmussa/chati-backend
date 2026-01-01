@@ -1397,6 +1397,16 @@ app.post("/send-sms", (req, res) => {
   res.status(503).json({ error: "Send SMS endpoint temporarily disabled. Messages are received and responded to via the WhatsApp webhook." });
 });
 
+// Version check endpoint
+app.get("/api/version", (req, res) => {
+  res.json({ 
+    version: "1.1.0-json-db",
+    database: "JSON",
+    timestamp: new Date().toISOString(),
+    corsHeaders: "x-user-id enabled"
+  });
+});
+
 // Global error handlers
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
