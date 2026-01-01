@@ -3,7 +3,7 @@ import bodyParser from "body-parser";
 import axios from "axios";
 import dotenv from "dotenv";
 import Twilio from "twilio";
-import { saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers } from "./database-json.js";
+import { saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers } from "./db-credentials.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
