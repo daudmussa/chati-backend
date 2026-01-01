@@ -7,6 +7,7 @@ import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumb
 
 console.log("[startup] Loading env...");
 dotenv.config();
+dotenv.config({ path: '.env.railway' });
 console.log("[startup] Env loaded, initializing app...");
 // Initialize Postgres schema (if DATABASE_URL is set)
 await initSchema();
