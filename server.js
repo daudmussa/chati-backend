@@ -41,7 +41,7 @@ const TWILIO_AUTH_TOKEN = stripQuotes(process.env.TWILIO_AUTH_TOKEN);
 const TWILIO_PHONE_NUMBER = stripQuotes(process.env.TWILIO_PHONE_NUMBER);
 const BUSINESS_CONTEXT = stripQuotes(process.env.BUSINESS_CONTEXT) || "";
 const BYPASS_CLAUDE =
-  process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true" || stripQuotes(process.env.BYPASS_CLAUDE) === "0";
+  process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true";
 
 console.log("[config] Environment check:");
 console.log("- CLAUDE_API_KEY:", CLAUDE_API_KEY ? `Set (${CLAUDE_API_KEY.substring(0, 10)}...)` : "MISSING");
