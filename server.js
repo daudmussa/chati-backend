@@ -116,13 +116,6 @@ app.post("/webhook", async (req, res) => {
 
       console.log(`[webhook] Using ${userCreds ? 'user-specific' : 'default'} credentials for ${from}`);
 
-  // Send immediate acknowledgment to Twilio
-  res.type("text/xml");
-  res.send(`<Response></Response>`);
-
-  // Process asynchronously with 33 second delay
-  setTimeout(async () => {
-    try {
       // Get or create conversation history for this phone number
       if (!conversationHistory.has(from)) {
         conversationHistory.set(from, {
