@@ -19,6 +19,7 @@ COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application files
 COPY server.js ./
+COPY db-credentials.js ./
 COPY package*.json ./
 
 # Expose port
