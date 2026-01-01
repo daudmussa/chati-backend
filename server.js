@@ -11,8 +11,8 @@ dotenv.config({ path: '.env.railway' });
 
 // Railway fallback: set DATABASE_URL directly if not present
 if (!process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
-  process.env.DATABASE_URL = 'postgresql://postgres:GiWEMBYWQdFsbVaydlZcNpuAOhIqYXMt@postgres.railway.internal:5432/railway';
-  console.log("[startup] Set DATABASE_URL from hardcoded Railway fallback");
+  process.env.DATABASE_URL = 'postgresql://postgres:GiWEMBYWQdFsbVaydlZcNpuAOhIqYXMt@trolley.proxy.rlwy.net:23856/railway';
+  console.log("[startup] Set DATABASE_URL from hardcoded Railway fallback (public proxy)");
 }
 
 console.log("[startup] Env loaded, checking DATABASE_URL...");
