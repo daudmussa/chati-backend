@@ -87,6 +87,7 @@ setInterval(() => {
 app.post("/webhook", async (req, res) => {
   const incomingMsg = req.body.Body || req.body.body || "";
   const from = req.body.From || req.body.from || "";
+  const to = req.body.To || req.body.to || "";
 
   console.log("Message from WhatsApp:", incomingMsg, "from:", from);
 
@@ -97,8 +98,8 @@ app.post("/webhook", async (req, res) => {
   // Process asynchronously with 33 second delay
   setTimeout(async () => {
     try {
-      // Get user credentials based on incoming phone number
-      const userCreds = getUserByPhoneNumber(from);
+      // Get user credentials based on store phone number (Twilio 'To')
+      const userCreds = getUserByPhoneNumber(to);
       
       // Fall back to environment variables if no user-specific credentials
       const USER_CLAUDE_API_KEY = userCreds?.claudeApiKey || CLAUDE_API_KEY;
@@ -116,15 +117,19 @@ app.post("/webhook", async (req, res) => {
 
       console.log(`[webhook] Using ${userCreds ? 'user-specific' : 'default'} credentials for ${from}`);
 
-      // Get or create conversation history for this phone number
+      // Get or create conversation history for this customer phone number
       if (!conversationHistory.has(from)) {
         conversationHistory.set(from, {
           messages: [],
           lastActivity: Date.now(),
+          storeNumber: to,
+          userId: userCreds?.userId || null,
         });
       }
       
       const conversation = conversationHistory.get(from);
+      conversation.storeNumber = to;
+      conversation.userId = userCreds?.userId || conversation.userId || null;
       conversation.lastActivity = Date.now();
       
       // Add user message to history
@@ -832,9 +837,16 @@ app.post("/webhook", async (req, res) => {
 });// Endpoint to get all conversations
 app.get("/api/conversations", (req, res) => {
   try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID required' });
+    }
+
     const conversations = [];
     
     for (const [phoneNumber, data] of conversationHistory.entries()) {
+      // Only include conversations associated with this user
+      if (!data.userId || data.userId !== userId) continue;
       if (data.messages.length === 0) continue;
       
       // Get customer name from conversation data or use phone number fallback
@@ -1059,34 +1071,37 @@ app.get("/api/store/by-name/:storeName", (req, res) => {
 });
 
 // Business settings API
+// Per-user business settings (in-memory for now)
+const businessSettingsByUser = new Map();
+
 app.get("/api/business/settings", (req, res) => {
-  res.json(businessSettings);
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  const settings = businessSettingsByUser.get(userId) || businessSettings;
+  res.json(settings);
 });
 
 app.put("/api/business/settings", (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+
+  const existing = businessSettingsByUser.get(userId) || { ...businessSettings };
   const { businessDescription, tone, sampleReplies, keywords, supportName, supportPhone } = req.body;
   
-  if (businessDescription !== undefined) {
-    businessSettings.businessDescription = businessDescription;
-  }
-  if (tone !== undefined) {
-    businessSettings.tone = tone;
-  }
-  if (sampleReplies !== undefined) {
-    businessSettings.sampleReplies = sampleReplies;
-  }
-  if (keywords !== undefined) {
-    businessSettings.keywords = keywords;
-  }
-  if (supportName !== undefined) {
-    businessSettings.supportName = supportName;
-  }
-  if (supportPhone !== undefined) {
-    businessSettings.supportPhone = supportPhone;
-  }
+  if (businessDescription !== undefined) existing.businessDescription = businessDescription;
+  if (tone !== undefined) existing.tone = tone;
+  if (sampleReplies !== undefined) existing.sampleReplies = sampleReplies;
+  if (keywords !== undefined) existing.keywords = keywords;
+  if (supportName !== undefined) existing.supportName = supportName;
+  if (supportPhone !== undefined) existing.supportPhone = supportPhone;
   
-  console.log('Business settings updated:', businessSettings);
-  res.json(businessSettings);
+  businessSettingsByUser.set(userId, existing);
+  console.log('Business settings updated for', userId, existing);
+  res.json(existing);
 });
 
 // Orders API

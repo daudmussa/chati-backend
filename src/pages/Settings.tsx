@@ -66,7 +66,11 @@ export default function Settings() {
 
   const fetchBusinessSettings = async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS);
+      const response = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS, {
+        headers: {
+          'x-user-id': user?.id || ''
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         setBusinessDescription(data.businessDescription || '');
@@ -153,7 +157,7 @@ export default function Settings() {
     try {
       const response = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
         body: JSON.stringify({
           businessDescription,
           tone,

@@ -196,7 +196,9 @@ export function getUserByPhoneNumber(phoneNumber) {
     return null;
   }
   
-  return getUserCredentials(userId);
+  const creds = getUserCredentials(userId);
+  if (!creds) return null;
+  return { ...creds, userId };
 }
 
 // Delete user credentials
