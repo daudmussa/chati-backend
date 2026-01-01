@@ -42,3 +42,6 @@ core
 
 .github/
 
+
+# User credential storage
+data/
