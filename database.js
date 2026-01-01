@@ -1,7 +1,23 @@
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const db = new Database('chati.db');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Use /app/data for Railway volume, fallback to local for development
+const DB_DIR = process.env.RAILWAY_ENVIRONMENT ? '/app/data' : __dirname;
+const DB_PATH = path.join(DB_DIR, 'chati.db');
+
+// Ensure directory exists
+if (!fs.existsSync(DB_DIR)) {
+  fs.mkdirSync(DB_DIR, { recursive: true });
+}
+
+console.log(`[database] Using database at: ${DB_PATH}`);
+const db = new Database(DB_PATH);
 
 // Encryption key - in production, use process.env.ENCRYPTION_KEY
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'chati-default-key-change-in-production-32bytes';
