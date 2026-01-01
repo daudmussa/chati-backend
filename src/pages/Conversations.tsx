@@ -39,7 +39,11 @@ export default function Conversations() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(API_ENDPOINTS.CONVERSATIONS);
+      const response = await fetch(API_ENDPOINTS.CONVERSATIONS, {
+        headers: {
+          'x-user-id': user?.id || ''
+        }
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch conversations');
@@ -64,7 +68,7 @@ export default function Conversations() {
       }
     } catch (err) {
       console.error('Error fetching conversations:', err);
-      setError('Failed to load conversations. Make sure the server is running on port 3000.');
+      setError('Failed to load conversations. Please check your login and API URL.');
     } finally {
       setLoading(false);
     }
