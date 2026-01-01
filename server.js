@@ -19,7 +19,7 @@ const app = express();
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id');
   if (req.method === 'OPTIONS') {
     return res.sendStatus(200);
   }
@@ -1266,7 +1266,16 @@ app.put("/api/user/credentials", (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
     
+    console.log('[credentials] PUT request received:', {
+      userId,
+      hasClaudeKey: !!req.body.claudeApiKey,
+      hasTwilioSid: !!req.body.twilioAccountSid,
+      hasTwilioToken: !!req.body.twilioAuthToken,
+      twilioPhone: req.body.twilioPhoneNumber
+    });
+    
     if (!userId) {
+      console.error('[credentials] Missing userId in request');
       return res.status(401).json({ error: "User ID required" });
     }
 
@@ -1294,10 +1303,11 @@ app.put("/api/user/credentials", (req, res) => {
       mapPhoneToUser(twilioPhoneNumber, userId);
     }
 
+    console.log('[credentials] Successfully saved credentials for user:', userId);
     res.json({ success: true, message: "Credentials saved successfully" });
   } catch (error) {
-    console.error("Error saving credentials:", error);
-    res.status(500).json({ error: "Failed to save credentials" });
+    console.error("[credentials] Error saving credentials:", error);
+    res.status(500).json({ error: "Failed to save credentials", details: error.message });
   }
 });
 

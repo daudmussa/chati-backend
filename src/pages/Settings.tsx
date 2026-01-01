@@ -42,7 +42,8 @@ export default function Settings() {
 
   const fetchUserCredentials = async () => {
     try {
-      const response = await fetch(`${API_ENDPOINTS.BUSINESS_SETTINGS.replace('/business/settings', '')}/api/user/credentials`, {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_BASE}/api/user/credentials`, {
         headers: {
           'x-user-id': localStorage.getItem('userId') || ''
         }
@@ -105,7 +106,8 @@ export default function Settings() {
   const handleSaveCredentials = async () => {
     setSaving(true);
     try {
-      const response = await fetch(`${API_ENDPOINTS.BUSINESS_SETTINGS.replace('/business/settings', '')}/api/user/credentials`, {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${API_BASE}/api/user/credentials`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
