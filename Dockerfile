@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install production dependencies (ignores lock mismatches)
+RUN npm install --omit=dev
 
 # Production stage
 FROM node:18-alpine
