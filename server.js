@@ -14,6 +14,8 @@ console.log("[debug] Raw process.env check:");
 console.log("- process.env.CLAUDE_API_KEY exists?", !!process.env.CLAUDE_API_KEY);
 console.log("- process.env.TWILIO_ACCOUNT_SID exists?", !!process.env.TWILIO_ACCOUNT_SID);
 console.log("- First 20 chars of CLAUDE_API_KEY:", process.env.CLAUDE_API_KEY?.substring(0, 20));
+console.log("- process.env.DATABASE_URL exists?", !!process.env.DATABASE_URL);
+console.log("- PGHOST exists?", !!process.env.PGHOST);
 
 const app = express();
 

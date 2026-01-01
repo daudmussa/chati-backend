@@ -1,12 +1,29 @@
 import { Pool } from 'pg';
 import crypto from 'crypto';
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.warn('[postgres] DATABASE_URL not set. Postgres features will be disabled.');
+let pool = null;
+function ensurePool() {
+  if (pool) return pool;
+  const DATABASE_URL = process.env.DATABASE_URL;
+  if (!DATABASE_URL) {
+    // Try constructing from PG* envs (Railway may expose these)
+    const host = process.env.PGHOST;
+    const port = process.env.PGPORT || '5432';
+    const user = process.env.PGUSER;
+    const pass = process.env.PGPASSWORD;
+    const db   = process.env.PGDATABASE || process.env.PGDB || 'railway';
+    if (host && user && pass && db) {
+      const url = `postgres://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}:${port}/${encodeURIComponent(db)}?sslmode=require`;
+      console.log('[postgres] Constructed DATABASE_URL from PG* envs');
+      pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
+      return pool;
+    }
+    console.warn('[postgres] DATABASE_URL not set and PG* envs missing. Postgres features will be disabled.');
+    return null;
+  }
+  pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
+  return pool;
 }
-
-const pool = DATABASE_URL ? new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } }) : null;
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'chati-default-key-change-in-production-32bytes';
 const ALGORITHM = 'aes-256-cbc';
@@ -37,7 +54,8 @@ function decrypt(text) {
 }
 
 export async function initSchema() {
-  if (!pool) return;
+  const p = ensurePool();
+  if (!p) return;
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_credentials (
       user_id TEXT PRIMARY KEY,
@@ -50,13 +68,13 @@ export async function initSchema() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  await pool.query(`
+  await p.query(`
     CREATE TABLE IF NOT EXISTS phone_user_mapping (
       phone_number TEXT PRIMARY KEY,
       user_id TEXT NOT NULL
     );
   `);
-  await pool.query(`
+  await p.query(`
     CREATE TABLE IF NOT EXISTS business_settings (
       user_id TEXT PRIMARY KEY,
       business_description TEXT,
@@ -68,7 +86,7 @@ export async function initSchema() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  await pool.query(`
+  await p.query(`
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL,
@@ -77,7 +95,7 @@ export async function initSchema() {
       last_activity TIMESTAMPTZ DEFAULT NOW()
     );
   `);
-  await pool.query(`
+  await p.query(`
     CREATE TABLE IF NOT EXISTS messages (
       id TEXT PRIMARY KEY,
       conversation_id TEXT NOT NULL,
@@ -90,8 +108,9 @@ export async function initSchema() {
 }
 
 export async function saveUserCredentials(userId, credentials) {
-  if (!pool) return;
-  await pool.query(`
+  const p = ensurePool();
+  if (!p) return;
+  await p.query(`
     INSERT INTO user_credentials (
       user_id, claude_api_key, twilio_account_sid, twilio_auth_token,
       twilio_phone_number, business_context, bypass_claude, updated_at
@@ -116,8 +135,9 @@ export async function saveUserCredentials(userId, credentials) {
 }
 
 export async function getUserCredentials(userId) {
-  if (!pool) return null;
-  const { rows } = await pool.query('SELECT * FROM user_credentials WHERE user_id=$1', [userId]);
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query('SELECT * FROM user_credentials WHERE user_id=$1', [userId]);
   const r = rows[0];
   if (!r) return null;
   return {
@@ -133,8 +153,9 @@ export async function getUserCredentials(userId) {
 }
 
 export async function mapPhoneToUser(phoneNumber, userId) {
-  if (!pool) return;
-  await pool.query(`
+  const p = ensurePool();
+  if (!p) return;
+  await p.query(`
     INSERT INTO phone_user_mapping (phone_number, user_id)
     VALUES ($1,$2)
     ON CONFLICT (phone_number) DO UPDATE SET user_id = EXCLUDED.user_id;
@@ -142,9 +163,10 @@ export async function mapPhoneToUser(phoneNumber, userId) {
 }
 
 export async function getUserByPhoneNumber(phoneNumber) {
-  if (!pool) return null;
+  const p = ensurePool();
+  if (!p) return null;
   const normalized = phoneNumber.replace(/^whatsapp:/, '');
-  const { rows } = await pool.query(`
+  const { rows } = await p.query(`
     SELECT uc.* FROM user_credentials uc
     JOIN phone_user_mapping pm ON uc.user_id = pm.user_id
     WHERE pm.phone_number = $1
@@ -163,20 +185,23 @@ export async function getUserByPhoneNumber(phoneNumber) {
 }
 
 export async function deleteUserCredentials(userId) {
-  if (!pool) return;
-  await pool.query('DELETE FROM phone_user_mapping WHERE user_id=$1', [userId]);
-  await pool.query('DELETE FROM user_credentials WHERE user_id=$1', [userId]);
+  const p = ensurePool();
+  if (!p) return;
+  await p.query('DELETE FROM phone_user_mapping WHERE user_id=$1', [userId]);
+  await p.query('DELETE FROM user_credentials WHERE user_id=$1', [userId]);
 }
 
 export async function getAllUsers() {
-  if (!pool) return [];
-  const { rows } = await pool.query('SELECT user_id, twilio_phone_number, business_context, updated_at FROM user_credentials');
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query('SELECT user_id, twilio_phone_number, business_context, updated_at FROM user_credentials');
   return rows;
 }
 
 export async function getBusinessSettings(userId) {
-  if (!pool) return null;
-  const { rows } = await pool.query('SELECT * FROM business_settings WHERE user_id=$1', [userId]);
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query('SELECT * FROM business_settings WHERE user_id=$1', [userId]);
   const r = rows[0];
   if (!r) return null;
   return {
@@ -190,8 +215,9 @@ export async function getBusinessSettings(userId) {
 }
 
 export async function saveBusinessSettings(userId, settings) {
-  if (!pool) return;
-  await pool.query(`
+  const p = ensurePool();
+  if (!p) return;
+  await p.query(`
     INSERT INTO business_settings (
       user_id, business_description, tone, sample_replies, keywords, support_name, support_phone, updated_at
     ) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
@@ -215,9 +241,10 @@ export async function saveBusinessSettings(userId, settings) {
 }
 
 export async function upsertConversation(userId, storeNumber, customerNumber) {
-  if (!pool) return null;
+  const p = ensurePool();
+  if (!p) return null;
   const id = `${customerNumber}-${storeNumber}`;
-  await pool.query(`
+  await p.query(`
     INSERT INTO conversations (id, user_id, customer_number, store_number, last_activity)
     VALUES ($1,$2,$3,$4,NOW())
     ON CONFLICT (id) DO UPDATE SET last_activity = NOW();
@@ -226,17 +253,19 @@ export async function upsertConversation(userId, storeNumber, customerNumber) {
 }
 
 export async function addMessage(conversationId, sender, text) {
-  if (!pool) return;
+  const p = ensurePool();
+  if (!p) return;
   const id = crypto.randomBytes(12).toString('hex');
-  await pool.query(`
+  await p.query(`
     INSERT INTO messages (id, conversation_id, sender, text, ts)
     VALUES ($1,$2,$3,$4,NOW());
   `, [id, conversationId, sender, text]);
 }
 
 export async function listConversations(userId) {
-  if (!pool) return [];
-  const { rows } = await pool.query(`
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(`
     SELECT c.id, c.customer_number, c.store_number, c.last_activity,
       (SELECT text FROM messages m WHERE m.conversation_id=c.id ORDER BY ts DESC LIMIT 1) AS last_text,
       (SELECT ts FROM messages m WHERE m.conversation_id=c.id ORDER BY ts DESC LIMIT 1) AS last_ts
@@ -248,7 +277,7 @@ export async function listConversations(userId) {
   const conversations = [];
   for (const r of rows) {
     const lastDigits = (r.customer_number || '').replace(/\D/g,'').slice(-4);
-    const { rows: msgRows } = await pool.query(`SELECT id, sender, text, ts FROM messages WHERE conversation_id=$1 ORDER BY ts ASC`, [r.id]);
+    const { rows: msgRows } = await p.query(`SELECT id, sender, text, ts FROM messages WHERE conversation_id=$1 ORDER BY ts ASC`, [r.id]);
     conversations.push({
       id: `whatsapp:${r.customer_number}`,
       customerNumber: r.customer_number,
