@@ -1400,10 +1400,11 @@ app.post("/send-sms", (req, res) => {
 // Version check endpoint
 app.get("/api/version", (req, res) => {
   res.json({ 
-    version: "1.1.0-json-db",
+    version: "1.2.0-json-db-fixed",
     database: "JSON",
     timestamp: new Date().toISOString(),
-    corsHeaders: "x-user-id enabled"
+    corsHeaders: "x-user-id enabled",
+    buildTime: "2026-01-01T15:45:00Z"
   });
 });
 
