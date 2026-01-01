@@ -3,11 +3,13 @@ import bodyParser from "body-parser";
 import axios from "axios";
 import dotenv from "dotenv";
 import Twilio from "twilio";
-import { saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers } from "./db-credentials.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
 console.log("[startup] Env loaded, initializing app...");
+// Initialize Postgres schema (if DATABASE_URL is set)
+await initSchema();
 console.log("[debug] Raw process.env check:");
 console.log("- process.env.CLAUDE_API_KEY exists?", !!process.env.CLAUDE_API_KEY);
 console.log("- process.env.TWILIO_ACCOUNT_SID exists?", !!process.env.TWILIO_ACCOUNT_SID);
@@ -99,7 +101,9 @@ app.post("/webhook", async (req, res) => {
   setTimeout(async () => {
     try {
       // Get user credentials based on store phone number (Twilio 'To')
-      const userCreds = getUserByPhoneNumber(to);
+      const userCreds = await getUserByPhoneNumber(to);
+      // Load per-user business settings from Postgres (fallback to global defaults)
+      const bizSettings = (userCreds?.userId ? await pgGetBusinessSettings(userCreds.userId) : null) || businessSettings;
       
       // Fall back to environment variables if no user-specific credentials
       const USER_CLAUDE_API_KEY = userCreds?.claudeApiKey || CLAUDE_API_KEY;
@@ -137,6 +141,15 @@ app.post("/webhook", async (req, res) => {
         role: "user",
         content: incomingMsg,
       });
+      // Persist conversation and message in Postgres if user is identified
+      if (userCreds?.userId) {
+        try {
+          const convId = await upsertConversation(userCreds.userId, to, from);
+          await addMessage(convId, 'user', incomingMsg);
+        } catch (e) {
+          console.warn('[webhook] Failed to persist user message:', e.message);
+        }
+      }
       
       // Keep only last 10 messages (5 exchanges) to avoid token limits
       if (conversation.messages.length > 10) {
@@ -724,19 +737,19 @@ app.post("/webhook", async (req, res) => {
       } else {
         // Check for redirection keywords BEFORE processing with AI
         const lowerMsg = incomingMsg.toLowerCase();
-        const hasRedirectionKeyword = businessSettings.keywords.some(keyword => 
+        const hasRedirectionKeyword = bizSettings.keywords.some(keyword => 
           lowerMsg.includes(keyword.toLowerCase())
         );
 
-        if (hasRedirectionKeyword && businessSettings.supportPhone) {
+        if (hasRedirectionKeyword && bizSettings.supportPhone) {
           // User mentioned a redirection keyword and we have support contact
           const conversation = conversationHistory.get(from) || {};
           const lang = conversation.language || 'en';
           
           if (lang === 'sw') {
-            messageToSend = `Naelewa unahitaji msaada maalum. Tafadhali wasiliana na ${businessSettings.supportName} kwenye WhatsApp: ${businessSettings.supportPhone}`;
+            messageToSend = `Naelewa unahitaji msaada maalum. Tafadhali wasiliana na ${bizSettings.supportName} kwenye WhatsApp: ${bizSettings.supportPhone}`;
           } else {
-            messageToSend = `I understand you need specialized assistance. Please contact ${businessSettings.supportName} on WhatsApp: ${businessSettings.supportPhone}`;
+            messageToSend = `I understand you need specialized assistance. Please contact ${bizSettings.supportName} on WhatsApp: ${bizSettings.supportPhone}`;
           }
         } else if (USER_BYPASS_CLAUDE) {
           console.log("BYPASS_CLAUDE enabled — sending canned reply");
@@ -754,7 +767,7 @@ app.post("/webhook", async (req, res) => {
           let systemPrompt = "You are a helpful customer service representative. Respond in the same language the customer uses. Give concise answers using complete sentences only. Limit replies to 1-3 full sentences unless the user explicitly asks for more detail.";
           
           // Use business settings for context
-          if (businessSettings.businessDescription) {
+          if (bizSettings.businessDescription) {
             const toneMap = {
               'professional': 'professional and formal',
               'friendly': 'friendly and casual',
@@ -762,9 +775,9 @@ app.post("/webhook", async (req, res) => {
               'helpful': 'helpful and supportive',
               'concise': 'concise and direct'
             };
-            const toneDescription = toneMap[businessSettings.tone] || 'friendly';
+            const toneDescription = toneMap[bizSettings.tone] || 'friendly';
             
-            systemPrompt = `You are a ${toneDescription} customer service representative for this business:\n\n${businessSettings.businessDescription}\n\nRespond helpfully to customer inquiries about the business. Respond in the same language the customer uses (English or Swahili). Give concise answers using complete sentences only. Limit replies to 1-3 full sentences unless the user explicitly asks for more detail. IMPORTANT: Do NOT repeat or summarize the business description above in your reply; use it only to inform your answer.`;
+            systemPrompt = `You are a ${toneDescription} customer service representative for this business:\n\n${bizSettings.businessDescription}\n\nRespond helpfully to customer inquiries about the business. Respond in the same language the customer uses (English or Swahili). Give concise answers using complete sentences only. Limit replies to 1-3 full sentences unless the user explicitly asks for more detail. IMPORTANT: Do NOT repeat or summarize the business description above in your reply; use it only to inform your answer.`;
           }
           
           // Add booking information if enabled
@@ -808,6 +821,14 @@ app.post("/webhook", async (req, res) => {
           role: "assistant",
           content: messageToSend,
         });
+        if (userCreds?.userId) {
+          try {
+            const convId = await upsertConversation(userCreds.userId, to, from);
+            await addMessage(convId, 'assistant', messageToSend);
+          } catch (e) {
+            console.warn('[webhook] Failed to persist assistant message:', e.message);
+          }
+        }
       }
 
       // Send the message via Twilio
@@ -835,70 +856,13 @@ app.post("/webhook", async (req, res) => {
     }
   }, 33000);
 });// Endpoint to get all conversations
-app.get("/api/conversations", (req, res) => {
+app.get("/api/conversations", async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
     if (!userId) {
       return res.status(401).json({ error: 'User ID required' });
     }
-
-    const conversations = [];
-    
-    for (const [phoneNumber, data] of conversationHistory.entries()) {
-      // Only include conversations associated with this user
-      if (!data.userId || data.userId !== userId) continue;
-      if (data.messages.length === 0) continue;
-      
-      // Get customer name from conversation data or use phone number fallback
-      const lastDigits = phoneNumber.replace(/\D/g, '').slice(-4);
-      const customerName = data.customerName || `Customer ${lastDigits}`;
-      
-      // Format messages
-      const messages = data.messages.map((msg, index) => ({
-        id: `${phoneNumber}-${index}`,
-        text: msg.content,
-        sender: msg.role === 'user' ? 'customer' : 'ai',
-        timestamp: new Date(data.lastActivity).toLocaleTimeString('en-US', { 
-          hour: 'numeric', 
-          minute: '2-digit',
-          hour12: true 
-        }),
-      }));
-      
-      // Get last message
-      const lastMessage = data.messages[data.messages.length - 1];
-      
-      // Calculate time ago
-      const timeDiff = Date.now() - data.lastActivity;
-      let timeAgo = '';
-      if (timeDiff < 60000) {
-        timeAgo = 'Just now';
-      } else if (timeDiff < 3600000) {
-        timeAgo = `${Math.floor(timeDiff / 60000)} min ago`;
-      } else if (timeDiff < 86400000) {
-        timeAgo = `${Math.floor(timeDiff / 3600000)} hour${Math.floor(timeDiff / 3600000) > 1 ? 's' : ''} ago`;
-      } else {
-        timeAgo = `${Math.floor(timeDiff / 86400000)} day${Math.floor(timeDiff / 86400000) > 1 ? 's' : ''} ago`;
-      }
-      
-      conversations.push({
-        id: phoneNumber,
-        customerNumber: phoneNumber.replace('whatsapp:', ''),
-        customerName: customerName,
-        lastMessage: lastMessage.content.substring(0, 50) + (lastMessage.content.length > 50 ? '...' : ''),
-        timestamp: timeAgo,
-        unread: 0, // We don't track unread for now
-        messages: messages,
-      });
-    }
-    
-    // Sort by last activity (most recent first)
-    conversations.sort((a, b) => {
-      const timeA = conversationHistory.get(a.id).lastActivity;
-      const timeB = conversationHistory.get(b.id).lastActivity;
-      return timeB - timeA;
-    });
-    
+    const conversations = await listConversations(userId);
     res.json(conversations);
   } catch (err) {
     console.error("Error fetching conversations:", err);
@@ -1070,38 +1034,44 @@ app.get("/api/store/by-name/:storeName", (req, res) => {
   res.status(404).json({ error: 'Store not found' });
 });
 
-// Business settings API
-// Per-user business settings (in-memory for now)
-const businessSettingsByUser = new Map();
-
-app.get("/api/business/settings", (req, res) => {
+// Business settings API (Postgres-backed)
+app.get("/api/business/settings", async (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) {
     return res.status(401).json({ error: 'User ID required' });
   }
-  const settings = businessSettingsByUser.get(userId) || businessSettings;
-  res.json(settings);
+  try {
+    const settings = (await pgGetBusinessSettings(userId)) || businessSettings;
+    res.json(settings);
+  } catch (e) {
+    console.error('[business] get error:', e);
+    res.status(500).json({ error: 'Failed to fetch business settings' });
+  }
 });
 
-app.put("/api/business/settings", (req, res) => {
+app.put("/api/business/settings", async (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) {
     return res.status(401).json({ error: 'User ID required' });
   }
-
-  const existing = businessSettingsByUser.get(userId) || { ...businessSettings };
-  const { businessDescription, tone, sampleReplies, keywords, supportName, supportPhone } = req.body;
-  
-  if (businessDescription !== undefined) existing.businessDescription = businessDescription;
-  if (tone !== undefined) existing.tone = tone;
-  if (sampleReplies !== undefined) existing.sampleReplies = sampleReplies;
-  if (keywords !== undefined) existing.keywords = keywords;
-  if (supportName !== undefined) existing.supportName = supportName;
-  if (supportPhone !== undefined) existing.supportPhone = supportPhone;
-  
-  businessSettingsByUser.set(userId, existing);
-  console.log('Business settings updated for', userId, existing);
-  res.json(existing);
+  try {
+    const { businessDescription, tone, sampleReplies, keywords, supportName, supportPhone } = req.body;
+    const settings = {
+      businessDescription,
+      tone,
+      sampleReplies,
+      keywords,
+      supportName,
+      supportPhone,
+    };
+    await pgSaveBusinessSettings(userId, settings);
+    const saved = (await pgGetBusinessSettings(userId)) || businessSettings;
+    console.log('Business settings updated for', userId, saved);
+    res.json(saved);
+  } catch (e) {
+    console.error('[business] save error:', e);
+    res.status(500).json({ error: 'Failed to save business settings' });
+  }
 });
 
 // Orders API
@@ -1270,7 +1240,7 @@ app.put("/api/admin/users/:userId/limits", (req, res) => {
 // ========================================
 
 // Save/Update user credentials
-app.put("/api/user/credentials", (req, res) => {
+app.put("/api/user/credentials", async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
     
@@ -1297,7 +1267,7 @@ app.put("/api/user/credentials", (req, res) => {
     } = req.body;
 
     // Save credentials to database
-    saveUserCredentials(userId, {
+    await saveUserCredentials(userId, {
       claudeApiKey,
       twilioAccountSid,
       twilioAuthToken,
@@ -1308,7 +1278,7 @@ app.put("/api/user/credentials", (req, res) => {
 
     // Map phone number to user if provided
     if (twilioPhoneNumber) {
-      mapPhoneToUser(twilioPhoneNumber, userId);
+      await mapPhoneToUser(twilioPhoneNumber, userId);
     }
 
     console.log('[credentials] Successfully saved credentials for user:', userId);
@@ -1320,7 +1290,7 @@ app.put("/api/user/credentials", (req, res) => {
 });
 
 // Get user credentials
-app.get("/api/user/credentials", (req, res) => {
+app.get("/api/user/credentials", async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
     
@@ -1328,7 +1298,7 @@ app.get("/api/user/credentials", (req, res) => {
       return res.status(401).json({ error: "User ID required" });
     }
 
-    const credentials = getUserCredentials(userId);
+    const credentials = await getUserCredentials(userId);
     
     if (!credentials) {
       return res.json({ 
@@ -1355,7 +1325,7 @@ app.get("/api/user/credentials", (req, res) => {
 });
 
 // Delete user credentials
-app.delete("/api/user/credentials", (req, res) => {
+app.delete("/api/user/credentials", async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
     
@@ -1363,7 +1333,7 @@ app.delete("/api/user/credentials", (req, res) => {
       return res.status(401).json({ error: "User ID required" });
     }
 
-    deleteUserCredentials(userId);
+    await deleteUserCredentials(userId);
     res.json({ success: true, message: "Credentials deleted successfully" });
   } catch (error) {
     console.error("Error deleting credentials:", error);
@@ -1372,7 +1342,7 @@ app.delete("/api/user/credentials", (req, res) => {
 });
 
 // Admin: Get all users with credentials
-app.get("/api/admin/users/credentials", (req, res) => {
+app.get("/api/admin/users/credentials", async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
     const userRole = req.headers['x-user-role'];
@@ -1381,7 +1351,7 @@ app.get("/api/admin/users/credentials", (req, res) => {
       return res.status(403).json({ error: "Admin access required" });
     }
 
-    const users = getAllUsers();
+    const users = await getAllUsers();
     res.json(users);
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -1415,8 +1385,8 @@ app.post("/send-sms", (req, res) => {
 // Version check endpoint
 app.get("/api/version", (req, res) => {
   res.json({ 
-    version: "1.2.0-json-db-fixed",
-    database: "JSON",
+    version: "1.3.0-postgres",
+    database: process.env.DATABASE_URL ? "Postgres" : "JSON",
     timestamp: new Date().toISOString(),
     corsHeaders: "x-user-id enabled",
     buildTime: "2026-01-01T15:45:00Z"
