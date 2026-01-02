@@ -310,8 +310,13 @@ export default function Admin() {
       let compareValue = 0;
       
       if (sortBy === 'payDate') {
-        const dateA = a.payDate ? new Date(a.payDate).getTime() : 0;
-        const dateB = b.payDate ? new Date(b.payDate).getTime() : 0;
+        // Handle null dates - put them at the end regardless of sort order
+        if (!a.payDate && !b.payDate) return 0;
+        if (!a.payDate) return 1; // a goes to end
+        if (!b.payDate) return -1; // b goes to end
+        
+        const dateA = new Date(a.payDate).getTime();
+        const dateB = new Date(b.payDate).getTime();
         compareValue = dateA - dateB;
       } else if (sortBy === 'name') {
         compareValue = a.storeName.localeCompare(b.storeName);
