@@ -371,6 +371,13 @@ export default function CustomerStore() {
   };
 
   const addToCart = (product: Product) => {
+    // Save store info for order creation
+    localStorage.setItem('storeUserId', storeSettings.userId || '');
+    localStorage.setItem('storeInfo', JSON.stringify({
+      storeName: storeSettings.storeName,
+      storeId: storeSettings.storeId
+    }));
+    
     const existingItem = cart.find(item => item.id === product.id);
     if (existingItem) {
       updateCart(cart.map(item =>

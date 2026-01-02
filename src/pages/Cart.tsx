@@ -169,6 +169,13 @@ export default function Cart() {
 
     // Save order to backend
     try {
+      const storeUserId = localStorage.getItem('storeUserId');
+      
+      if (!storeUserId) {
+        console.warn('No store user ID found, order will not be saved');
+        throw new Error('Store user ID not found');
+      }
+      
       const orderData = {
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
@@ -183,13 +190,18 @@ export default function Cart() {
 
       const response = await fetch(API_ENDPOINTS.ORDERS, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': storeUserId
+        },
         body: JSON.stringify(orderData),
       });
 
       if (!response.ok) {
         throw new Error('Failed to save order');
       }
+      
+      console.log('Order saved successfully to database');
     } catch (error) {
       console.error('Failed to save order:', error);
       // Continue with WhatsApp even if saving fails
