@@ -1067,11 +1067,13 @@ app.get("/api/business/settings", async (req, res) => {
 
 app.put("/api/business/settings", async (req, res) => {
   const userId = req.headers['x-user-id'];
+  console.log('[business] PUT request, userId:', userId);
   if (!userId) {
     return res.status(401).json({ error: 'User ID required' });
   }
   try {
     const { businessDescription, tone, sampleReplies, keywords, supportName, supportPhone } = req.body;
+    console.log('[business] Request body:', { businessDescription, tone, sampleReplies, keywords, supportName, supportPhone });
     const settings = {
       businessDescription,
       tone,
@@ -1082,11 +1084,12 @@ app.put("/api/business/settings", async (req, res) => {
     };
     await pgSaveBusinessSettings(userId, settings);
     const saved = (await pgGetBusinessSettings(userId)) || businessSettings;
-    console.log('Business settings updated for', userId, saved);
+    console.log('[business] Settings updated for', userId, saved);
     res.json(saved);
   } catch (e) {
     console.error('[business] save error:', e);
-    res.status(500).json({ error: 'Failed to save business settings' });
+    console.error('[business] error stack:', e.stack);
+    res.status(500).json({ error: 'Failed to save business settings', details: e.message });
   }
 });
 
