@@ -474,8 +474,14 @@ export async function getStoreSettings(userId) {
       storePhone: rows[0].store_phone || '',
     };
   }
-  // Generate default store ID if doesn't exist
+  
+  // Create initial store settings with generated ID if doesn't exist
   const storeId = crypto.randomBytes(8).toString('hex');
+  await p.query(`
+    INSERT INTO store_settings (user_id, store_id, store_name, store_phone, created_at, updated_at)
+    VALUES ($1, $2, '', '', NOW(), NOW())
+  `, [userId, storeId]);
+  
   return { storeId, storeName: '', storePhone: '' };
 }
 

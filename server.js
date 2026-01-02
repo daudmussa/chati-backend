@@ -1364,6 +1364,13 @@ app.get("/api/admin/users", async (req, res) => {
       // Get business settings
       const settings = await pgGetBusinessSettings(dbUser.id);
       
+      // Get store settings for store ID
+      const storeSettings = await pgGetStoreSettings(dbUser.id);
+      
+      // Get orders and bookings count
+      const orders = await listOrders(dbUser.id);
+      const bookings = await listBookings(dbUser.id);
+      
       allUsers.push({
         userId: dbUser.id,
         email: dbUser.email,
@@ -1371,10 +1378,10 @@ app.get("/api/admin/users", async (req, res) => {
         role: dbUser.role,
         storeName: settings?.businessName || settings?.businessDescription || 'No business name',
         storePhone: credentials?.twilioPhoneNumber || 'No phone',
-        storeId: dbUser.id.slice(0, 8),
-        ordersCount: 0, // TODO: Add orders table
-        bookingsCount: 0, // TODO: Add bookings table
-        totalRevenue: 0,
+        storeId: storeSettings?.storeId || dbUser.id.slice(0, 8),
+        ordersCount: orders.length,
+        bookingsCount: bookings.length,
+        totalRevenue: orders.reduce((sum, order) => sum + order.totalAmount, 0),
         isCurrent: dbUser.id === requestingUserId,
         enabledFeatures: dbUser.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
         limits: {
@@ -1383,7 +1390,7 @@ app.get("/api/admin/users", async (req, res) => {
         },
         currentCounts: {
           conversations: conversations.length,
-          products: 0, // TODO: Add products table
+          products: 0, // TODO: Count products
         },
       });
     }
