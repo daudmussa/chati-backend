@@ -63,9 +63,18 @@ export default function Admin() {
   }, [user]);
 
   const fetchUsers = async () => {
-    if (!user?.id || user.role !== 'admin') return;
+    if (!user?.id) {
+      console.log('[Admin] No user ID');
+      return;
+    }
+    
+    if (user.role !== 'admin') {
+      console.log('[Admin] User is not admin, role:', user.role);
+      return;
+    }
 
     try {
+      console.log('[Admin] Fetching users with:', { userId: user.id, role: user.role });
       const response = await fetch(API_ENDPOINTS.ADMIN_USERS, {
         headers: {
           'x-user-id': user.id,
@@ -73,11 +82,16 @@ export default function Admin() {
         },
       });
 
+      console.log('[Admin] Response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('[Admin] Users data:', data);
         setUsers(data);
       } else {
-        throw new Error('Failed to fetch users');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('[Admin] Error response:', errorData);
+        throw new Error(errorData.error || 'Failed to fetch users');
       }
     } catch (error) {
       console.error('Failed to fetch users:', error);
