@@ -121,6 +121,21 @@ app.post("/webhook", async (req, res) => {
       // Load per-user business settings from Postgres (fallback to global defaults)
       const bizSettings = (userCreds?.userId ? await pgGetBusinessSettings(userCreds.userId) : null) || businessSettings;
       
+      // Load user-specific booking settings and services
+      let userBookingsEnabled = false;
+      let userServices = [];
+      let userBookings = [];
+      if (userCreds?.userId) {
+        try {
+          const bookingSettings = await getBookingSettings(userCreds.userId);
+          userBookingsEnabled = bookingSettings.enabled || false;
+          userServices = await listServices(userCreds.userId);
+          userBookings = await listBookings(userCreds.userId);
+        } catch (e) {
+          console.warn('[webhook] Failed to load booking settings:', e.message);
+        }
+      }
+      
       // Fall back to environment variables if no user-specific credentials
       const USER_CLAUDE_API_KEY = userCreds?.claudeApiKey || CLAUDE_API_KEY;
       const USER_TWILIO_ACCOUNT_SID = userCreds?.twilioAccountSid || TWILIO_ACCOUNT_SID;
@@ -191,10 +206,10 @@ app.post("/webhook", async (req, res) => {
 
       if (isChangeRequest && conversation.lastBookingId) {
         // Handle booking change request
-        const existingBooking = bookings.find(b => b.id === conversation.lastBookingId);
+        const existingBooking = userBookings.find(b => b.id === conversation.lastBookingId);
         
         if (existingBooking && existingBooking.status === 'pending') {
-          const service = services.find(s => s.id === existingBooking.serviceId);
+          const service = userServices.find(s => s.id === existingBooking.serviceId);
           
           if (service) {
             // Detect language from conversation
@@ -267,12 +282,12 @@ app.post("/webhook", async (req, res) => {
           conversation.language = isSwahili ? 'sw' : 'en';
           
           // Initial inquiry - check if bookings are available
-          if (bookingsEnabled && services.length > 0) {
+          if (userBookingsEnabled && userServices.length > 0) {
             let servicesText = isSwahili 
               ? "Ndiyo, unaweza kufanya booking! 📅\n\nHizi ndizo huduma zetu:\n\n"
               : "Yes, booking is available! 📅\n\nHere are our services:\n\n";
             
-            services.forEach((service, index) => {
+            userServices.forEach((service, index) => {
               servicesText += `${index + 1}. *${service.name}*\n`;
               servicesText += `   💰 TZS ${service.price.toLocaleString()}\n`;
               servicesText += `   ⏱️ ${isSwahili ? 'Dakika' : 'minutes'} ${service.duration}\n`;
@@ -294,11 +309,11 @@ app.post("/webhook", async (req, res) => {
             messageToSend = servicesText;
           } else {
             if (isSwahili) {
-              messageToSend = bookingsEnabled 
+              messageToSend = userBookingsEnabled 
                 ? "Samahani, hakuna huduma za booking kwa sasa. Tafadhali rudi baadaye." 
                 : "Samahani, booking haipatikani kwa sasa. Tafadhali wasiliana nasi moja kwa moja.";
             } else {
-              messageToSend = bookingsEnabled 
+              messageToSend = userBookingsEnabled 
                 ? "Sorry, we don't have any services available for booking at the moment. Please check back later." 
                 : "Sorry, booking is currently not available. Please contact us directly for assistance.";
             }
@@ -307,8 +322,8 @@ app.post("/webhook", async (req, res) => {
           // User is selecting a service
           const serviceNum = parseInt(incomingMsg.trim());
           
-          if (serviceNum > 0 && serviceNum <= services.length) {
-            const selectedService = services[serviceNum - 1];
+          if (serviceNum > 0 && serviceNum <= userServices.length) {
+            const selectedService = userServices[serviceNum - 1];
             
             // Check if service has available dates
             if (!selectedService.availableDates || selectedService.availableDates.length === 0) {
@@ -399,10 +414,10 @@ app.post("/webhook", async (req, res) => {
                 : `Thank you ${customerName}! Now please tell me your new date and time.\n\nFor example: "January 5 at 2:00 PM"`;
             } else {
               // Name only edit - update booking immediately
-              const bookingIndex = bookings.findIndex(b => b.id === userState.editingBookingId);
+              const bookingIndex = userBookings.findIndex(b => b.id === userState.editingBookingId);
               
               if (bookingIndex >= 0) {
-                const oldBooking = bookings[bookingIndex];
+                const oldBooking = userBookings[bookingIndex];
                 bookings[bookingIndex] = {
                   ...oldBooking,
                   customerName: customerName,
@@ -549,7 +564,7 @@ app.post("/webhook", async (req, res) => {
               return `${i + 1}. ${date.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}`;
             }).join('\n');
             
-            const selectedService = services.find(s => s.id === userState.serviceId);
+            const selectedService = userServices.find(s => s.id === userState.serviceId);
             const timesList = selectedService && selectedService.timeSlots && selectedService.timeSlots.length > 0
               ? selectedService.timeSlots.slice(0, 8).join(', ') + (selectedService.timeSlots.length > 8 ? '...' : '')
               : '';
@@ -573,7 +588,7 @@ app.post("/webhook", async (req, res) => {
             }
           } else if (!foundTimeMatch) {
             const lang = userState.language || 'en';
-            const selectedService = services.find(s => s.id === userState.serviceId);
+            const selectedService = userServices.find(s => s.id === userState.serviceId);
             const timesList = selectedService && selectedService.timeSlots && selectedService.timeSlots.length > 0
               ? selectedService.timeSlots.slice(0, 12).join(', ')
               : '9:00 AM, 10:00 AM, 11:00 AM, 12:00 PM, 1:00 PM, 2:00 PM, 3:00 PM, 4:00 PM, 5:00 PM';
@@ -587,7 +602,7 @@ app.post("/webhook", async (req, res) => {
             }
           } else if (selectedDate && selectedTime) {
             // Get the selected service to validate time slots
-            const selectedService = services.find(s => s.id === userState.serviceId);
+            const selectedService = userServices.find(s => s.id === userState.serviceId);
             
             // Validate time slot availability
             if (selectedService && selectedService.timeSlots && selectedService.timeSlots.length > 0) {
@@ -616,10 +631,10 @@ app.post("/webhook", async (req, res) => {
               // Check if this is an edit or new booking
               if (userState.editingBookingId) {
                 // Update existing booking (date/time and potentially name)
-                const bookingIndex = bookings.findIndex(b => b.id === userState.editingBookingId);
+                const bookingIndex = userBookings.findIndex(b => b.id === userState.editingBookingId);
                 
                 if (bookingIndex >= 0) {
-                  const oldBooking = bookings[bookingIndex];
+                  const oldBooking = userBookings[bookingIndex];
                   bookings[bookingIndex] = {
                     ...oldBooking,
                     dateBooked: selectedDate,
@@ -692,8 +707,7 @@ app.post("/webhook", async (req, res) => {
                 
                 const customerName = userState.customerName;
                 
-                const booking = {
-                  id: Math.random().toString(36).substr(2, 9),
+                const bookingData = {
                   customerName: customerName,
                   customerPhone: from.replace('whatsapp:', ''),
                   serviceId: userState.serviceId,
@@ -703,11 +717,32 @@ app.post("/webhook", async (req, res) => {
                   price: userState.price,
                   status: 'pending',
                   notes: 'Booked via WhatsApp',
-                  createdAt: new Date().toISOString(),
                 };
                 
-                bookings.push(booking);
-                console.log('✅ Booking created:', booking);
+                // Save booking to database
+                let booking;
+                if (userCreds?.userId) {
+                  try {
+                    booking = await createBooking(userCreds.userId, bookingData);
+                    console.log('✅ Booking created in database:', booking.id);
+                  } catch (e) {
+                    console.error('[webhook] Failed to create booking:', e);
+                    messageToSend = lang === 'sw' 
+                      ? "Samahani, kuna tatizo katika kuhifadhi nafasi yako. Tafadhali jaribu tena."
+                      : "Sorry, there was an error saving your booking. Please try again.";
+                    delete conversation.bookingState;
+                    return;
+                  }
+                } else {
+                  // Fallback: create in-memory booking if no user
+                  booking = {
+                    id: Math.random().toString(36).substr(2, 9),
+                    ...bookingData,
+                    createdAt: new Date().toISOString(),
+                  };
+                  bookings.push(booking);
+                  console.log('✅ Booking created (in-memory):', booking);
+                }
                 
                 // Store booking ID in conversation for potential edits
                 conversation.lastBookingId = booking.id;
@@ -797,7 +832,7 @@ app.post("/webhook", async (req, res) => {
           }
           
           // Add booking information if enabled
-          if (bookingsEnabled && services.length > 0) {
+          if (userBookingsEnabled && userServices.length > 0) {
             systemPrompt += `\n\nIMPORTANT: This business has a booking system enabled. If a customer asks about bookings, appointments, reservations, or scheduling, inform them they can book by saying "I want to book" or "I'd like to make a reservation".`;
           }
 
