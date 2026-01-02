@@ -759,6 +759,44 @@ export async function createBooking(userId, booking) {
   return { ...booking, id, createdAt: new Date().toISOString() };
 }
 
+export async function updateBooking(userId, bookingId, updates) {
+  const p = ensurePool();
+  if (!p) return false;
+  
+  const fields = [];
+  const values = [];
+  let paramCount = 1;
+  
+  if (updates.customerName !== undefined) {
+    fields.push(`customer_name = $${paramCount++}`);
+    values.push(updates.customerName);
+  }
+  if (updates.dateBooked !== undefined) {
+    fields.push(`date_booked = $${paramCount++}`);
+    values.push(updates.dateBooked);
+  }
+  if (updates.timeSlot !== undefined) {
+    fields.push(`time_slot = $${paramCount++}`);
+    values.push(updates.timeSlot);
+  }
+  if (updates.notes !== undefined) {
+    fields.push(`notes = $${paramCount++}`);
+    values.push(updates.notes);
+  }
+  
+  if (fields.length === 0) return false;
+  
+  fields.push(`updated_at = NOW()`);
+  values.push(bookingId, userId);
+  
+  await p.query(
+    `UPDATE bookings SET ${fields.join(', ')} WHERE id = $${paramCount++} AND user_id = $${paramCount++}`,
+    values
+  );
+  
+  return true;
+}
+
 export async function updateBookingStatus(userId, bookingId, status) {
   const p = ensurePool();
   if (!p) return false;

@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import Twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBookingStatus } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -416,15 +416,20 @@ app.post("/webhook", async (req, res) => {
               // Name only edit - update booking immediately
               const bookingIndex = userBookings.findIndex(b => b.id === userState.editingBookingId);
               
-              if (bookingIndex >= 0) {
+              if (bookingIndex >= 0 && userCreds?.userId) {
                 const oldBooking = userBookings[bookingIndex];
-                bookings[bookingIndex] = {
-                  ...oldBooking,
-                  customerName: customerName,
-                  notes: oldBooking.notes + ' | Name updated via WhatsApp',
-                };
                 
-                console.log('✅ Booking name updated:', bookings[bookingIndex]);
+                // Update in database
+                try {
+                  await updateBooking(userCreds.userId, userState.editingBookingId, {
+                    customerName: customerName,
+                    notes: (oldBooking.notes || '') + ' | Name updated via WhatsApp'
+                  });
+                  
+                  console.log('✅ Booking name updated in database:', userState.editingBookingId);
+                } catch (e) {
+                  console.error('[webhook] Failed to update booking name:', e);
+                }
                 
                 // Update conversation customer name too
                 conversation.customerName = customerName;
@@ -633,18 +638,22 @@ app.post("/webhook", async (req, res) => {
                 // Update existing booking (date/time and potentially name)
                 const bookingIndex = userBookings.findIndex(b => b.id === userState.editingBookingId);
                 
-                if (bookingIndex >= 0) {
+                if (bookingIndex >= 0 && userCreds?.userId) {
                   const oldBooking = userBookings[bookingIndex];
-                  bookings[bookingIndex] = {
-                    ...oldBooking,
-                    dateBooked: selectedDate,
-                    timeSlot: selectedTime,
-                    // Update name if it was changed during edit flow
-                    customerName: userState.customerName || oldBooking.customerName,
-                    notes: oldBooking.notes + ' | Updated via WhatsApp',
-                  };
                   
-                  console.log('✅ Booking updated:', bookings[bookingIndex]);
+                  // Update in database
+                  try {
+                    await updateBooking(userCreds.userId, userState.editingBookingId, {
+                      dateBooked: selectedDate,
+                      timeSlot: selectedTime,
+                      customerName: userState.customerName || oldBooking.customerName,
+                      notes: (oldBooking.notes || '') + ' | Updated via WhatsApp'
+                    });
+                    
+                    console.log('✅ Booking updated in database:', userState.editingBookingId);
+                  } catch (e) {
+                    console.error('[webhook] Failed to update booking:', e);
+                  }
                   
                   // Update conversation customer name if changed
                   if (userState.customerName) {
@@ -660,10 +669,12 @@ app.post("/webhook", async (req, res) => {
                   
                   const lang = userState.language || 'en';
                   
+                  const updatedCustomerName = userState.customerName || oldBooking.customerName;
+                  
                   if (lang === 'sw') {
                     messageToSend = `✅ *Nafasi Imebadilishwa!*\n\n` +
                       `🆔 Nambari ya Uhakikisho: ${oldBooking.id}\n` +
-                      `👤 Jina: ${bookings[bookingIndex].customerName}\n` +
+                      `👤 Jina: ${updatedCustomerName}\n` +
                       `📋 Huduma: ${oldBooking.serviceName}\n` +
                       `📅 Tarehe Mpya: ${dateFormatted}\n` +
                       `⏰ Saa Mpya: ${selectedTime}\n` +
@@ -672,7 +683,7 @@ app.post("/webhook", async (req, res) => {
                   } else {
                     messageToSend = `✅ *Booking Updated!*\n\n` +
                       `🆔 Booking ID: ${oldBooking.id}\n` +
-                      `👤 Name: ${bookings[bookingIndex].customerName}\n` +
+                      `👤 Name: ${updatedCustomerName}\n` +
                       `📋 Service: ${oldBooking.serviceName}\n` +
                       `📅 New Date: ${dateFormatted}\n` +
                       `⏰ New Time: ${selectedTime}\n` +
