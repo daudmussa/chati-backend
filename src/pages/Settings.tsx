@@ -13,7 +13,7 @@ import { API_ENDPOINTS } from '@/config/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function Settings() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -38,9 +38,11 @@ export default function Settings() {
 
   // Fetch business settings on mount
   useEffect(() => {
-    fetchBusinessSettings();
-    fetchUserCredentials();
-  }, []);
+    if (user?.id) {
+      fetchBusinessSettings();
+      fetchUserCredentials();
+    }
+  }, [user?.id]);
 
   const fetchUserCredentials = async () => {
     try {
@@ -109,13 +111,22 @@ export default function Settings() {
   };
 
   const handleSaveCredentials = async () => {
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       const response = await fetch(API_ENDPOINTS.USER_CREDENTIALS, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': user?.id || ''
+          'x-user-id': user.id
         },
         body: JSON.stringify({
           claudeApiKey,
@@ -138,13 +149,14 @@ export default function Settings() {
         setTwilioAccountSid('');
         setTwilioAuthToken('');
       } else {
-        throw new Error('Failed to save credentials');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to save credentials');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to save credentials:', error);
       toast({
         title: "Error",
-        description: "Failed to save credentials",
+        description: error.message || "Failed to save credentials",
         variant: "destructive",
       });
     } finally {
@@ -153,11 +165,24 @@ export default function Settings() {
   };
 
   const handleSaveAI = async () => {
-    setLoading(true);
+    if (!user?.id) {
+      toast({
+        title: "Error",
+        description: "User not authenticated",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSaving(true);
     try {
+      console.log('[Settings] Saving with user ID:', user.id);
       const response = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id || '' },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'x-user-id': user.id 
+        },
         body: JSON.stringify({
           businessDescription,
           tone,
@@ -168,18 +193,23 @@ export default function Settings() {
         }),
       });
 
+      console.log('[Settings] Response status:', response.status);
+
       if (response.ok) {
         toast({
           title: "Settings saved",
           description: "Your AI personality settings have been updated successfully.",
         });
       } else {
-        throw new Error('Failed to save settings');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('[Settings] Error response:', errorData);
+        throw new Error(errorData.error || 'Failed to save settings');
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[Settings] Save error:', error);
       toast({
         title: "Error",
-        description: "Failed to save settings",
+        description: error.message || "Failed to save settings",
         variant: "destructive",
       });
     } finally {
