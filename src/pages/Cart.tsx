@@ -43,24 +43,21 @@ export default function Cart() {
       setCart(JSON.parse(saved));
     }
     
-    // Fetch store phone from API
-    fetchStorePhone();
-  }, []);
-
-  const fetchStorePhone = async () => {
-    try {
-      const response = await fetch(API_ENDPOINTS.STORE_SETTINGS);
-      if (response.ok) {
-        const data = await response.json();
-        setBusinessPhone(data.storePhone || '+255719958997');
+    // Get store phone from localStorage (saved when adding to cart)
+    const storeInfoStr = localStorage.getItem('storeInfo');
+    if (storeInfoStr) {
+      try {
+        const storeInfo = JSON.parse(storeInfoStr);
+        setBusinessPhone(storeInfo.storePhone || '+255719958997');
+      } catch (e) {
+        console.error('Failed to parse store info:', e);
+        setBusinessPhone('+255719958997');
       }
-    } catch (error) {
-      console.error('Failed to fetch store phone:', error);
-      setBusinessPhone('+255719958997'); // Fallback
-    } finally {
-      setLoadingPhone(false);
+    } else {
+      setBusinessPhone('+255719958997');
     }
-  };
+    setLoadingPhone(false);
+  }, []);
 
   const updateCart = (newCart: CartItem[]) => {
     setCart(newCart);

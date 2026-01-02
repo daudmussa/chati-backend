@@ -180,6 +180,7 @@ export default function CustomerStore() {
     storeId: '',
     storeName: 'Our Store',
     userId: '',
+    storePhone: '',
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [tempStoreName, setTempStoreName] = useState('');
@@ -375,7 +376,8 @@ export default function CustomerStore() {
     localStorage.setItem('storeUserId', storeSettings.userId || '');
     localStorage.setItem('storeInfo', JSON.stringify({
       storeName: storeSettings.storeName,
-      storeId: storeSettings.storeId
+      storeId: storeSettings.storeId,
+      storePhone: storeSettings.storePhone || ''
     }));
     
     const existingItem = cart.find(item => item.id === product.id);
