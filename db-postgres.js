@@ -247,8 +247,8 @@ export async function saveBusinessSettings(userId, settings) {
     userId,
     settings.businessDescription || '',
     settings.tone || 'friendly',
-    settings.sampleReplies || [],
-    settings.keywords || [],
+    JSON.stringify(settings.sampleReplies || []),
+    JSON.stringify(settings.keywords || []),
     settings.supportName || '',
     settings.supportPhone || '',
   ]);
