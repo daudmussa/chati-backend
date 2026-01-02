@@ -1072,9 +1072,10 @@ app.put("/api/business/settings", async (req, res) => {
     return res.status(401).json({ error: 'User ID required' });
   }
   try {
-    const { businessDescription, tone, sampleReplies, keywords, supportName, supportPhone } = req.body;
-    console.log('[business] Request body:', { businessDescription, tone, sampleReplies, keywords, supportName, supportPhone });
+    const { businessName, businessDescription, tone, sampleReplies, keywords, supportName, supportPhone } = req.body;
+    console.log('[business] Request body:', { businessName, businessDescription, tone, sampleReplies, keywords, supportName, supportPhone });
     const settings = {
+      businessName,
       businessDescription,
       tone,
       sampleReplies,
@@ -1180,7 +1181,7 @@ app.get("/api/admin/users", async (req, res) => {
         email: dbUser.email,
         name: dbUser.name,
         role: dbUser.role,
-        storeName: settings?.businessDescription || 'No store name',
+        storeName: settings?.businessName || settings?.businessDescription || 'No business name',
         storePhone: credentials?.twilioPhoneNumber || 'No phone',
         storeId: dbUser.id.slice(0, 8),
         ordersCount: 0, // TODO: Add orders table

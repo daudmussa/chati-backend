@@ -6,6 +6,7 @@ interface User {
   email: string;
   name: string;
   role: 'admin' | 'user';
+  businessName?: string;
 }
 
 interface AuthContextType {
@@ -41,7 +42,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (response.ok) {
           const data = await response.json();
-          setUser(data.user);
+          const userData = data.user;
+          
+          // Fetch business name
+          try {
+            const settingsRes = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS, {
+              headers: { 'x-user-id': userData.id }
+            });
+            if (settingsRes.ok) {
+              const settings = await settingsRes.json();
+              userData.businessName = settings.businessName || userData.name;
+            }
+          } catch (err) {
+            console.log('Could not fetch business name');
+          }
+          
+          setUser(userData);
         } else {
           localStorage.removeItem('auth_token');
         }

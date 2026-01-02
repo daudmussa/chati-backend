@@ -91,6 +91,7 @@ export async function initSchema() {
   await p.query(`
     CREATE TABLE IF NOT EXISTS business_settings (
       user_id TEXT PRIMARY KEY,
+      business_name TEXT,
       business_description TEXT,
       tone TEXT,
       sample_replies JSONB,
@@ -223,6 +224,7 @@ export async function getBusinessSettings(userId) {
   const r = rows[0];
   if (!r) return null;
   return {
+    businessName: r.business_name || '',
     businessDescription: r.business_description || '',
     tone: r.tone || 'friendly',
     sampleReplies: r.sample_replies || [],
@@ -237,9 +239,10 @@ export async function saveBusinessSettings(userId, settings) {
   if (!p) return;
   await p.query(`
     INSERT INTO business_settings (
-      user_id, business_description, tone, sample_replies, keywords, support_name, support_phone, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+      user_id, business_name, business_description, tone, sample_replies, keywords, support_name, support_phone, updated_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
     ON CONFLICT (user_id) DO UPDATE SET
+      business_name = EXCLUDED.business_name,
       business_description = EXCLUDED.business_description,
       tone = EXCLUDED.tone,
       sample_replies = EXCLUDED.sample_replies,
@@ -249,6 +252,7 @@ export async function saveBusinessSettings(userId, settings) {
       updated_at = NOW();
   `, [
     userId,
+    settings.businessName || '',
     settings.businessDescription || '',
     settings.tone || 'friendly',
     JSON.stringify(settings.sampleReplies || []),

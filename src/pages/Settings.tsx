@@ -18,6 +18,9 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Business Info
+  const [businessName, setBusinessName] = useState('');
+
   // AI Settings
   const [businessDescription, setBusinessDescription] = useState('');
   const [tone, setTone] = useState('friendly');
@@ -75,6 +78,7 @@ export default function Settings() {
       });
       if (response.ok) {
         const data = await response.json();
+        setBusinessName(data.businessName || '');
         setBusinessDescription(data.businessDescription || '');
         setTone(data.tone || 'friendly');
         setSampleReplies(data.sampleReplies || []);
@@ -184,6 +188,7 @@ export default function Settings() {
           'x-user-id': user.id 
         },
         body: JSON.stringify({
+          businessName,
           businessDescription,
           tone,
           sampleReplies,
@@ -241,6 +246,16 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="businessName">Business Name</Label>
+                <Input
+                  id="businessName"
+                  value={businessName}
+                  onChange={(e) => setBusinessName(e.target.value)}
+                  placeholder="e.g., Mama Njema Shop"
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="description">Business Description</Label>
                 <Textarea
