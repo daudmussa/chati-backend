@@ -342,7 +342,7 @@ export async function getAllUsers() {
   const p = ensurePool();
   if (!p) return [];
   const { rows } = await p.query(`
-    SELECT id, email, name, role, enabled_features, limits, created_at 
+    SELECT id, email, name, role, enabled_features, limits, pay_date, package, status, promo_code, created_at 
     FROM users 
     ORDER BY created_at DESC
   `);
