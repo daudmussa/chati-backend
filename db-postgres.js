@@ -101,6 +101,12 @@ export async function initSchema() {
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  
+  // Migration: Add business_name column if it doesn't exist
+  await p.query(`
+    ALTER TABLE business_settings 
+    ADD COLUMN IF NOT EXISTS business_name TEXT;
+  `);
   await p.query(`
     CREATE TABLE IF NOT EXISTS conversations (
       id TEXT PRIMARY KEY,
