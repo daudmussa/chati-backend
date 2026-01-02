@@ -50,15 +50,22 @@ export default function Conversations() {
       }
       
       const data = await response.json();
-      setConversations(data);
+      
+      // Apply limit: only show up to maxConversations
+      let limitedData = data;
+      if (user?.limits?.maxConversations) {
+        limitedData = data.slice(0, user.limits.maxConversations);
+      }
+      
+      setConversations(limitedData);
       
       // Select the first conversation if none is selected or if the selected one is no longer available
-      if (data.length > 0) {
-        if (!selectedConversation || !data.find((c: Conversation) => c.id === selectedConversation.id)) {
-          setSelectedConversation(data[0]);
+      if (limitedData.length > 0) {
+        if (!selectedConversation || !limitedData.find((c: Conversation) => c.id === selectedConversation.id)) {
+          setSelectedConversation(limitedData[0]);
         } else {
           // Update the selected conversation with fresh data
-          const updated = data.find((c: Conversation) => c.id === selectedConversation.id);
+          const updated = limitedData.find((c: Conversation) => c.id === selectedConversation.id);
           if (updated) {
             setSelectedConversation(updated);
           }
@@ -120,6 +127,18 @@ export default function Conversations() {
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-800 rounded-lg p-4">
             <p className="text-sm">{error}</p>
+          </div>
+        )}
+        
+        {user?.limits && conversations.length >= user.limits.maxConversations && (
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-lg p-4">
+            <p className="text-sm font-medium">⚠️ Conversation Limit Reached</p>
+            <p className="text-sm mt-1">
+              You have reached your maximum limit of {user.limits.maxConversations} conversations. 
+              Only the first {user.limits.maxConversations} conversations are displayed. 
+              New incoming messages will receive an automated response informing customers you're at capacity. 
+              Contact your admin to increase your limit.
+            </p>
           </div>
         )}
 
