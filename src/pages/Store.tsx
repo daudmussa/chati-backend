@@ -406,6 +406,19 @@ export default function Store() {
       });
       return;
     }
+    
+    // Double-check limit before saving (in case products were added elsewhere)
+    if (!editingProduct && user?.limits) {
+      const currentProductCount = products.length;
+      if (currentProductCount >= user.limits.maxProducts) {
+        toast({
+          title: "Product Limit Reached",
+          description: `You have reached your maximum limit of ${user.limits.maxProducts} products. Please contact admin to increase your limit.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
 
     const productData: Product = {
       id: editingProduct?.id || '',
@@ -444,12 +457,22 @@ export default function Store() {
         setIsDialogOpen(false);
         resetForm();
       } else {
-        throw new Error('Failed to save product');
+        const errorData = await response.json().catch(() => ({ error: 'Failed to save product' }));
+        if (response.status === 403 && errorData.message) {
+          // Handle limit reached error from server
+          toast({
+            title: "Product Limit Reached",
+            description: errorData.message,
+            variant: "destructive",
+          });
+        } else {
+          throw new Error(errorData.error || 'Failed to save product');
+        }
       }
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save product",
+        description: error instanceof Error ? error.message : "Failed to save product",
         variant: "destructive",
       });
     }

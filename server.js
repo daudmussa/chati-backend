@@ -152,6 +152,26 @@ app.post("/webhook", async (req, res) => {
 
       console.log(`[webhook] Using ${userCreds ? 'user-specific' : 'default'} credentials for ${from}`);
 
+      // Check conversation limit before creating new conversation
+      if (!conversationHistory.has(from) && userCreds?.userId) {
+        const user = await getUserById(userCreds.userId);
+        const userLimits = user?.limits || { maxConversations: 100 };
+        const existingConversations = await listConversations(userCreds.userId);
+        
+        if (existingConversations.length >= userLimits.maxConversations) {
+          console.log(`[webhook] Conversation limit reached for user ${userCreds.userId}`);
+          // Send a message to the customer that the business has reached their limit
+          if (userTwilioClient && USER_TWILIO_PHONE_NUMBER) {
+            await userTwilioClient.messages.create({
+              body: "We're currently at capacity and unable to start new conversations. Please try again later or contact us through another channel.",
+              from: USER_TWILIO_PHONE_NUMBER,
+              to: from,
+            });
+          }
+          return;
+        }
+      }
+      
       // Get or create conversation history for this customer phone number
       if (!conversationHistory.has(from)) {
         conversationHistory.set(from, {
@@ -1237,6 +1257,20 @@ app.post("/api/products", async (req, res) => {
     return res.status(401).json({ error: 'User ID required' });
   }
   try {
+    // Check product limit
+    const user = await getUserById(userId);
+    const userLimits = user?.limits || { maxProducts: 50 };
+    const existingProducts = await listProducts(userId);
+    
+    if (existingProducts.length >= userLimits.maxProducts) {
+      return res.status(403).json({ 
+        error: 'Product limit reached', 
+        message: `You have reached your maximum limit of ${userLimits.maxProducts} products. Please contact admin to increase your limit.`,
+        currentCount: existingProducts.length,
+        maxProducts: userLimits.maxProducts
+      });
+    }
+    
     const product = await saveProduct(userId, req.body);
     console.log('[products] Product saved:', product.id);
     res.json(product);
