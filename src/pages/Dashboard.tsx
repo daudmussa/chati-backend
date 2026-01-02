@@ -4,8 +4,10 @@ import { MessageSquare, Send, Users, Calendar, CheckCircle } from 'lucide-react'
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { API_ENDPOINTS } from '@/config/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Dashboard() {
+  const { user } = useAuth();
   const [stats, setStats] = useState({
     totalMessages: 0,
     aiReplies: 0,
@@ -18,26 +20,36 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchDashboardData();
-    // Refresh every 10 seconds
-    const interval = setInterval(fetchDashboardData, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    if (user?.id) {
+      fetchDashboardData();
+      // Refresh every 10 seconds
+      const interval = setInterval(fetchDashboardData, 10000);
+      return () => clearInterval(interval);
+    }
+  }, [user?.id]);
 
   const fetchDashboardData = async () => {
+    if (!user?.id) return;
+    
     try {
       // Fetch conversations
-      const conversationsRes = await fetch(API_ENDPOINTS.CONVERSATIONS);
+      const conversationsRes = await fetch(API_ENDPOINTS.CONVERSATIONS, {
+        headers: { 'x-user-id': user.id }
+      });
       const conversations = conversationsRes.ok ? await conversationsRes.json() : [];
 
       // Fetch bookings
-      const bookingsRes = await fetch(API_ENDPOINTS.BOOKINGS);
+      const bookingsRes = await fetch(API_ENDPOINTS.BOOKINGS, {
+        headers: { 'x-user-id': user.id }
+      });
       const bookings = bookingsRes.ok ? await bookingsRes.json() : [];
 
-      // Calculate stats
-      const totalMessages = conversations.reduce((sum: number, conv: any) => sum + conv.messages.length, 0);
+      // Calculate stats from actual conversation data
+      const totalMessages = conversations.reduce((sum: number, conv: any) => 
+        sum + (conv.messages?.length || 0), 0
+      );
       const aiReplies = conversations.reduce((sum: number, conv: any) => 
-        sum + conv.messages.filter((msg: any) => msg.sender === 'ai').length, 0
+        sum + (conv.messages?.filter((msg: any) => msg.sender === 'ai').length || 0), 0
       );
       const pendingBookings = bookings.filter((b: any) => b.status === 'pending').length;
 
@@ -49,17 +61,16 @@ export default function Dashboard() {
         pendingBookings,
       });
 
-      // Get recent activity from conversations (last 5 messages)
+      // Get recent activity from conversations (last 5)
       const activity = conversations
-        .filter((conv: any) => conv.messages.length > 0)
+        .slice(0, 5)
         .map((conv: any) => ({
-          customer: conv.customerName,
+          customer: conv.customerName || conv.customerNumber,
           phone: conv.customerNumber,
-          message: conv.lastMessage,
-          time: conv.timestamp,
-          status: 'replied'
-        }))
-        .slice(0, 5);
+          message: conv.lastMessage || 'New conversation',
+          time: conv.timestamp || 'Just now',
+          status: 'active'
+        }));
 
       setRecentActivity(activity);
       setLoading(false);

@@ -27,23 +27,28 @@ import Features from "./pages/Features";
 import About from "./pages/About";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/" />;
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+  
+  return isAuthenticated ? <>{children}</> : <Navigate to="/signin" />;
 }
 
 function FeatureProtectedRoute({ children, featureId }: { children: React.ReactNode; featureId: string }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
+  
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
   
   if (!isAuthenticated) {
-    return <Navigate to="/" />;
+    return <Navigate to="/signin" />;
   }
   
-  // Check if user has access to this feature
-  const hasAccess = user?.enabledFeatures?.includes(featureId) ?? true;
-  
-  if (!hasAccess) {
-    return <Navigate to="/dashboard" />;
-  }
+  // For now, allow all features since we removed enabledFeatures from User model
+  // In the future, you can add feature gating logic here
   
   return <>{children}</>;
 }
