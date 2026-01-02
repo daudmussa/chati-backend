@@ -425,7 +425,10 @@ export default function Bookings() {
     try {
       const response = await fetch(API_ENDPOINTS.BOOKING_STATUS(bookingId), {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+        },
         body: JSON.stringify({ status: newStatus }),
       });
 
@@ -434,6 +437,8 @@ export default function Bookings() {
           b.id === bookingId ? { ...b, status: newStatus } : b
         ));
         toast({ title: "Booking updated", description: `Booking status changed to ${newStatus}` });
+      } else {
+        throw new Error('Failed to update booking');
       }
     } catch (error) {
       toast({ title: "Error", description: "Failed to update booking", variant: "destructive" });
