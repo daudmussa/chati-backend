@@ -47,8 +47,13 @@ function FeatureProtectedRoute({ children, featureId }: { children: React.ReactN
     return <Navigate to="/signin" />;
   }
   
-  // For now, allow all features since we removed enabledFeatures from User model
-  // In the future, you can add feature gating logic here
+  // Check if user has access to this feature
+  const hasFeature = user?.enabledFeatures?.includes(featureId);
+  
+  if (!hasFeature) {
+    // Redirect to dashboard with a message (you could also show an error toast here)
+    return <Navigate to="/dashboard" replace />;
+  }
   
   return <>{children}</>;
 }

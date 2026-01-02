@@ -1305,7 +1305,8 @@ app.post("/api/auth/signup", async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing']
       }
     });
   } catch (error) {
@@ -1353,7 +1354,8 @@ app.post("/api/auth/login", async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing']
       }
     });
   } catch (error) {
@@ -1388,7 +1390,8 @@ app.get("/api/auth/me", async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: user.role
+        role: user.role,
+        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing']
       }
     });
   } catch (error) {

@@ -110,6 +110,8 @@ export default function Admin() {
       ? currentFeatures.filter(f => f !== featureId)
       : [...currentFeatures, featureId];
 
+    console.log('[Admin] Toggling feature:', { userId, featureId, currentFeatures, newFeatures });
+
     try {
       const response = await fetch(API_ENDPOINTS.ADMIN_USER_FEATURES(userId), {
         method: 'PUT',
@@ -121,26 +123,25 @@ export default function Admin() {
         body: JSON.stringify({ enabledFeatures: newFeatures }),
       });
 
+      console.log('[Admin] Toggle response status:', response.status);
+
       if (response.ok) {
+        const result = await response.json();
+        console.log('[Admin] Toggle result:', result);
+
         // Update local state
         setUsers(users.map(u => 
           u.userId === userId ? { ...u, enabledFeatures: newFeatures } : u
         ));
 
-        // Update localStorage if toggling current user's features
+        // If toggling current user's features, reload to update navigation
         if (userId === user?.id) {
-          const users = JSON.parse(localStorage.getItem('users') || '[]');
-          const updatedUsers = users.map((u: any) => 
-            u.id === userId ? { ...u, enabledFeatures: newFeatures } : u
-          );
-          localStorage.setItem('users', JSON.stringify(updatedUsers));
-          
-          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-          currentUser.enabledFeatures = newFeatures;
-          localStorage.setItem('user', JSON.stringify(currentUser));
-          
-          // Reload to update navigation
-          window.location.reload();
+          toast({
+            title: "Feature Updated",
+            description: "Reloading to apply changes...",
+          });
+          setTimeout(() => window.location.reload(), 1000);
+          return;
         }
 
         toast({
@@ -148,12 +149,15 @@ export default function Admin() {
           description: `Successfully ${newFeatures.includes(featureId) ? 'enabled' : 'disabled'} feature`,
         });
       } else {
-        throw new Error('Failed to update features');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        console.error('[Admin] Toggle error:', errorData);
+        throw new Error(errorData.error || 'Failed to update features');
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('[Admin] Toggle exception:', error);
       toast({
         title: "Error",
-        description: "Failed to update user features",
+        description: error.message || "Failed to update user features",
         variant: "destructive",
       });
     }
@@ -162,6 +166,8 @@ export default function Admin() {
   const updateLimits = async (userId: string) => {
     const newLimits = editingLimits[userId];
     if (!newLimits) return;
+
+    console.log('[Admin] Updating limits:', { userId, newLimits });
 
     try {
       const response = await fetch(API_ENDPOINTS.ADMIN_USER_LIMITS(userId), {
@@ -174,24 +180,16 @@ export default function Admin() {
         body: JSON.stringify({ limits: newLimits }),
       });
 
+      console.log('[Admin] Limits response status:', response.status);
+
       if (response.ok) {
+        const result = await response.json();
+        console.log('[Admin] Limits result:', result);
+
         // Update local state
         setUsers(users.map(u => 
           u.userId === userId ? { ...u, limits: newLimits } : u
         ));
-
-        // Update localStorage if updating current user's limits
-        if (userId === user?.id) {
-          const users = JSON.parse(localStorage.getItem('users') || '[]');
-          const updatedUsers = users.map((u: any) => 
-            u.id === userId ? { ...u, limits: newLimits } : u
-          );
-          localStorage.setItem('users', JSON.stringify(updatedUsers));
-          
-          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-          currentUser.limits = newLimits;
-          localStorage.setItem('user', JSON.stringify(currentUser));
-        }
 
         // Clear editing state
         const newEditingLimits = { ...editingLimits };
@@ -203,9 +201,11 @@ export default function Admin() {
           description: "User limits have been successfully updated",
         });
       } else {
+        console.error('[Admin] Limits error: response not ok', { status: response.status });
         throw new Error('Failed to update limits');
       }
     } catch (error) {
+      console.error('[Admin] Limits error:', error);
       toast({
         title: "Error",
         description: "Failed to update user limits",
