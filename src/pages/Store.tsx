@@ -42,11 +42,22 @@ interface Order {
 
 const categories = [
   'Electronics',
-  'Clothing',
+  'Clothing & Fashion',
   'Food & Beverages',
   'Home & Garden',
   'Health & Beauty',
+  'Sports & Outdoors',
+  'Books & Stationery',
+  'Toys & Games',
+  'Automotive',
+  'Jewelry & Accessories',
+  'Pet Supplies',
+  'Baby & Kids',
+  'Furniture',
+  'Art & Crafts',
+  'Music & Instruments',
   'Services',
+  'Digital Products',
   'Other',
 ];
 
