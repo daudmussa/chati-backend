@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,6 +26,7 @@ interface Staff {
 export default function Staff() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -40,8 +42,17 @@ export default function Staff() {
   });
 
   useEffect(() => {
+    if (user?.role !== 'admin') {
+      toast({
+        title: "Access Denied",
+        description: "Only administrators can access this page",
+        variant: "destructive",
+      });
+      navigate('/dashboard');
+      return;
+    }
     fetchStaff();
-  }, []);
+  }, [user]);
 
   const fetchStaff = async () => {
     if (!user?.id) return;

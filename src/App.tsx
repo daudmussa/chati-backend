@@ -76,7 +76,7 @@ function App() {
             <Route path="/billing" element={<FeatureProtectedRoute featureId="billing"><Billing /></FeatureProtectedRoute>} />
             <Route path="/store" element={<FeatureProtectedRoute featureId="store"><Store /></FeatureProtectedRoute>} />
             <Route path="/bookings" element={<FeatureProtectedRoute featureId="bookings"><Bookings /></FeatureProtectedRoute>} />
-            <Route path="/staff" element={<FeatureProtectedRoute featureId="staff"><Staff /></FeatureProtectedRoute>} />
+            <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             {/* Public customer-facing pages */}
             <Route path="/shop" element={<ShopLanding />} />
