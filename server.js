@@ -3,7 +3,9 @@ import bodyParser from "body-parser";
 import axios from "axios";
 import dotenv from "dotenv";
 import Twilio from "twilio";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations } from "./db-postgres.js";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -57,6 +59,7 @@ const TWILIO_PHONE_NUMBER = stripQuotes(process.env.TWILIO_PHONE_NUMBER);
 const BUSINESS_CONTEXT = stripQuotes(process.env.BUSINESS_CONTEXT) || "";
 const BYPASS_CLAUDE =
   process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true";
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
 console.log("[config] Environment check:");
 console.log("- CLAUDE_API_KEY:", CLAUDE_API_KEY ? `Set (${CLAUDE_API_KEY.substring(0, 10)}...)` : "MISSING");
@@ -64,6 +67,7 @@ console.log("- TWILIO_ACCOUNT_SID:", TWILIO_ACCOUNT_SID ? `Set (${TWILIO_ACCOUNT
 console.log("- TWILIO_AUTH_TOKEN:", TWILIO_AUTH_TOKEN ? "Set" : "MISSING");
 console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
 console.log("- BYPASS_CLAUDE:", BYPASS_CLAUDE);
+console.log("- JWT_SECRET:", JWT_SECRET !== "your-secret-key-change-in-production" ? "Set" : "Using default (CHANGE THIS)")
 
 let twilioClient = null;
 if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
@@ -1247,6 +1251,141 @@ app.put("/api/admin/users/:userId/limits", (req, res) => {
 });
 
 // Health check endpoint
+// ========================================
+// AUTHENTICATION API
+// ========================================
+
+// Signup endpoint
+app.post("/api/auth/signup", async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+    
+    console.log('[auth] Signup request for email:', email);
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password required" });
+    }
+    
+    // Check if user already exists
+    const existing = await getUserByEmail(email);
+    if (existing) {
+      return res.status(400).json({ error: "Email already registered" });
+    }
+    
+    // Hash password
+    const passwordHash = await bcrypt.hash(password, 10);
+    
+    // Create user
+    const user = await createUser(email, passwordHash, name || email.split('@')[0]);
+    
+    // Generate JWT
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    console.log('[auth] User created:', user.id);
+    
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('[auth] Signup error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Login endpoint
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    console.log('[auth] Login request for email:', email);
+    
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password required" });
+    }
+    
+    // Get user with password hash
+    const user = await getUserByEmail(email);
+    if (!user) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    
+    // Verify password
+    const valid = await bcrypt.compare(password, user.password_hash);
+    if (!valid) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    
+    // Generate JWT
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    console.log('[auth] User logged in:', user.id);
+    
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('[auth] Login error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get current user
+app.get("/api/auth/me", async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: "No token provided" });
+    }
+    
+    const token = authHeader.substring(7);
+    
+    // Verify JWT
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Get user without password
+    const user = await getUserById(decoded.userId);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('[auth] Token validation error:', error);
+    res.status(401).json({ error: "Invalid token" });
+  }
+});
+
 // ========================================
 // USER CREDENTIALS MANAGEMENT API
 // ========================================

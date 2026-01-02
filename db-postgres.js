@@ -56,6 +56,20 @@ function decrypt(text) {
 export async function initSchema() {
   const p = ensurePool();
   if (!p) return;
+  
+  // Users table for authentication
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      name TEXT,
+      role TEXT DEFAULT 'user',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_credentials (
       user_id TEXT PRIMARY KEY,
@@ -294,4 +308,30 @@ export async function listConversations(userId) {
     });
   }
   return conversations;
+}
+
+// Auth functions
+export async function createUser(email, passwordHash, name) {
+  const p = ensurePool();
+  if (!p) return null;
+  const id = crypto.randomBytes(16).toString('hex');
+  await p.query(`
+    INSERT INTO users (id, email, password_hash, name, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, NOW(), NOW())
+  `, [id, email, passwordHash, name]);
+  return { id, email, name, role: 'user' };
+}
+
+export async function getUserByEmail(email) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query('SELECT * FROM users WHERE email=$1', [email]);
+  return rows[0] || null;
+}
+
+export async function getUserById(id) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query('SELECT id, email, name, role, created_at FROM users WHERE id=$1', [id]);
+  return rows[0] || null;
 }
