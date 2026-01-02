@@ -1696,6 +1696,11 @@ app.post("/api/auth/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid credentials" });
     }
     
+    // Check if user is active
+    if (user.status && user.status !== 'active') {
+      return res.status(403).json({ error: "Your account is currently inactive. Please contact support." });
+    }
+    
     // Generate JWT
     const token = jwt.sign(
       { userId: user.id, email: user.email },
@@ -1741,6 +1746,11 @@ app.get("/api/auth/me", async (req, res) => {
     const user = await getUserById(decoded.userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
+    }
+    
+    // Check if user is active
+    if (user.status && user.status !== 'active') {
+      return res.status(403).json({ error: "Your account is currently inactive. Please contact support." });
     }
     
     console.log('[auth] /me - User from DB:', { id: user.id, limits: user.limits });

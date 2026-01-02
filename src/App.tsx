@@ -73,7 +73,7 @@ function App() {
             <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
             <Route path="/conversations" element={<FeatureProtectedRoute featureId="conversations"><Conversations /></FeatureProtectedRoute>} />
             <Route path="/settings" element={<FeatureProtectedRoute featureId="settings"><Settings /></FeatureProtectedRoute>} />
-            <Route path="/billing" element={<FeatureProtectedRoute featureId="billing"><Billing /></FeatureProtectedRoute>} />
+            {/* <Route path="/billing" element={<FeatureProtectedRoute featureId="billing"><Billing /></FeatureProtectedRoute>} /> */}
             <Route path="/store" element={<FeatureProtectedRoute featureId="store"><Store /></FeatureProtectedRoute>} />
             <Route path="/bookings" element={<FeatureProtectedRoute featureId="bookings"><Bookings /></FeatureProtectedRoute>} />
             <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
