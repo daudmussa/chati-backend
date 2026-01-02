@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Store, ShoppingCart, Calendar, Phone, Settings, Save, CreditCard, Package } from 'lucide-react';
+import { Users, Store, ShoppingCart, Calendar, Phone, Settings, Save, CreditCard, Package, Search, ArrowUpDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '@/config/api';
 
@@ -42,6 +42,9 @@ export default function Admin() {
   const navigate = useNavigate();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'payDate' | 'name' | 'created'>('payDate');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingLimits, setEditingLimits] = useState<{[userId: string]: { maxConversations: number; maxProducts: number }}>({});
   const [editingSubscription, setEditingSubscription] = useState<{[userId: string]: { payDate: string | null; package: string; status: string; promoCode: string | null }}>({});
 
@@ -289,6 +292,37 @@ export default function Admin() {
     }
   };
 
+  // Filter and sort users
+  const filteredAndSortedUsers = users
+    .filter(u => {
+      if (!searchQuery) return true;
+      const query = searchQuery.toLowerCase();
+      return (
+        u.storeName.toLowerCase().includes(query) ||
+        u.storePhone.toLowerCase().includes(query) ||
+        u.email?.toLowerCase().includes(query) ||
+        u.name?.toLowerCase().includes(query) ||
+        u.promoCode?.toLowerCase().includes(query) ||
+        u.storeId.toLowerCase().includes(query)
+      );
+    })
+    .sort((a, b) => {
+      let compareValue = 0;
+      
+      if (sortBy === 'payDate') {
+        const dateA = a.payDate ? new Date(a.payDate).getTime() : 0;
+        const dateB = b.payDate ? new Date(b.payDate).getTime() : 0;
+        compareValue = dateA - dateB;
+      } else if (sortBy === 'name') {
+        compareValue = a.storeName.localeCompare(b.storeName);
+      } else if (sortBy === 'created') {
+        // Assuming we don't have createdAt, use userId as proxy
+        compareValue = a.userId.localeCompare(b.userId);
+      }
+      
+      return sortOrder === 'asc' ? compareValue : -compareValue;
+    });
+
   const totalUsers = users.length;
   const totalOrders = users.reduce((sum, u) => sum + u.ordersCount, 0);
   const totalBookings = users.reduce((sum, u) => sum + u.bookingsCount, 0);
@@ -349,19 +383,55 @@ export default function Admin() {
         {/* Users List */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              All Users
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                All Users ({filteredAndSortedUsers.length})
+              </CardTitle>
+              <div className="flex items-center gap-3">
+                {/* Search */}
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by name, phone, promo..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                {/* Sort */}
+                <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="payDate">Pay Date</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="created">Created</SelectItem>
+                  </SelectContent>
+                </Select>
+                {/* Sort Order */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                >
+                  <ArrowUpDown className="h-4 w-4 mr-2" />
+                  {sortOrder === 'asc' ? 'Asc' : 'Desc'}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="text-center py-8 text-gray-500">Loading users...</div>
-            ) : users.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">No users found</div>
+            ) : filteredAndSortedUsers.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                {searchQuery ? 'No users found matching your search' : 'No users found'}
+              </div>
             ) : (
               <div className="space-y-3">
-                {users.map((userData) => (
+                {filteredAndSortedUsers.map((userData) => (
                   <div
                     key={userData.userId}
                     className={`p-4 rounded-lg border ${
