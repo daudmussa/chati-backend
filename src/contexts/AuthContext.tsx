@@ -7,6 +7,7 @@ interface User {
   name: string;
   role: 'admin' | 'user';
   businessName?: string;
+  enabledFeatures?: string[];
 }
 
 interface AuthContextType {

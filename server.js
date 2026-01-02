@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import Twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -1188,7 +1188,7 @@ app.get("/api/admin/users", async (req, res) => {
         bookingsCount: 0, // TODO: Add bookings table
         totalRevenue: 0,
         isCurrent: dbUser.id === requestingUserId,
-        enabledFeatures: ['conversations', 'store', 'bookings', 'settings', 'billing'],
+        enabledFeatures: dbUser.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
         limits: {
           maxConversations: 100,
           maxProducts: 50,
@@ -1208,7 +1208,7 @@ app.get("/api/admin/users", async (req, res) => {
 });
 
 // Admin API - Update user features
-app.put("/api/admin/users/:userId/features", (req, res) => {
+app.put("/api/admin/users/:userId/features", async (req, res) => {
   const requestingUserRole = req.headers['x-user-role'];
   
   if (requestingUserRole !== 'admin') {
@@ -1222,17 +1222,18 @@ app.put("/api/admin/users/:userId/features", (req, res) => {
     return res.status(400).json({ error: 'enabledFeatures must be an array' });
   }
   
-  // Get or create store settings for this user
-  const settings = getStoreSettings(userId);
-  settings.enabledFeatures = enabledFeatures;
-  storeSettingsByUser.set(userId, settings);
-  
-  console.log('User features updated:', userId, enabledFeatures);
-  res.json({ success: true, userId, enabledFeatures });
+  try {
+    await updateUserFeatures(userId, enabledFeatures);
+    console.log('[admin] User features updated:', userId, enabledFeatures);
+    res.json({ success: true, userId, enabledFeatures });
+  } catch (error) {
+    console.error('[admin] Error updating features:', error);
+    res.status(500).json({ error: 'Failed to update features' });
+  }
 });
 
 // Admin API - Update user limits
-app.put("/api/admin/users/:userId/limits", (req, res) => {
+app.put("/api/admin/users/:userId/limits", async (req, res) => {
   const requestingUserRole = req.headers['x-user-role'];
   
   if (requestingUserRole !== 'admin') {
@@ -1246,16 +1247,18 @@ app.put("/api/admin/users/:userId/limits", (req, res) => {
     return res.status(400).json({ error: 'limits must be an object' });
   }
   
-  // Get or create store settings for this user
-  const settings = getStoreSettings(userId);
-  settings.limits = {
-    maxConversations: limits.maxConversations || 100,
-    maxProducts: limits.maxProducts || 50,
-  };
-  storeSettingsByUser.set(userId, settings);
-  
-  console.log('User limits updated:', userId, settings.limits);
-  res.json({ success: true, userId, limits: settings.limits });
+  try {
+    const updatedLimits = {
+      maxConversations: limits.maxConversations || 100,
+      maxProducts: limits.maxProducts || 50,
+    };
+    await updateUserLimits(userId, updatedLimits);
+    console.log('[admin] User limits updated:', userId, updatedLimits);
+    res.json({ success: true, userId, limits: updatedLimits });
+  } catch (error) {
+    console.error('[admin] Error updating limits:', error);
+    res.status(500).json({ error: 'Failed to update limits' });
+  }
 });
 
 // Health check endpoint
