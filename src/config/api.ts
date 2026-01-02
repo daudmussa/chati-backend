@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   ADMIN_USERS: `${API_BASE_URL}/api/admin/users`,
   ADMIN_USER_FEATURES: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/features`,
   ADMIN_USER_LIMITS: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/limits`,
+  ADMIN_USER_SUBSCRIPTION: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/subscription`,
   
   // Conversations
   CONVERSATIONS: `${API_BASE_URL}/api/conversations`,

@@ -83,6 +83,30 @@ export async function initSchema() {
     ADD COLUMN IF NOT EXISTS limits JSONB DEFAULT '{"maxConversations": 100, "maxProducts": 50}'::jsonb;
   `);
   
+  // Migration: Add pay_date column if it doesn't exist
+  await p.query(`
+    ALTER TABLE users 
+    ADD COLUMN IF NOT EXISTS pay_date TIMESTAMPTZ;
+  `);
+  
+  // Migration: Add package column if it doesn't exist
+  await p.query(`
+    ALTER TABLE users 
+    ADD COLUMN IF NOT EXISTS package TEXT DEFAULT 'starter';
+  `);
+  
+  // Migration: Add status column if it doesn't exist
+  await p.query(`
+    ALTER TABLE users 
+    ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active';
+  `);
+  
+  // Migration: Add promo_code column if it doesn't exist
+  await p.query(`
+    ALTER TABLE users 
+    ADD COLUMN IF NOT EXISTS promo_code TEXT;
+  `);
+  
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_credentials (
       user_id TEXT PRIMARY KEY,
@@ -448,7 +472,7 @@ export async function getUserByEmail(email) {
 export async function getUserById(id) {
   const p = ensurePool();
   if (!p) return null;
-  const { rows } = await p.query('SELECT id, email, name, role, enabled_features, limits, created_at FROM users WHERE id=$1', [id]);
+  const { rows } = await p.query('SELECT id, email, name, role, enabled_features, limits, pay_date, package, status, promo_code, created_at FROM users WHERE id=$1', [id]);
   return rows[0] || null;
 }
 
@@ -470,6 +494,46 @@ export async function updateUserLimits(userId, limits) {
   console.log('[db-postgres] Updating with JSON:', limitsJson);
   const result = await p.query('UPDATE users SET limits = $1::jsonb, updated_at = NOW() WHERE id = $2 RETURNING limits', [limitsJson, userId]);
   console.log('[db-postgres] Update result:', result.rows[0]);
+  return true;
+}
+
+export async function updateUserSubscription(userId, subscriptionData) {
+  console.log('[db-postgres] updateUserSubscription called:', { userId, subscriptionData });
+  const p = ensurePool();
+  if (!p) {
+    console.log('[db-postgres] No pool available');
+    return false;
+  }
+  
+  const updates = [];
+  const values = [];
+  let paramCount = 1;
+  
+  if (subscriptionData.payDate !== undefined) {
+    updates.push(`pay_date = $${paramCount++}`);
+    values.push(subscriptionData.payDate);
+  }
+  if (subscriptionData.package !== undefined) {
+    updates.push(`package = $${paramCount++}`);
+    values.push(subscriptionData.package);
+  }
+  if (subscriptionData.status !== undefined) {
+    updates.push(`status = $${paramCount++}`);
+    values.push(subscriptionData.status);
+  }
+  if (subscriptionData.promoCode !== undefined) {
+    updates.push(`promo_code = $${paramCount++}`);
+    values.push(subscriptionData.promoCode || null);
+  }
+  
+  if (updates.length === 0) return false;
+  
+  updates.push('updated_at = NOW()');
+  values.push(userId);
+  
+  const query = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramCount}`;
+  console.log('[db-postgres] Update query:', query, values);
+  await p.query(query, values);
   return true;
 }
 

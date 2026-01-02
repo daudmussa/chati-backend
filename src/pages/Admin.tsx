@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
-import { Users, Store, ShoppingCart, Calendar, TrendingUp, Phone, Settings, Save } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Users, Store, ShoppingCart, Calendar, Phone, Settings, Save, CreditCard, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '@/config/api';
 
@@ -19,7 +20,6 @@ interface UserData {
   storeId: string;
   ordersCount: number;
   bookingsCount: number;
-  totalRevenue: number;
   isCurrent: boolean;
   enabledFeatures: string[];
   limits: {
@@ -30,6 +30,10 @@ interface UserData {
     conversations: number;
     products: number;
   };
+  payDate: string | null;
+  package: string;
+  status: string;
+  promoCode: string | null;
 }
 
 export default function Admin() {
@@ -39,6 +43,7 @@ export default function Admin() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingLimits, setEditingLimits] = useState<{[userId: string]: { maxConversations: number; maxProducts: number }}>({});
+  const [editingSubscription, setEditingSubscription] = useState<{[userId: string]: { payDate: string | null; package: string; status: string; promoCode: string | null }}>({});
 
   const availableFeatures = [
     { id: 'conversations', label: 'Conversations', icon: '💬' },
@@ -214,10 +219,66 @@ export default function Admin() {
     }
   };
 
+  const updateSubscription = async (userId: string) => {
+    const subscription = editingSubscription[userId];
+    if (!subscription) return;
+
+    console.log('[Admin] Updating subscription:', { userId, subscription });
+
+    try {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USER_SUBSCRIPTION(userId), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+          'x-user-role': user?.role || '',
+        },
+        body: JSON.stringify(subscription),
+      });
+
+      console.log('[Admin] Subscription response status:', response.status);
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('[Admin] Subscription result:', result);
+
+        // Update local state
+        setUsers(users.map(u => 
+          u.userId === userId ? { 
+            ...u, 
+            payDate: subscription.payDate,
+            package: subscription.package,
+            status: subscription.status,
+            promoCode: subscription.promoCode
+          } : u
+        ));
+
+        // Clear editing state
+        const newEditingSubscription = { ...editingSubscription };
+        delete newEditingSubscription[userId];
+        setEditingSubscription(newEditingSubscription);
+
+        toast({
+          title: "Subscription Updated",
+          description: "User subscription has been successfully updated",
+        });
+      } else {
+        console.error('[Admin] Subscription error: response not ok', { status: response.status });
+        throw new Error('Failed to update subscription');
+      }
+    } catch (error) {
+      console.error('[Admin] Subscription error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update user subscription",
+        variant: "destructive",
+      });
+    }
+  };
+
   const totalUsers = users.length;
   const totalOrders = users.reduce((sum, u) => sum + u.ordersCount, 0);
   const totalBookings = users.reduce((sum, u) => sum + u.bookingsCount, 0);
-  const totalRevenue = users.reduce((sum, u) => sum + u.totalRevenue, 0);
 
   return (
     <DashboardLayout>
@@ -228,7 +289,7 @@ export default function Admin() {
         </div>
 
         {/* Overview Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
@@ -266,22 +327,6 @@ export default function Admin() {
                 </div>
                 <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
                   <Calendar className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    TZS {totalRevenue.toLocaleString()}
-                  </p>
-                </div>
-                <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <TrendingUp className="h-6 w-6 text-orange-600" />
                 </div>
               </div>
             </CardContent>
@@ -354,12 +399,6 @@ export default function Admin() {
                                 {userData.bookingsCount}
                               </p>
                             </div>
-                            <div>
-                              <p className="text-xs text-gray-500">Revenue</p>
-                              <p className="text-lg font-semibold text-gray-900">
-                                TZS {userData.totalRevenue.toLocaleString()}
-                              </p>
-                            </div>
                           </div>
 
                           {/* Feature Toggles */}
@@ -400,7 +439,7 @@ export default function Admin() {
                           {/* Usage Limits */}
                           <div className="mt-4 pt-4 border-t border-gray-200">
                             <div className="flex items-center gap-2 mb-3">
-                              <TrendingUp className="h-4 w-4 text-gray-600" />
+                              <Settings className="h-4 w-4 text-gray-600" />
                               <h4 className="text-sm font-semibold text-gray-700">Usage Limits</h4>
                             </div>
                             
@@ -482,6 +521,165 @@ export default function Admin() {
                                     </Button>
                                   )}
                                 </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Subscription Management */}
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <CreditCard className="h-4 w-4 text-gray-600" />
+                              <h4 className="text-sm font-semibold text-gray-700">Subscription</h4>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              {/* Pay Date */}
+                              <div className="p-3 rounded bg-purple-50 border border-purple-200">
+                                <Label className="text-sm font-medium text-purple-900 mb-2 block">
+                                  📅 Pay Date
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="date"
+                                    value={editingSubscription[userData.userId]?.payDate ?? userData.payDate ?? ''}
+                                    onChange={(e) => setEditingSubscription({
+                                      ...editingSubscription,
+                                      [userData.userId]: {
+                                        payDate: e.target.value,
+                                        package: editingSubscription[userData.userId]?.package ?? userData.package,
+                                        status: editingSubscription[userData.userId]?.status ?? userData.status,
+                                        promoCode: editingSubscription[userData.userId]?.promoCode ?? userData.promoCode,
+                                      }
+                                    })}
+                                    className="flex-1 h-8 text-sm"
+                                  />
+                                  {editingSubscription[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateSubscription(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Package */}
+                              <div className="p-3 rounded bg-indigo-50 border border-indigo-200">
+                                <Label className="text-sm font-medium text-indigo-900 mb-2 block">
+                                  📦 Package
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Select
+                                    value={editingSubscription[userData.userId]?.package ?? userData.package}
+                                    onValueChange={(value) => setEditingSubscription({
+                                      ...editingSubscription,
+                                      [userData.userId]: {
+                                        payDate: editingSubscription[userData.userId]?.payDate ?? userData.payDate,
+                                        package: value,
+                                        status: editingSubscription[userData.userId]?.status ?? userData.status,
+                                        promoCode: editingSubscription[userData.userId]?.promoCode ?? userData.promoCode,
+                                      }
+                                    })}
+                                  >
+                                    <SelectTrigger className="flex-1 h-8 text-sm">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="starter">Starter</SelectItem>
+                                      <SelectItem value="professional">Professional</SelectItem>
+                                      <SelectItem value="enterprise">Enterprise</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {editingSubscription[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateSubscription(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Status */}
+                              <div className="p-3 rounded bg-amber-50 border border-amber-200">
+                                <Label className="text-sm font-medium text-amber-900 mb-2 block">
+                                  ⚡ Status
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Select
+                                    value={editingSubscription[userData.userId]?.status ?? userData.status}
+                                    onValueChange={(value) => setEditingSubscription({
+                                      ...editingSubscription,
+                                      [userData.userId]: {
+                                        payDate: editingSubscription[userData.userId]?.payDate ?? userData.payDate,
+                                        package: editingSubscription[userData.userId]?.package ?? userData.package,
+                                        status: value,
+                                        promoCode: editingSubscription[userData.userId]?.promoCode ?? userData.promoCode,
+                                      }
+                                    })}
+                                  >
+                                    <SelectTrigger className="flex-1 h-8 text-sm">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="active">Active</SelectItem>
+                                      <SelectItem value="inactive">Inactive</SelectItem>
+                                      <SelectItem value="suspended">Suspended</SelectItem>
+                                      <SelectItem value="trial">Trial</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {editingSubscription[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateSubscription(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Promo Code */}
+                              <div className="p-3 rounded bg-pink-50 border border-pink-200">
+                                <Label className="text-sm font-medium text-pink-900 mb-2 block">
+                                  🎁 Promo Code
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="text"
+                                    placeholder="Enter promo code (optional)"
+                                    value={editingSubscription[userData.userId]?.promoCode ?? userData.promoCode ?? ''}
+                                    onChange={(e) => setEditingSubscription({
+                                      ...editingSubscription,
+                                      [userData.userId]: {
+                                        payDate: editingSubscription[userData.userId]?.payDate ?? userData.payDate,
+                                        package: editingSubscription[userData.userId]?.package ?? userData.package,
+                                        status: editingSubscription[userData.userId]?.status ?? userData.status,
+                                        promoCode: e.target.value,
+                                      }
+                                    })}
+                                    className="flex-1 h-8 text-sm"
+                                  />
+                                  {editingSubscription[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateSubscription(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                                {userData.promoCode && !editingSubscription[userData.userId] && (
+                                  <Badge className="mt-2 bg-pink-600">
+                                    Active: {userData.promoCode}
+                                  </Badge>
+                                )}
                               </div>
                             </div>
                           </div>

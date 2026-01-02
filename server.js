@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import Twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -1418,7 +1418,6 @@ app.get("/api/admin/users", async (req, res) => {
         storeId: storeSettings?.storeId || dbUser.id.slice(0, 8),
         ordersCount: orders.length,
         bookingsCount: bookings.length,
-        totalRevenue: orders.reduce((sum, order) => sum + order.totalAmount, 0),
         isCurrent: dbUser.id === requestingUserId,
         enabledFeatures: dbUser.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
         limits: dbUser.limits || {
@@ -1429,6 +1428,10 @@ app.get("/api/admin/users", async (req, res) => {
           conversations: conversations.length,
           products: products.length,
         },
+        payDate: dbUser.pay_date || null,
+        package: dbUser.package || 'starter',
+        status: dbUser.status || 'active',
+        promoCode: dbUser.promo_code || null,
       });
     }
     
@@ -1498,6 +1501,36 @@ app.put("/api/admin/users/:userId/limits", async (req, res) => {
   } catch (error) {
     console.error('[admin] Error updating limits:', error);
     res.status(500).json({ error: 'Failed to update limits' });
+  }
+});
+
+// Admin API - Update user subscription (payDate, package, status, promoCode)
+app.put("/api/admin/users/:userId/subscription", async (req, res) => {
+  const requestingUserRole = req.headers['x-user-role'];
+  
+  if (requestingUserRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { userId } = req.params;
+  const { payDate, package: packageName, status, promoCode } = req.body;
+  
+  console.log('[admin] PUT /api/admin/users/:userId/subscription:', { userId, payDate, packageName, status, promoCode });
+  
+  try {
+    const subscriptionData = {};
+    if (payDate !== undefined) subscriptionData.payDate = payDate;
+    if (packageName !== undefined) subscriptionData.package = packageName;
+    if (status !== undefined) subscriptionData.status = status;
+    if (promoCode !== undefined) subscriptionData.promoCode = promoCode;
+    
+    await updateUserSubscription(userId, subscriptionData);
+    console.log('[admin] User subscription updated:', userId, subscriptionData);
+    
+    res.json({ success: true, userId, ...subscriptionData });
+  } catch (error) {
+    console.error('[admin] Error updating subscription:', error);
+    res.status(500).json({ error: 'Failed to update subscription' });
   }
 });
 
