@@ -45,6 +45,17 @@ export default function Admin() {
   const [editingLimits, setEditingLimits] = useState<{[userId: string]: { maxConversations: number; maxProducts: number }}>({});
   const [editingSubscription, setEditingSubscription] = useState<{[userId: string]: { payDate: string | null; package: string; status: string; promoCode: string | null }}>({});
 
+  // Helper function to format date for input[type="date"]
+  const formatDateForInput = (dateString: string | null): string => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      return date.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
+
   const availableFeatures = [
     { id: 'conversations', label: 'Conversations', icon: '💬' },
     { id: 'store', label: 'Store', icon: '🏪' },
@@ -541,7 +552,11 @@ export default function Admin() {
                                 <div className="flex items-center gap-2">
                                   <Input
                                     type="date"
-                                    value={editingSubscription[userData.userId]?.payDate ?? userData.payDate ?? ''}
+                                    value={
+                                      editingSubscription[userData.userId]?.payDate 
+                                        ? formatDateForInput(editingSubscription[userData.userId].payDate)
+                                        : formatDateForInput(userData.payDate)
+                                    }
                                     onChange={(e) => setEditingSubscription({
                                       ...editingSubscription,
                                       [userData.userId]: {
