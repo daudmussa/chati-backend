@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,6 +108,7 @@ const timeSlots = [
 
 export default function Bookings() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [services, setServices] = useState<BookingService[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -173,7 +175,10 @@ export default function Bookings() {
     try {
       const response = await fetch(API_ENDPOINTS.SERVICES, {
         method: editingService ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+        },
         body: JSON.stringify(serviceData),
       });
 
@@ -196,8 +201,13 @@ export default function Bookings() {
   };
 
   const loadServices = async () => {
+    if (!user?.id) return;
     try {
-      const response = await fetch(API_ENDPOINTS.SERVICES);
+      const response = await fetch(API_ENDPOINTS.SERVICES, {
+        headers: {
+          'x-user-id': user.id,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         setServices(data);
@@ -208,8 +218,13 @@ export default function Bookings() {
   };
 
   const loadBookings = async () => {
+    if (!user?.id) return;
     try {
-      const response = await fetch(API_ENDPOINTS.BOOKINGS);
+      const response = await fetch(API_ENDPOINTS.BOOKINGS, {
+        headers: {
+          'x-user-id': user.id,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         setBookings(data);
@@ -220,8 +235,13 @@ export default function Bookings() {
   };
 
   const loadBookingStatus = async () => {
+    if (!user?.id) return;
     try {
-      const response = await fetch(API_ENDPOINTS.BOOKINGS_STATUS);
+      const response = await fetch(API_ENDPOINTS.BOOKINGS_STATUS, {
+        headers: {
+          'x-user-id': user.id,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
         setBookingsEnabled(data.enabled);
@@ -232,10 +252,14 @@ export default function Bookings() {
   };
 
   const toggleBookings = async (enabled: boolean) => {
+    if (!user?.id) return;
     try {
       const response = await fetch(API_ENDPOINTS.BOOKINGS_TOGGLE, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
         body: JSON.stringify({ enabled }),
       });
 

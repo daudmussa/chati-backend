@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import Twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBookingStatus } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -887,87 +887,140 @@ app.get("/api/conversations", async (req, res) => {
 });
 
 // Bookings API endpoints
-app.get("/api/bookings/status", (req, res) => {
-  res.json({ enabled: bookingsEnabled });
+app.get("/api/bookings/status", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const settings = await getBookingSettings(userId);
+    res.json(settings);
+  } catch (error) {
+    console.error('[bookings] Error fetching status:', error);
+    res.status(500).json({ error: 'Failed to fetch booking status' });
+  }
 });
 
-app.post("/api/bookings/toggle", (req, res) => {
-  bookingsEnabled = req.body.enabled;
-  console.log(`Bookings ${bookingsEnabled ? 'enabled' : 'disabled'}`);
-  res.json({ enabled: bookingsEnabled });
+app.post("/api/bookings/toggle", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const { enabled } = req.body;
+    await setBookingStatus(userId, enabled);
+    console.log(`[bookings] Bookings ${enabled ? 'enabled' : 'disabled'} for user ${userId}`);
+    res.json({ enabled });
+  } catch (error) {
+    console.error('[bookings] Error toggling:', error);
+    res.status(500).json({ error: 'Failed to toggle bookings' });
+  }
 });
 
-app.get("/api/bookings", (req, res) => {
-  res.json(bookings);
+app.get("/api/bookings", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const userBookings = await listBookings(userId);
+    res.json(userBookings);
+  } catch (error) {
+    console.error('[bookings] Error fetching:', error);
+    res.status(500).json({ error: 'Failed to fetch bookings' });
+  }
 });
 
-app.post("/api/bookings", (req, res) => {
-  const booking = {
-    ...req.body,
-    id: Math.random().toString(36).substr(2, 9),
-    createdAt: new Date().toISOString(),
-  };
-  bookings.push(booking);
-  console.log('New booking created:', booking);
-  res.json(booking);
+app.post("/api/bookings", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const booking = await createBooking(userId, req.body);
+    console.log('[bookings] New booking created:', booking.id);
+    res.json(booking);
+  } catch (error) {
+    console.error('[bookings] Error creating:', error);
+    res.status(500).json({ error: 'Failed to create booking' });
+  }
 });
 
-app.put("/api/bookings/:id/status", (req, res) => {
+app.put("/api/bookings/:id/status", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
   const { id } = req.params;
   const { status } = req.body;
-  const booking = bookings.find(b => b.id === id);
-  
-  if (booking) {
-    booking.status = status;
-    console.log(`Booking ${id} status updated to ${status}`);
-    res.json(booking);
-  } else {
-    res.status(404).json({ error: 'Booking not found' });
+  try {
+    await updateBookingStatus(userId, id, status);
+    console.log(`[bookings] Booking ${id} status updated to ${status}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[bookings] Error updating status:', error);
+    res.status(500).json({ error: 'Failed to update booking status' });
   }
 });
 
 // Services API endpoints
-app.get("/api/services", (req, res) => {
-  res.json(services);
-});
-
-app.post("/api/services", (req, res) => {
-  const service = req.body;
-  const existingIndex = services.findIndex(s => s.id === service.id);
-  
-  if (existingIndex >= 0) {
-    services[existingIndex] = service;
-  } else {
-    services.push(service);
+app.get("/api/services", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
   }
-  
-  console.log('Service saved:', service);
-  res.json(service);
+  try {
+    const userServices = await listServices(userId);
+    res.json(userServices);
+  } catch (error) {
+    console.error('[services] Error fetching:', error);
+    res.status(500).json({ error: 'Failed to fetch services' });
+  }
 });
 
-app.put("/api/services", (req, res) => {
-  const service = req.body;
-  const index = services.findIndex(s => s.id === service.id);
-  
-  if (index >= 0) {
-    services[index] = service;
-    console.log('Service updated:', service);
+app.post("/api/services", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const service = await saveService(userId, req.body);
+    console.log('[services] Service saved:', service.id);
     res.json(service);
-  } else {
-    res.status(404).json({ error: 'Service not found' });
+  } catch (error) {
+    console.error('[services] Error saving:', error);
+    res.status(500).json({ error: 'Failed to save service' });
   }
 });
 
-app.delete("/api/services/:id", (req, res) => {
+app.put("/api/services", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const service = await saveService(userId, req.body);
+    console.log('[services] Service updated:', service.id);
+    res.json(service);
+  } catch (error) {
+    console.error('[services] Error updating:', error);
+    res.status(500).json({ error: 'Failed to update service' });
+  }
+});
+
+app.delete("/api/services/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
   const { id } = req.params;
-  const index = services.findIndex(s => s.id === id);
-  
-  if (index >= 0) {
-    services.splice(index, 1);
-    console.log('Service deleted:', id);
+  try {
+    await deleteService(userId, id);
+    console.log('[services] Service deleted:', id);
     res.json({ success: true });
-  } else {
-    res.status(404).json({ error: 'Service not found' });
+  } catch (error) {
+    console.error('[services] Error deleting:', error);
+    res.status(500).json({ error: 'Failed to delete service' });
   }
 });
 
@@ -986,37 +1039,51 @@ function getStoreSettings(userId) {
   return storeSettingsByUser.get(userId);
 }
 
-app.get("/api/store/settings", (req, res) => {
+app.get("/api/store/settings", async (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) {
     return res.status(401).json({ error: 'User ID required' });
   }
-  res.json(getStoreSettings(userId));
+  try {
+    const settings = await pgGetStoreSettings(userId);
+    res.json(settings);
+  } catch (error) {
+    console.error('[store] Error fetching settings:', error);
+    res.status(500).json({ error: 'Failed to fetch store settings' });
+  }
 });
 
-app.put("/api/store/settings", (req, res) => {
+app.put("/api/store/settings", async (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) {
     return res.status(401).json({ error: 'User ID required' });
   }
   
-  const { storeName, storePhone } = req.body;
-  const settings = getStoreSettings(userId);
-  
-  if (storeName !== undefined) {
-    if (!storeName || storeName.trim().length === 0) {
+  try {
+    const { storeName, storePhone } = req.body;
+    const currentSettings = await pgGetStoreSettings(userId);
+    
+    const updatedSettings = {
+      storeId: currentSettings.storeId,
+      storeName: storeName !== undefined ? storeName.trim() : currentSettings.storeName,
+      storePhone: storePhone !== undefined ? storePhone.trim() : currentSettings.storePhone,
+    };
+    
+    if (!updatedSettings.storeName || updatedSettings.storeName.length === 0) {
       return res.status(400).json({ error: 'Store name is required' });
     }
-    settings.storeName = storeName.trim();
+    
+    const saved = await pgSaveStoreSettings(userId, updatedSettings);
+    console.log('[store] Settings updated:', saved);
+    res.json(saved);
+  } catch (error) {
+    console.error('[store] Error updating settings:', error);
+    if (error.message === 'Store name already taken') {
+      res.status(400).json({ error: 'Store name already taken' });
+    } else {
+      res.status(500).json({ error: 'Failed to update store settings' });
+    }
   }
-  
-  if (storePhone !== undefined) {
-    settings.storePhone = storePhone.trim();
-  }
-  
-  storeSettingsByUser.set(userId, settings);
-  console.log('Store settings updated:', settings);
-  res.json(settings);
 });
 
 // Business settings (used by AI for context) - global for now
@@ -1033,21 +1100,19 @@ let businessSettings = {
 };
 
 // Get store by name (for public store access)
-app.get("/api/store/by-name/:storeName", (req, res) => {
+app.get("/api/store/by-name/:storeName", async (req, res) => {
   const { storeName } = req.params;
-  
-  // Normalize store names for comparison (lowercase, trim)
-  const normalizedRequestName = storeName.toLowerCase().trim().replace(/\s+/g, '-');
-  
-  // Search through all user stores
-  for (const [userId, settings] of storeSettingsByUser.entries()) {
-    const normalizedStoreName = settings.storeName.toLowerCase().trim().replace(/\s+/g, '-');
-    if (normalizedRequestName === normalizedStoreName) {
-      return res.json(settings);
+  try {
+    const store = await pgGetStoreByName(storeName);
+    if (store) {
+      res.json(store);
+    } else {
+      res.status(404).json({ error: 'Store not found' });
     }
+  } catch (error) {
+    console.error('[store] Error fetching by name:', error);
+    res.status(500).json({ error: 'Failed to fetch store' });
   }
-  
-  res.status(404).json({ error: 'Store not found' });
 });
 
 // Business settings API (Postgres-backed)
@@ -1094,17 +1159,94 @@ app.put("/api/business/settings", async (req, res) => {
   }
 });
 
-// Orders API
-app.get("/api/orders", (req, res) => {
+// Products API
+app.get("/api/products", async (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) {
     return res.status(401).json({ error: 'User ID required' });
   }
-  const userOrders = orders.filter(o => o.userId === userId);
-  res.json(userOrders);
+  try {
+    const products = await listProducts(userId);
+    res.json(products);
+  } catch (error) {
+    console.error('[products] Error fetching:', error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
 });
 
-app.post("/api/orders", (req, res) => {
+app.get("/api/products/by-store/:storeName", async (req, res) => {
+  const { storeName } = req.params;
+  try {
+    const products = await getProductsByStore(storeName);
+    res.json(products);
+  } catch (error) {
+    console.error('[products] Error fetching by store:', error);
+    res.status(500).json({ error: 'Failed to fetch products' });
+  }
+});
+
+app.post("/api/products", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const product = await saveProduct(userId, req.body);
+    console.log('[products] Product saved:', product.id);
+    res.json(product);
+  } catch (error) {
+    console.error('[products] Error saving:', error);
+    res.status(500).json({ error: 'Failed to save product' });
+  }
+});
+
+app.put("/api/products/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const product = await saveProduct(userId, { ...req.body, id: req.params.id });
+    console.log('[products] Product updated:', product.id);
+    res.json(product);
+  } catch (error) {
+    console.error('[products] Error updating:', error);
+    res.status(500).json({ error: 'Failed to update product' });
+  }
+});
+
+app.delete("/api/products/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  const { id } = req.params;
+  try {
+    await deleteProduct(userId, id);
+    console.log('[products] Product deleted:', id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[products] Error deleting:', error);
+    res.status(500).json({ error: 'Failed to delete product' });
+  }
+});
+
+// Orders API
+app.get("/api/orders", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const userOrders = await listOrders(userId);
+    res.json(userOrders);
+  } catch (error) {
+    console.error('[orders] Error fetching:', error);
+    res.status(500).json({ error: 'Failed to fetch orders' });
+  }
+});
+
+app.post("/api/orders", async (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) {
     return res.status(401).json({ error: 'User ID required' });
@@ -1116,24 +1258,24 @@ app.post("/api/orders", (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   
-  const order = {
-    id: Math.random().toString(36).substr(2, 9),
-    userId,
-    customerName,
-    customerPhone,
-    items,
-    totalAmount,
-    totalItems,
-    status: 'pending',
-    createdAt: new Date().toISOString(),
-  };
-  
-  orders.unshift(order); // Add to beginning
-  console.log('New order created:', order);
-  res.json(order);
+  try {
+    const order = await createOrder(userId, {
+      customerName,
+      customerPhone,
+      items,
+      totalAmount,
+      totalItems,
+      status: 'pending'
+    });
+    console.log('[orders] New order created:', order.id);
+    res.json(order);
+  } catch (error) {
+    console.error('[orders] Error creating:', error);
+    res.status(500).json({ error: 'Failed to create order' });
+  }
 });
 
-app.put("/api/orders/:id", (req, res) => {
+app.put("/api/orders/:id", async (req, res) => {
   const userId = req.headers['x-user-id'];
   if (!userId) {
     return res.status(401).json({ error: 'User ID required' });
@@ -1142,13 +1284,13 @@ app.put("/api/orders/:id", (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   
-  const order = orders.find(o => o.id === id && o.userId === userId);
-  if (order) {
-    order.status = status;
-    console.log('Order status updated:', id, status);
-    res.json(order);
-  } else {
-    res.status(404).json({ error: 'Order not found' });
+  try {
+    await updateOrderStatus(userId, id, status);
+    console.log('[orders] Order status updated:', id, status);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[orders] Error updating status:', error);
+    res.status(500).json({ error: 'Failed to update order status' });
   }
 });
 

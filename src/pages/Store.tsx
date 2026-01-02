@@ -92,7 +92,7 @@ const mockProducts: Product[] = [
 export default function Store() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -122,13 +122,31 @@ export default function Store() {
   const [tempStorePhone, setTempStorePhone] = useState('');
   const [loadingStore, setLoadingStore] = useState(true);
 
-  // Fetch store settings on mount
+  // Fetch store settings and products on mount
   useEffect(() => {
     if (user?.id) {
       fetchStoreSettings();
+      fetchProducts();
       fetchOrders();
     }
   }, [user?.id]);
+
+  const fetchProducts = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(API_ENDPOINTS.PRODUCTS, {
+        headers: {
+          'x-user-id': user.id,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+    }
+  };
 
   const fetchOrders = async () => {
     if (!user?.id) return;
@@ -379,7 +397,7 @@ export default function Store() {
     setIsDialogOpen(true);
   };
 
-  const handleSaveProduct = () => {
+  const handleSaveProduct = async () => {
     if (!formData.title || !formData.price || !formData.category) {
       toast({
         title: "Error",
@@ -390,7 +408,7 @@ export default function Store() {
     }
 
     const productData: Product = {
-      id: editingProduct?.id || Math.random().toString(36).substr(2, 9),
+      id: editingProduct?.id || '',
       title: formData.title,
       description: formData.description,
       price: parseFloat(formData.price),
@@ -399,21 +417,66 @@ export default function Store() {
       inStock: formData.inStock,
     };
 
-    if (editingProduct) {
-      setProducts(products.map(p => p.id === editingProduct.id ? productData : p));
-      toast({ title: "Product updated", description: "Product has been updated successfully" });
-    } else {
-      setProducts([...products, productData]);
-      toast({ title: "Product added", description: "New product has been added to your store" });
-    }
+    try {
+      const endpoint = editingProduct 
+        ? API_ENDPOINTS.PRODUCT_BY_ID(editingProduct.id)
+        : API_ENDPOINTS.PRODUCTS;
+      const method = editingProduct ? 'PUT' : 'POST';
+      
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+        },
+        body: JSON.stringify(productData),
+      });
 
-    setIsDialogOpen(false);
-    resetForm();
+      if (response.ok) {
+        const savedProduct = await response.json();
+        if (editingProduct) {
+          setProducts(products.map(p => p.id === editingProduct.id ? savedProduct : p));
+          toast({ title: "Product updated", description: "Product has been updated successfully" });
+        } else {
+          setProducts([...products, savedProduct]);
+          toast({ title: "Product added", description: "New product has been added to your store" });
+        }
+        setIsDialogOpen(false);
+        resetForm();
+      } else {
+        throw new Error('Failed to save product');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save product",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleDeleteProduct = (id: string) => {
-    setProducts(products.filter(p => p.id !== id));
-    toast({ title: "Product deleted", description: "Product has been removed from your store" });
+  const handleDeleteProduct = async (id: string) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.PRODUCT_BY_ID(id), {
+        method: 'DELETE',
+        headers: {
+          'x-user-id': user?.id || '',
+        },
+      });
+
+      if (response.ok) {
+        setProducts(products.filter(p => p.id !== id));
+        toast({ title: "Product deleted", description: "Product has been removed from your store" });
+      } else {
+        throw new Error('Failed to delete product');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete product",
+        variant: "destructive",
+      });
+    }
   };
 
   const filteredProducts = products.filter(product => {

@@ -132,6 +132,95 @@ export async function initSchema() {
       ts TIMESTAMPTZ DEFAULT NOW()
     );
   `);
+  
+  // Store settings table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS store_settings (
+      user_id TEXT PRIMARY KEY,
+      store_id TEXT UNIQUE NOT NULL,
+      store_name TEXT NOT NULL,
+      store_phone TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
+  // Products table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      price NUMERIC(10,2) NOT NULL,
+      image TEXT,
+      category TEXT,
+      in_stock BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
+  // Orders table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS orders (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      customer_name TEXT NOT NULL,
+      customer_phone TEXT NOT NULL,
+      items JSONB NOT NULL,
+      total_amount NUMERIC(10,2) NOT NULL,
+      total_items INT NOT NULL,
+      status TEXT DEFAULT 'pending',
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
+  // Booking services table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS booking_services (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      duration INT NOT NULL,
+      price NUMERIC(10,2) NOT NULL,
+      description TEXT,
+      available_dates JSONB DEFAULT '[]'::jsonb,
+      time_slots JSONB DEFAULT '[]'::jsonb,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
+  // Bookings table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS bookings (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      customer_name TEXT NOT NULL,
+      customer_phone TEXT NOT NULL,
+      service_id TEXT NOT NULL,
+      service_name TEXT NOT NULL,
+      date_booked DATE NOT NULL,
+      time_slot TEXT NOT NULL,
+      price NUMERIC(10,2) NOT NULL,
+      status TEXT DEFAULT 'pending',
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
+  // Booking settings table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS booking_settings (
+      user_id TEXT PRIMARY KEY,
+      enabled BOOLEAN DEFAULT FALSE,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
   console.log('[postgres] schema initialized');
 }
 
@@ -367,5 +456,315 @@ export async function updateUserFeatures(userId, features) {
 export async function updateUserLimits(userId, limits) {
   // For now, limits are stored in business_settings or separate table
   // This is a placeholder for future implementation
+  return true;
+}
+
+// ========================================
+// Store Functions
+// ========================================
+
+export async function getStoreSettings(userId) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query('SELECT * FROM store_settings WHERE user_id=$1', [userId]);
+  if (rows[0]) {
+    return {
+      storeId: rows[0].store_id,
+      storeName: rows[0].store_name,
+      storePhone: rows[0].store_phone || '',
+    };
+  }
+  // Generate default store ID if doesn't exist
+  const storeId = crypto.randomBytes(8).toString('hex');
+  return { storeId, storeName: '', storePhone: '' };
+}
+
+export async function saveStoreSettings(userId, settings) {
+  const p = ensurePool();
+  if (!p) return null;
+  
+  // Check if store name already exists for another user
+  const { rows: existing } = await p.query(
+    'SELECT user_id FROM store_settings WHERE store_name=$1 AND user_id!=$2',
+    [settings.storeName, userId]
+  );
+  
+  if (existing.length > 0) {
+    throw new Error('Store name already taken');
+  }
+  
+  const storeId = settings.storeId || crypto.randomBytes(8).toString('hex');
+  
+  await p.query(`
+    INSERT INTO store_settings (user_id, store_id, store_name, store_phone, updated_at)
+    VALUES ($1, $2, $3, $4, NOW())
+    ON CONFLICT (user_id) DO UPDATE SET
+      store_name = EXCLUDED.store_name,
+      store_phone = EXCLUDED.store_phone,
+      updated_at = NOW();
+  `, [userId, storeId, settings.storeName, settings.storePhone || '']);
+  
+  return { storeId, storeName: settings.storeName, storePhone: settings.storePhone || '' };
+}
+
+export async function getStoreByName(storeName) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query('SELECT * FROM store_settings WHERE store_name=$1', [storeName]);
+  if (rows[0]) {
+    return {
+      userId: rows[0].user_id,
+      storeId: rows[0].store_id,
+      storeName: rows[0].store_name,
+      storePhone: rows[0].store_phone || '',
+    };
+  }
+  return null;
+}
+
+// Product Functions
+export async function listProducts(userId) {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(
+    'SELECT * FROM products WHERE user_id=$1 ORDER BY created_at DESC',
+    [userId]
+  );
+  return rows.map(r => ({
+    id: r.id,
+    title: r.title,
+    description: r.description,
+    price: parseFloat(r.price),
+    image: r.image,
+    category: r.category,
+    inStock: r.in_stock,
+  }));
+}
+
+export async function getProductsByStore(storeName) {
+  const p = ensurePool();
+  if (!p) return [];
+  
+  const store = await getStoreByName(storeName);
+  if (!store) return [];
+  
+  return await listProducts(store.userId);
+}
+
+export async function saveProduct(userId, product) {
+  const p = ensurePool();
+  if (!p) return null;
+  
+  const id = product.id || crypto.randomBytes(12).toString('hex');
+  
+  await p.query(`
+    INSERT INTO products (id, user_id, title, description, price, image, category, in_stock, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+    ON CONFLICT (id) DO UPDATE SET
+      title = EXCLUDED.title,
+      description = EXCLUDED.description,
+      price = EXCLUDED.price,
+      image = EXCLUDED.image,
+      category = EXCLUDED.category,
+      in_stock = EXCLUDED.in_stock,
+      updated_at = NOW();
+  `, [id, userId, product.title, product.description, product.price, product.image, product.category, product.inStock !== false]);
+  
+  return { ...product, id };
+}
+
+export async function deleteProduct(userId, productId) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query('DELETE FROM products WHERE id=$1 AND user_id=$2', [productId, userId]);
+  return true;
+}
+
+// Order Functions
+export async function listOrders(userId) {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(
+    'SELECT * FROM orders WHERE user_id=$1 ORDER BY created_at DESC',
+    [userId]
+  );
+  return rows.map(r => ({
+    id: r.id,
+    customerName: r.customer_name,
+    customerPhone: r.customer_phone,
+    items: r.items,
+    totalAmount: parseFloat(r.total_amount),
+    totalItems: r.total_items,
+    status: r.status,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function createOrder(userId, order) {
+  const p = ensurePool();
+  if (!p) return null;
+  
+  const id = crypto.randomBytes(12).toString('hex');
+  
+  await p.query(`
+    INSERT INTO orders (id, user_id, customer_name, customer_phone, items, total_amount, total_items, status, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+  `, [
+    id,
+    userId,
+    order.customerName,
+    order.customerPhone,
+    JSON.stringify(order.items),
+    order.totalAmount,
+    order.totalItems,
+    order.status || 'pending'
+  ]);
+  
+  return { ...order, id, createdAt: new Date().toISOString() };
+}
+
+export async function updateOrderStatus(userId, orderId, status) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query(
+    'UPDATE orders SET status=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3',
+    [status, orderId, userId]
+  );
+  return true;
+}
+
+// ========================================
+// Booking Functions
+// ========================================
+
+export async function getBookingSettings(userId) {
+  const p = ensurePool();
+  if (!p) return { enabled: false };
+  const { rows } = await p.query('SELECT * FROM booking_settings WHERE user_id=$1', [userId]);
+  return rows[0] ? { enabled: rows[0].enabled } : { enabled: false };
+}
+
+export async function setBookingStatus(userId, enabled) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query(`
+    INSERT INTO booking_settings (user_id, enabled, updated_at)
+    VALUES ($1, $2, NOW())
+    ON CONFLICT (user_id) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = NOW();
+  `, [userId, enabled]);
+  return true;
+}
+
+export async function listServices(userId) {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(
+    'SELECT * FROM booking_services WHERE user_id=$1 ORDER BY created_at DESC',
+    [userId]
+  );
+  return rows.map(r => ({
+    id: r.id,
+    name: r.name,
+    duration: r.duration,
+    price: parseFloat(r.price),
+    description: r.description,
+    availableDates: r.available_dates || [],
+    timeSlots: r.time_slots || [],
+  }));
+}
+
+export async function saveService(userId, service) {
+  const p = ensurePool();
+  if (!p) return null;
+  
+  const id = service.id || crypto.randomBytes(12).toString('hex');
+  
+  await p.query(`
+    INSERT INTO booking_services (id, user_id, name, duration, price, description, available_dates, time_slots, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+    ON CONFLICT (id) DO UPDATE SET
+      name = EXCLUDED.name,
+      duration = EXCLUDED.duration,
+      price = EXCLUDED.price,
+      description = EXCLUDED.description,
+      available_dates = EXCLUDED.available_dates,
+      time_slots = EXCLUDED.time_slots,
+      updated_at = NOW();
+  `, [
+    id,
+    userId,
+    service.name,
+    service.duration,
+    service.price,
+    service.description,
+    JSON.stringify(service.availableDates || []),
+    JSON.stringify(service.timeSlots || [])
+  ]);
+  
+  return { ...service, id };
+}
+
+export async function deleteService(userId, serviceId) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query('DELETE FROM booking_services WHERE id=$1 AND user_id=$2', [serviceId, userId]);
+  return true;
+}
+
+export async function listBookings(userId) {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(
+    'SELECT * FROM bookings WHERE user_id=$1 ORDER BY date_booked DESC, time_slot ASC',
+    [userId]
+  );
+  return rows.map(r => ({
+    id: r.id,
+    customerName: r.customer_name,
+    customerPhone: r.customer_phone,
+    serviceId: r.service_id,
+    serviceName: r.service_name,
+    dateBooked: r.date_booked,
+    timeSlot: r.time_slot,
+    price: parseFloat(r.price),
+    status: r.status,
+    notes: r.notes || '',
+    createdAt: r.created_at,
+  }));
+}
+
+export async function createBooking(userId, booking) {
+  const p = ensurePool();
+  if (!p) return null;
+  
+  const id = crypto.randomBytes(12).toString('hex');
+  
+  await p.query(`
+    INSERT INTO bookings (id, user_id, customer_name, customer_phone, service_id, service_name, date_booked, time_slot, price, status, notes, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+  `, [
+    id,
+    userId,
+    booking.customerName,
+    booking.customerPhone,
+    booking.serviceId,
+    booking.serviceName,
+    booking.dateBooked,
+    booking.timeSlot,
+    booking.price,
+    booking.status || 'pending',
+    booking.notes || ''
+  ]);
+  
+  return { ...booking, id, createdAt: new Date().toISOString() };
+}
+
+export async function updateBookingStatus(userId, bookingId, status) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query(
+    'UPDATE bookings SET status=$1, updated_at=NOW() WHERE id=$2 AND user_id=$3',
+    [status, bookingId, userId]
+  );
   return true;
 }
