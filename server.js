@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import Twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -1090,6 +1090,90 @@ app.delete("/api/services/:id", async (req, res) => {
   }
 });
 
+// ========================================
+// STAFF API
+// ========================================
+
+app.get("/api/staff", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const staff = await listStaff(userId);
+    res.json(staff);
+  } catch (error) {
+    console.error('[staff] Error fetching:', error);
+    res.status(500).json({ error: 'Failed to fetch staff' });
+  }
+});
+
+app.get("/api/staff/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  const { id } = req.params;
+  try {
+    const staff = await getStaffById(id, userId);
+    if (!staff) {
+      return res.status(404).json({ error: 'Staff not found' });
+    }
+    res.json(staff);
+  } catch (error) {
+    console.error('[staff] Error fetching by id:', error);
+    res.status(500).json({ error: 'Failed to fetch staff' });
+  }
+});
+
+app.post("/api/staff", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const staff = await createStaff(userId, req.body);
+    console.log('[staff] Staff created:', staff.id);
+    res.json(staff);
+  } catch (error) {
+    console.error('[staff] Error creating:', error);
+    res.status(500).json({ error: 'Failed to create staff' });
+  }
+});
+
+app.put("/api/staff/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  const { id } = req.params;
+  try {
+    await updateStaff(id, userId, req.body);
+    const updated = await getStaffById(id, userId);
+    console.log('[staff] Staff updated:', id);
+    res.json(updated);
+  } catch (error) {
+    console.error('[staff] Error updating:', error);
+    res.status(500).json({ error: 'Failed to update staff' });
+  }
+});
+
+app.delete("/api/staff/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  const { id } = req.params;
+  try {
+    await deleteStaff(id, userId);
+    console.log('[staff] Staff deleted:', id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[staff] Error deleting:', error);
+    res.status(500).json({ error: 'Failed to delete staff' });
+  }
+});
+
 // Store settings API (per user)
 const storeSettingsByUser = new Map();
 
@@ -1419,7 +1503,7 @@ app.get("/api/admin/users", async (req, res) => {
         ordersCount: orders.length,
         bookingsCount: bookings.length,
         isCurrent: dbUser.id === requestingUserId,
-        enabledFeatures: dbUser.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
+        enabledFeatures: dbUser.enabled_features || ['conversations', 'store', 'bookings', 'staff', 'settings', 'billing'],
         limits: dbUser.limits || {
           maxConversations: 100,
           maxProducts: 50,
@@ -1579,7 +1663,7 @@ app.post("/api/auth/signup", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
+        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'staff', 'settings', 'billing'],
         limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }
     });
@@ -1629,7 +1713,7 @@ app.post("/api/auth/login", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
+        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'staff', 'settings', 'billing'],
         limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }
     });
@@ -1668,7 +1752,7 @@ app.get("/api/auth/me", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
+        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'staff', 'settings', 'billing'],
         limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }
     });

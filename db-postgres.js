@@ -65,7 +65,7 @@ export async function initSchema() {
       password_hash TEXT NOT NULL,
       name TEXT,
       role TEXT DEFAULT 'user',
-      enabled_features JSONB DEFAULT '["conversations", "store", "bookings", "settings", "billing"]'::jsonb,
+      enabled_features JSONB DEFAULT '["conversations", "store", "bookings", "staff", "settings", "billing"]'::jsonb,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -74,7 +74,7 @@ export async function initSchema() {
   // Migration: Add enabled_features column if it doesn't exist
   await p.query(`
     ALTER TABLE users 
-    ADD COLUMN IF NOT EXISTS enabled_features JSONB DEFAULT '["conversations", "store", "bookings", "settings", "billing"]'::jsonb;
+    ADD COLUMN IF NOT EXISTS enabled_features JSONB DEFAULT '["conversations", "store", "bookings", "staff", "settings", "billing"]'::jsonb;
   `);
   
   // Migration: Add limits column if it doesn't exist
@@ -247,6 +247,19 @@ export async function initSchema() {
     CREATE TABLE IF NOT EXISTS booking_settings (
       user_id TEXT PRIMARY KEY,
       enabled BOOLEAN DEFAULT FALSE,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
+  // Staff table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS staff (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      gender TEXT,
+      promo_code TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
@@ -878,6 +891,109 @@ export async function updateBooking(userId, bookingId, updates) {
     values
   );
   
+  return true;
+}
+
+// ========================================
+// Staff Functions
+// ========================================
+
+export async function listStaff(userId) {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(
+    'SELECT * FROM staff WHERE user_id=$1 ORDER BY created_at DESC',
+    [userId]
+  );
+  return rows.map(r => ({
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    gender: r.gender,
+    promoCode: r.promo_code,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function getStaffById(staffId, userId) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query(
+    'SELECT * FROM staff WHERE id=$1 AND user_id=$2',
+    [staffId, userId]
+  );
+  if (rows.length === 0) return null;
+  const r = rows[0];
+  return {
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    gender: r.gender,
+    promoCode: r.promo_code,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export async function createStaff(userId, staffData) {
+  const p = ensurePool();
+  if (!p) return null;
+  
+  const id = crypto.randomBytes(16).toString('hex');
+  await p.query(
+    `INSERT INTO staff (id, user_id, name, gender, promo_code, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
+    [id, userId, staffData.name, staffData.gender || null, staffData.promoCode || null]
+  );
+  
+  return {
+    id,
+    userId,
+    name: staffData.name,
+    gender: staffData.gender || null,
+    promoCode: staffData.promoCode || null,
+  };
+}
+
+export async function updateStaff(staffId, userId, updates) {
+  const p = ensurePool();
+  if (!p) return false;
+  
+  const fields = [];
+  const values = [];
+  let paramCount = 1;
+  
+  if (updates.name !== undefined) {
+    fields.push(`name = $${paramCount++}`);
+    values.push(updates.name);
+  }
+  if (updates.gender !== undefined) {
+    fields.push(`gender = $${paramCount++}`);
+    values.push(updates.gender || null);
+  }
+  if (updates.promoCode !== undefined) {
+    fields.push(`promo_code = $${paramCount++}`);
+    values.push(updates.promoCode || null);
+  }
+  
+  if (fields.length === 0) return false;
+  
+  fields.push(`updated_at = NOW()`);
+  values.push(staffId, userId);
+  
+  await p.query(
+    `UPDATE staff SET ${fields.join(', ')} WHERE id = $${paramCount++} AND user_id = $${paramCount++}`,
+    values
+  );
+  
+  return true;
+}
+
+export async function deleteStaff(staffId, userId) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query('DELETE FROM staff WHERE id=$1 AND user_id=$2', [staffId, userId]);
   return true;
 }
 

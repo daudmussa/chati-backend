@@ -32,6 +32,10 @@ export const API_ENDPOINTS = {
   SERVICE_BY_ID: (id: string) => `${API_BASE_URL}/api/services/${id}`,
   BOOKING_STATUS: (id: string) => `${API_BASE_URL}/api/bookings/${id}/status`,
   
+  // Staff
+  STAFF: `${API_BASE_URL}/api/staff`,
+  STAFF_BY_ID: (id: string) => `${API_BASE_URL}/api/staff/${id}`,
+  
   // Settings
   BUSINESS_SETTINGS: `${API_BASE_URL}/api/business/settings`,
   

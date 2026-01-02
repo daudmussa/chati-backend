@@ -60,6 +60,7 @@ export default function Admin() {
     { id: 'conversations', label: 'Conversations', icon: '💬' },
     { id: 'store', label: 'Store', icon: '🏪' },
     { id: 'bookings', label: 'Bookings', icon: '📅' },
+    { id: 'staff', label: 'Staff', icon: '👥' },
     { id: 'settings', label: 'AI Settings', icon: '⚙️' },
     { id: 'billing', label: 'Billing', icon: '💳' },
   ];

@@ -12,7 +12,8 @@ import {
   X,
   ShoppingBag,
   CalendarCheck,
-  Shield
+  Shield,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +32,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: 'Conversations', href: '/conversations', icon: MessageSquare, featureId: 'conversations' },
     { name: 'Store', href: '/store', icon: ShoppingBag, featureId: 'store' },
     { name: 'Bookings', href: '/bookings', icon: CalendarCheck, featureId: 'bookings' },
+    { name: 'Staff', href: '/staff', icon: Users, featureId: 'staff' },
     { name: 'AI Settings', href: '/settings', icon: Settings, featureId: 'settings' },
     { name: 'Billing', href: '/billing', icon: CreditCard, featureId: 'billing' },
     ...(user?.role === 'admin' ? [{ name: 'Admin', href: '/admin', icon: Shield, featureId: null }] : []),
