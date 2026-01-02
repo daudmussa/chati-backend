@@ -43,6 +43,7 @@ export default function Admin() {
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterByPayDate, setFilterByPayDate] = useState('');
   const [sortBy, setSortBy] = useState<'payDate' | 'name' | 'created'>('payDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingLimits, setEditingLimits] = useState<{[userId: string]: { maxConversations: number; maxProducts: number }}>({});
@@ -295,16 +296,28 @@ export default function Admin() {
   // Filter and sort users
   const filteredAndSortedUsers = users
     .filter(u => {
-      if (!searchQuery) return true;
-      const query = searchQuery.toLowerCase();
-      return (
-        u.storeName.toLowerCase().includes(query) ||
-        u.storePhone.toLowerCase().includes(query) ||
-        u.email?.toLowerCase().includes(query) ||
-        u.name?.toLowerCase().includes(query) ||
-        u.promoCode?.toLowerCase().includes(query) ||
-        u.storeId.toLowerCase().includes(query)
-      );
+      // Text search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = (
+          u.storeName.toLowerCase().includes(query) ||
+          u.storePhone.toLowerCase().includes(query) ||
+          u.email?.toLowerCase().includes(query) ||
+          u.name?.toLowerCase().includes(query) ||
+          u.promoCode?.toLowerCase().includes(query) ||
+          u.storeId.toLowerCase().includes(query)
+        );
+        if (!matchesSearch) return false;
+      }
+      
+      // Pay date filter
+      if (filterByPayDate) {
+        if (!u.payDate) return false;
+        const userPayDate = formatDateForInput(u.payDate);
+        if (userPayDate !== filterByPayDate) return false;
+      }
+      
+      return true;
     })
     .sort((a, b) => {
       let compareValue = 0;
@@ -404,6 +417,25 @@ export default function Admin() {
                     className="pl-10"
                   />
                 </div>
+                {/* Pay Date Filter */}
+                <div className="relative w-48">
+                  <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="date"
+                    placeholder="Filter by pay date..."
+                    value={filterByPayDate}
+                    onChange={(e) => setFilterByPayDate(e.target.value)}
+                    className="pl-10"
+                  />
+                  {filterByPayDate && (
+                    <button
+                      onClick={() => setFilterByPayDate('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
                 {/* Sort */}
                 <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
                   <SelectTrigger className="w-40">
@@ -432,7 +464,9 @@ export default function Admin() {
               <div className="text-center py-8 text-gray-500">Loading users...</div>
             ) : filteredAndSortedUsers.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                {searchQuery ? 'No users found matching your search' : 'No users found'}
+                {searchQuery || filterByPayDate 
+                  ? 'No users found matching your filters' 
+                  : 'No users found'}
               </div>
             ) : (
               <div className="space-y-3">
