@@ -49,6 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const data = await response.json();
           const userData = data.user;
           
+          console.log('[AuthContext] Loaded user data:', userData);
+          console.log('[AuthContext] User limits:', userData.limits);
+          
           // Fetch business name
           try {
             const settingsRes = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS, {
