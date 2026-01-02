@@ -208,7 +208,11 @@ export async function deleteUserCredentials(userId) {
 export async function getAllUsers() {
   const p = ensurePool();
   if (!p) return [];
-  const { rows } = await p.query('SELECT user_id, twilio_phone_number, business_context, updated_at FROM user_credentials');
+  const { rows } = await p.query(`
+    SELECT id, email, name, role, created_at 
+    FROM users 
+    ORDER BY created_at DESC
+  `);
   return rows;
 }
 

@@ -1152,7 +1152,7 @@ app.put("/api/orders/:id", (req, res) => {
 });
 
 // Admin API - Get all users and their data
-app.get("/api/admin/users", (req, res) => {
+app.get("/api/admin/users", async (req, res) => {
   const requestingUserId = req.headers['x-user-id'];
   const requestingUserRole = req.headers['x-user-role'];
   
@@ -1161,45 +1161,49 @@ app.get("/api/admin/users", (req, res) => {
     return res.status(403).json({ error: 'Admin access required' });
   }
   
-  const allUsers = [];
-  
-  // Get all store settings (which includes userId)
-  for (const [userId, settings] of storeSettingsByUser.entries()) {
-    const userOrders = orders.filter(o => o.userId === userId);
-    const userBookings = bookings.filter(b => b.userId === userId);
-    const userProducts = products.filter(p => p.userId === userId);
+  try {
+    const dbUsers = await getAllUsers();
+    const allUsers = [];
     
-    // Get user features from localStorage simulation (in real app, from database)
-    const userFeatures = settings.enabledFeatures || ['conversations', 'store', 'bookings', 'settings', 'billing'];
-    const userLimits = settings.limits || { maxConversations: 100, maxProducts: 50 };
-    
-    // Count conversations for this user
-    let conversationCount = 0;
-    for (const [phone, data] of conversationHistory.entries()) {
-      if (data.userId === userId) {
-        conversationCount++;
-      }
+    for (const dbUser of dbUsers) {
+      // Get conversations count for this user
+      const conversations = await listConversations(dbUser.id);
+      
+      // Get credentials for phone number
+      const credentials = await getUserCredentials(dbUser.id);
+      
+      // Get business settings
+      const settings = await pgGetBusinessSettings(dbUser.id);
+      
+      allUsers.push({
+        userId: dbUser.id,
+        email: dbUser.email,
+        name: dbUser.name,
+        role: dbUser.role,
+        storeName: settings?.businessDescription || 'No store name',
+        storePhone: credentials?.twilioPhoneNumber || 'No phone',
+        storeId: dbUser.id.slice(0, 8),
+        ordersCount: 0, // TODO: Add orders table
+        bookingsCount: 0, // TODO: Add bookings table
+        totalRevenue: 0,
+        isCurrent: dbUser.id === requestingUserId,
+        enabledFeatures: ['conversations', 'store', 'bookings', 'settings', 'billing'],
+        limits: {
+          maxConversations: 100,
+          maxProducts: 50,
+        },
+        currentCounts: {
+          conversations: conversations.length,
+          products: 0, // TODO: Add products table
+        },
+      });
     }
     
-    allUsers.push({
-      userId,
-      storeName: settings.storeName,
-      storePhone: settings.storePhone,
-      storeId: settings.storeId,
-      ordersCount: userOrders.length,
-      bookingsCount: userBookings.length,
-      totalRevenue: userOrders.reduce((sum, o) => sum + (o.totalAmount || 0), 0),
-      isCurrent: userId === requestingUserId,
-      enabledFeatures: userFeatures,
-      limits: userLimits,
-      currentCounts: {
-        conversations: conversationCount,
-        products: userProducts.length,
-      },
-    });
+    res.json(allUsers);
+  } catch (error) {
+    console.error('[admin] Error fetching users:', error);
+    res.status(500).json({ error: 'Failed to fetch users' });
   }
-  
-  res.json(allUsers);
 });
 
 // Admin API - Update user features
