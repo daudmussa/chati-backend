@@ -774,7 +774,7 @@ export default function CustomerStore() {
       {/* Footer */}
       <footer className="border-t bg-white mt-12">
         <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-8 h-8 bg-[#25D366] rounded-lg flex items-center justify-center">
@@ -797,27 +797,6 @@ export default function CustomerStore() {
                 <li>
                   <Link to="/cart" className="text-gray-600 hover:text-[#25D366]">
                     Shopping Cart
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Support</h4>
-              <ul className="space-y-2 text-sm">
-                <li>
-                  <a 
-                    href={`https://wa.me/${storeSettings.storePhone || ''}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-gray-600 hover:text-[#25D366] flex items-center gap-1"
-                  >
-                    <MessageSquare className="w-3 h-3" />
-                    Contact via WhatsApp
-                  </a>
-                </li>
-                <li>
-                  <Link to="/terms" className="text-gray-600 hover:text-[#25D366]">
-                    Terms & Conditions
                   </Link>
                 </li>
               </ul>
