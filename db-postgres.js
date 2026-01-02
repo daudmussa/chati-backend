@@ -472,8 +472,6 @@ export async function updateUserLimits(userId, limits) {
   console.log('[db-postgres] Update result:', result.rows[0]);
   return true;
 }
-  return true;
-}
 
 // ========================================
 // Store Functions
