@@ -179,14 +179,19 @@ export default function CustomerStore() {
   const [storeSettings, setStoreSettings] = useState({
     storeId: '',
     storeName: 'Our Store',
+    userId: '',
   });
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [tempStoreName, setTempStoreName] = useState('');
   const [loadingStore, setLoadingStore] = useState(true);
   const [copiedId, setCopiedId] = useState(false);
   const [storeNotFound, setStoreNotFound] = useState(false);
+  
+  // Products state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
 
-  // Fetch store settings on mount
+  // Fetch store settings and products on mount
   useEffect(() => {
     fetchStoreSettings();
   }, [storeNameParam]);
@@ -209,6 +214,9 @@ export default function CustomerStore() {
         const data = await response.json();
         setStoreSettings(data);
         setTempStoreName(data.storeName);
+        
+        // Fetch products for this store
+        fetchProducts(data.storeName || storeNameParam);
       } else if (response.status === 404) {
         setStoreNotFound(true);
       }
@@ -216,6 +224,26 @@ export default function CustomerStore() {
       console.error('Failed to fetch store settings:', error);
     } finally {
       setLoadingStore(false);
+    }
+  };
+  
+  const fetchProducts = async (storeName: string) => {
+    setLoadingProducts(true);
+    try {
+      const response = await fetch(API_ENDPOINTS.PRODUCTS_BY_STORE(storeName));
+      
+      if (response.ok) {
+        const data = await response.json();
+        setProducts(data);
+      } else {
+        console.error('Failed to fetch products');
+        setProducts([]);
+      }
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      setProducts([]);
+    } finally {
+      setLoadingProducts(false);
     }
   };
 
@@ -301,7 +329,7 @@ export default function CustomerStore() {
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
-    let result = mockProducts.filter(product => {
+    let result = products.filter(product => {
       const matchesSearch = product.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.description.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = categoryFilter === 'All' || product.category === categoryFilter;
@@ -325,7 +353,7 @@ export default function CustomerStore() {
     }
 
     return result;
-  }, [searchQuery, categoryFilter, sortBy]);
+  }, [products, searchQuery, categoryFilter, sortBy]);
 
   // Pagination
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE);
@@ -484,12 +512,19 @@ export default function CustomerStore() {
         </div>
 
         {/* Products Grid */}
-        {paginatedProducts.length === 0 ? (
+        {loadingProducts ? (
+          <Card className="p-12 text-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+              <p className="text-muted-foreground">Loading products...</p>
+            </div>
+          </Card>
+        ) : paginatedProducts.length === 0 ? (
           <Card className="p-12 text-center">
             <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
             <p className="text-muted-foreground">
-              Try adjusting your search or filters
+              {products.length === 0 ? 'This store has no products yet' : 'Try adjusting your search or filters'}
             </p>
           </Card>
         ) : (
