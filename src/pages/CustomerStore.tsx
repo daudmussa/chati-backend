@@ -16,6 +16,7 @@ import {
   Package,
   ChevronLeft,
   ChevronRight,
+  Settings,
   Store as StoreIcon,
   Copy,
   Check
