@@ -11,7 +11,7 @@ export default function SignIn() {
   const [isSignIn, setIsSignIn] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [businessName, setBusinessName] = useState('');
+  const [name, setName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -27,8 +27,8 @@ export default function SignIn() {
       return;
     }
 
-    if (!isSignIn && !businessName) {
-      setError('Business name is required for sign up');
+    if (!isSignIn && !name) {
+      setError('Name is required for sign up');
       return;
     }
 
@@ -42,11 +42,11 @@ export default function SignIn() {
       if (isSignIn) {
         await login(email, password);
       } else {
-        await signup(email, password, businessName);
+        await signup(email, password, name);
       }
       navigate('/dashboard');
-    } catch (err) {
-      setError(isSignIn ? 'Failed to sign in. Please check your credentials.' : 'Failed to create account. Please try again.');
+    } catch (err: any) {
+      setError(err.message || (isSignIn ? 'Failed to sign in. Please check your credentials.' : 'Failed to create account. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -73,12 +73,12 @@ export default function SignIn() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isSignIn && (
               <div className="space-y-2">
-                <Label htmlFor="businessName">Business Name</Label>
+                <Label htmlFor="name">Name</Label>
                 <Input
-                  id="businessName"
-                  placeholder="e.g., Mama Njema Shop"
-                  value={businessName}
-                  onChange={(e) => setBusinessName(e.target.value)}
+                  id="name"
+                  placeholder="e.g., John Doe"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                   required={!isSignIn}
                 />
               </div>

@@ -1,93 +1,101 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { API_ENDPOINTS } from '../config/api';
 
 interface User {
   id: string;
   email: string;
-  businessName: string;
+  name: string;
   role: 'admin' | 'user';
-  enabledFeatures: string[];
-  limits: {
-    maxConversations: number;
-    maxProducts: number;
-  };
 }
 
 interface AuthContextType {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, businessName: string) => Promise<void>;
+  signup: (email: string, password: string, name: string) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(() => {
-    // Load user from localStorage on init
-    const savedUser = localStorage.getItem('user');
-    return savedUser ? JSON.parse(savedUser) : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const signup = async (email: string, password: string, businessName: string) => {
-    // Mock signup - in production this would call your backend
-    // First user is admin, rest are regular users
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const newUser = {
-      id: Math.random().toString(36).substr(2, 9),
-      email,
-      businessName,
-      role: users.length === 0 ? 'admin' as const : 'user' as const,
-      enabledFeatures: ['conversations', 'store', 'bookings', 'settings', 'billing'],
-      limits: {
-        maxConversations: 100,
-        maxProducts: 50,
-      },
+  // Load user from token on mount
+  useEffect(() => {
+    const loadUser = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(API_ENDPOINTS.AUTH_ME, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setUser(data.user);
+        } else {
+          localStorage.removeItem('auth_token');
+        }
+      } catch (error) {
+        console.error('Failed to load user:', error);
+        localStorage.removeItem('auth_token');
+      } finally {
+        setLoading(false);
+      }
     };
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
-    localStorage.setItem('user', JSON.stringify(newUser));
-    setUser(newUser);
+
+    loadUser();
+  }, []);
+
+  const signup = async (email: string, password: string, name: string) => {
+    const response = await fetch(API_ENDPOINTS.AUTH_SIGNUP, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password, name }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Signup failed');
+    }
+
+    const data = await response.json();
+    localStorage.setItem('auth_token', data.token);
+    setUser(data.user);
   };
 
   const login = async (email: string, password: string) => {
-    // Mock login - in production this would call your backend
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const foundUser = users.find((u: User) => u.email === email);
-    
-    if (foundUser) {
-      // Ensure enabledFeatures exists for backward compatibility
-      if (!foundUser.enabledFeatures) {
-        foundUser.enabledFeatures = ['conversations', 'store', 'bookings', 'settings', 'billing'];
-      }
-      // Ensure limits exist for backward compatibility
-      if (!foundUser.limits) {
-        foundUser.limits = { maxConversations: 100, maxProducts: 50 };
-      }
-      localStorage.setItem('user', JSON.stringify(foundUser));
-      setUser(foundUser);
-    } else {
-      // Fallback for existing sessions - create admin user
-      const mockUser = {
-        id: 'admin-123',
-        email,
-        businessName: 'Demo Business',
-        role: 'admin' as const,
-        enabledFeatures: ['conversations', 'store', 'bookings', 'settings', 'billing'],
-        limits: {
-          maxConversations: 999999,
-          maxProducts: 999999,
-        },
-      };
-      const updatedUsers = [mockUser, ...users];
-      localStorage.setItem('users', JSON.stringify(updatedUsers));
-      localStorage.setItem('user', JSON.stringify(mockUser));
-      setUser(mockUser);
+    const response = await fetch(API_ENDPOINTS.AUTH_LOGIN, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Login failed');
     }
+
+    const data = await response.json();
+    localStorage.setItem('auth_token', data.token);
+    setUser(data.user);
   };
 
   const logout = () => {
-    localStorage.removeItem('user');
+    localStorage.removeItem('auth_token');
     setUser(null);
   };
 
@@ -99,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signup,
         logout,
         isAuthenticated: !!user,
+        loading,
       }}
     >
       {children}

@@ -2,6 +2,11 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export const API_ENDPOINTS = {
+  // Authentication
+  AUTH_SIGNUP: `${API_BASE_URL}/api/auth/signup`,
+  AUTH_LOGIN: `${API_BASE_URL}/api/auth/login`,
+  AUTH_ME: `${API_BASE_URL}/api/auth/me`,
+  
   // Store
   STORE_SETTINGS: `${API_BASE_URL}/api/store/settings`,
   STORE_BY_NAME: (name: string) => `${API_BASE_URL}/api/store/by-name/${encodeURIComponent(name)}`,
