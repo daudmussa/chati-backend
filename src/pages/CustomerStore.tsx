@@ -16,7 +16,6 @@ import {
   Package,
   ChevronLeft,
   ChevronRight,
-  Settings,
   Store as StoreIcon,
   Copy,
   Check
@@ -426,16 +425,6 @@ export default function CustomerStore() {
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  setTempStoreName(storeSettings.storeName);
-                  setIsSettingsOpen(true);
-                }}
-              >
-                <Settings className="w-5 h-5" />
-              </Button>
               <Link to="/cart">
                 <Button variant="outline" className="relative">
                   <ShoppingCart className="w-5 h-5 mr-2" />
@@ -780,6 +769,64 @@ export default function CustomerStore() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Footer */}
+      <footer className="border-t bg-white mt-12">
+        <div className="container mx-auto px-4 py-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-8 h-8 bg-[#25D366] rounded-lg flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5 text-white" />
+                </div>
+                <span className="font-bold text-lg">{storeSettings.storeName}</span>
+              </div>
+              <p className="text-gray-600 text-sm">
+                Shop quality products and get instant support via WhatsApp.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-3">Quick Links</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link to="/shop" className="text-gray-600 hover:text-[#25D366]">
+                    Find Stores
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/cart" className="text-gray-600 hover:text-[#25D366]">
+                    Shopping Cart
+                  </Link>
+                </li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-3">Support</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <a 
+                    href={`https://wa.me/${storeSettings.storePhone || ''}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-600 hover:text-[#25D366] flex items-center gap-1"
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    Contact via WhatsApp
+                  </a>
+                </li>
+                <li>
+                  <Link to="/terms" className="text-gray-600 hover:text-[#25D366]">
+                    Terms & Conditions
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <div className="border-t pt-6 text-center text-gray-600 text-sm">
+            <p>Powered by Chati Solutions</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
