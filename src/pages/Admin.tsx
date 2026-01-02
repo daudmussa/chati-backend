@@ -103,6 +103,7 @@ export default function Admin() {
       if (response.ok) {
         const data = await response.json();
         console.log('[Admin] Users data:', data);
+        console.log('[Admin] First user payDate:', data[0]?.payDate);
         setUsers(data);
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
@@ -546,9 +547,16 @@ export default function Admin() {
                             <div className="space-y-3">
                               {/* Pay Date */}
                               <div className="p-3 rounded bg-purple-50 border border-purple-200">
-                                <Label className="text-sm font-medium text-purple-900 mb-2 block">
-                                  📅 Pay Date
-                                </Label>
+                                <div className="flex items-center justify-between mb-2">
+                                  <Label className="text-sm font-medium text-purple-900">
+                                    📅 Pay Date
+                                  </Label>
+                                  {userData.payDate && !editingSubscription[userData.userId] && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      {new Date(userData.payDate).toLocaleDateString()}
+                                    </Badge>
+                                  )}
+                                </div>
                                 <div className="flex items-center gap-2">
                                   <Input
                                     type="date"
