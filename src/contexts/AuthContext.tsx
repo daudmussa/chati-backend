@@ -8,6 +8,10 @@ interface User {
   role: 'admin' | 'user';
   businessName?: string;
   enabledFeatures?: string[];
+  limits?: {
+    maxConversations: number;
+    maxProducts: number;
+  };
 }
 
 interface AuthContextType {

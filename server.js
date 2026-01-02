@@ -1371,6 +1371,9 @@ app.get("/api/admin/users", async (req, res) => {
       const orders = await listOrders(dbUser.id);
       const bookings = await listBookings(dbUser.id);
       
+      // Get products count
+      const products = await listProducts(dbUser.id);
+      
       allUsers.push({
         userId: dbUser.id,
         email: dbUser.email,
@@ -1384,13 +1387,13 @@ app.get("/api/admin/users", async (req, res) => {
         totalRevenue: orders.reduce((sum, order) => sum + order.totalAmount, 0),
         isCurrent: dbUser.id === requestingUserId,
         enabledFeatures: dbUser.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
-        limits: {
+        limits: dbUser.limits || {
           maxConversations: 100,
           maxProducts: 50,
         },
         currentCounts: {
           conversations: conversations.length,
-          products: 0, // TODO: Count products
+          products: products.length,
         },
       });
     }
@@ -1438,6 +1441,8 @@ app.put("/api/admin/users/:userId/limits", async (req, res) => {
   const { userId } = req.params;
   const { limits } = req.body;
   
+  console.log('[admin] PUT /api/admin/users/:userId/limits:', { userId, limits });
+  
   if (!limits || typeof limits !== 'object') {
     return res.status(400).json({ error: 'limits must be an object' });
   }
@@ -1447,8 +1452,14 @@ app.put("/api/admin/users/:userId/limits", async (req, res) => {
       maxConversations: limits.maxConversations || 100,
       maxProducts: limits.maxProducts || 50,
     };
+    console.log('[admin] Calling updateUserLimits with:', updatedLimits);
     await updateUserLimits(userId, updatedLimits);
     console.log('[admin] User limits updated:', userId, updatedLimits);
+    
+    // Verify the update by fetching the user
+    const user = await getUserById(userId);
+    console.log('[admin] Verified user limits after update:', user?.limits);
+    
     res.json({ success: true, userId, limits: updatedLimits });
   } catch (error) {
     console.error('[admin] Error updating limits:', error);
@@ -1501,7 +1512,8 @@ app.post("/api/auth/signup", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing']
+        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
+        limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }
     });
   } catch (error) {
@@ -1550,7 +1562,8 @@ app.post("/api/auth/login", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing']
+        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
+        limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }
     });
   } catch (error) {
@@ -1579,6 +1592,8 @@ app.get("/api/auth/me", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
     
+    console.log('[auth] /me - User from DB:', { id: user.id, limits: user.limits });
+    
     res.json({
       success: true,
       user: {
@@ -1586,7 +1601,8 @@ app.get("/api/auth/me", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing']
+        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'settings', 'billing'],
+        limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }
     });
   } catch (error) {

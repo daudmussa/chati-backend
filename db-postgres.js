@@ -77,6 +77,12 @@ export async function initSchema() {
     ADD COLUMN IF NOT EXISTS enabled_features JSONB DEFAULT '["conversations", "store", "bookings", "settings", "billing"]'::jsonb;
   `);
   
+  // Migration: Add limits column if it doesn't exist
+  await p.query(`
+    ALTER TABLE users 
+    ADD COLUMN IF NOT EXISTS limits JSONB DEFAULT '{"maxConversations": 100, "maxProducts": 50}'::jsonb;
+  `);
+  
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_credentials (
       user_id TEXT PRIMARY KEY,
@@ -312,7 +318,7 @@ export async function getAllUsers() {
   const p = ensurePool();
   if (!p) return [];
   const { rows } = await p.query(`
-    SELECT id, email, name, role, enabled_features, created_at 
+    SELECT id, email, name, role, enabled_features, limits, created_at 
     FROM users 
     ORDER BY created_at DESC
   `);
@@ -442,7 +448,7 @@ export async function getUserByEmail(email) {
 export async function getUserById(id) {
   const p = ensurePool();
   if (!p) return null;
-  const { rows } = await p.query('SELECT id, email, name, role, enabled_features, created_at FROM users WHERE id=$1', [id]);
+  const { rows } = await p.query('SELECT id, email, name, role, enabled_features, limits, created_at FROM users WHERE id=$1', [id]);
   return rows[0] || null;
 }
 
@@ -454,8 +460,18 @@ export async function updateUserFeatures(userId, features) {
 }
 
 export async function updateUserLimits(userId, limits) {
-  // For now, limits are stored in business_settings or separate table
-  // This is a placeholder for future implementation
+  console.log('[db-postgres] updateUserLimits called:', { userId, limits });
+  const p = ensurePool();
+  if (!p) {
+    console.log('[db-postgres] No pool available');
+    return false;
+  }
+  const limitsJson = JSON.stringify(limits);
+  console.log('[db-postgres] Updating with JSON:', limitsJson);
+  const result = await p.query('UPDATE users SET limits = $1::jsonb, updated_at = NOW() WHERE id = $2 RETURNING limits', [limitsJson, userId]);
+  console.log('[db-postgres] Update result:', result.rows[0]);
+  return true;
+}
   return true;
 }
 
