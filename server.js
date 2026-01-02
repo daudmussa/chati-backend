@@ -5,7 +5,7 @@ import dotenv from "dotenv";
 import Twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -1560,6 +1560,33 @@ process.on("uncaughtException", (err) => {
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
   // Don't exit - just log
+});
+
+// Quick admin promotion endpoint (remove after first admin is created)
+app.post("/api/admin/promote", async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email required' });
+    }
+    
+    const user = await getUserByEmail(email);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const pool = ensurePool();
+    if (!pool) {
+      return res.status(500).json({ error: 'Database unavailable' });
+    }
+    
+    await pool.query('UPDATE users SET role = $1 WHERE email = $2', ['admin', email]);
+    
+    res.json({ success: true, message: `${email} is now an admin` });
+  } catch (error) {
+    console.error('[admin] Promotion error:', error);
+    res.status(500).json({ error: 'Failed to promote user' });
+  }
 });
 
 console.log("[startup] About to call app.listen()...");

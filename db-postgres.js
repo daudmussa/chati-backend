@@ -2,7 +2,7 @@ import { Pool } from 'pg';
 import crypto from 'crypto';
 
 let pool = null;
-function ensurePool() {
+export function ensurePool() {
   if (pool) return pool;
   const DATABASE_URL = process.env.DATABASE_URL;
   if (!DATABASE_URL) {
