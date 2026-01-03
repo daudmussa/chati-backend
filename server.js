@@ -6,7 +6,7 @@ import Twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -1810,6 +1810,35 @@ app.put("/api/admin/users/:userId/subscription", async (req, res) => {
   } catch (error) {
     console.error('[admin] Error updating subscription:', error);
     res.status(500).json({ error: 'Failed to update subscription' });
+  }
+});
+
+// Delete user endpoint
+app.delete("/api/admin/users/:userId", async (req, res) => {
+  const requestingUserId = req.headers['x-user-id'];
+  const requestingUserRole = req.headers['x-user-role'];
+  
+  if (requestingUserRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { userId } = req.params;
+  
+  // Prevent admin from deleting themselves
+  if (userId === requestingUserId) {
+    return res.status(400).json({ error: 'Cannot delete your own account' });
+  }
+  
+  console.log('[admin] DELETE /api/admin/users/:userId:', { userId, requestedBy: requestingUserId });
+  
+  try {
+    await deleteUser(userId);
+    console.log('[admin] User deleted successfully:', userId);
+    
+    res.json({ success: true, userId });
+  } catch (error) {
+    console.error('[admin] Error deleting user:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 

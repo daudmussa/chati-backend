@@ -573,6 +573,36 @@ export async function updateUserSubscription(userId, subscriptionData) {
   return true;
 }
 
+export async function deleteUser(userId) {
+  const p = ensurePool();
+  if (!p) return false;
+  
+  console.log('[db-postgres] Deleting user and all associated data:', userId);
+  
+  try {
+    // Delete all user-related data in correct order (respecting foreign keys)
+    await p.query('DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)', [userId]);
+    await p.query('DELETE FROM conversations WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM bookings WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM services WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM orders WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM products WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM staff WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM booking_settings WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM store_settings WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM business_settings WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM user_credentials WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM phone_user_mapping WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM users WHERE id = $1', [userId]);
+    
+    console.log('[db-postgres] User and all associated data deleted successfully:', userId);
+    return true;
+  } catch (error) {
+    console.error('[db-postgres] Error deleting user:', error);
+    throw error;
+  }
+}
+
 // ========================================
 // Store Functions
 // ========================================

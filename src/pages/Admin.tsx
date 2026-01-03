@@ -295,6 +295,48 @@ export default function Admin() {
     }
   };
 
+  const deleteUserAccount = async (userId: string, userName: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${userName}? This will permanently delete all their data including conversations, products, orders, and bookings. This action cannot be undone.`)) {
+      return;
+    }
+
+    console.log('[Admin] Deleting user:', userId);
+
+    try {
+      const response = await fetch(API_ENDPOINTS.ADMIN_DELETE_USER(userId), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+          'x-user-role': user?.role || '',
+        },
+      });
+
+      console.log('[Admin] Delete response status:', response.status);
+
+      if (response.ok) {
+        // Remove user from local state
+        setUsers(users.filter(u => u.userId !== userId));
+
+        toast({
+          title: "User Deleted",
+          description: `${userName} and all their data have been permanently deleted`,
+        });
+      } else {
+        const error = await response.json();
+        console.error('[Admin] Delete error: response not ok', { status: response.status, error });
+        throw new Error(error.error || 'Failed to delete user');
+      }
+    } catch (error: any) {
+      console.error('[Admin] Delete error:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Filter and sort users
   const filteredAndSortedUsers = users
     .filter(u => {
@@ -487,15 +529,25 @@ export default function Admin() {
                           <Store className="h-6 w-6 text-white" />
                         </div>
                         
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-semibold text-gray-900">{userData.storeName}</h3>
-                            {userData.isCurrent && (
-                              <Badge className="bg-blue-500">You</Badge>
+                          <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap justify-between">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-semibold text-gray-900">{userData.storeName}</h3>
+                              {userData.isCurrent && (
+                                <Badge className="bg-blue-500">You</Badge>
+                              )}
+                            </div>
+                            {!userData.isCurrent && (
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => deleteUserAccount(userData.userId, userData.storeName)}
+                                className="h-7 text-xs"
+                              >
+                                Delete User
+                              </Button>
                             )}
-                          </div>
-                          
-                          <div className="mt-1 space-y-1 text-sm text-gray-600">
+                          </div>                          <div className="mt-1 space-y-1 text-sm text-gray-600">
                             <div className="flex items-center gap-2">
                               <Phone className="h-4 w-4" />
                               <span>{userData.storePhone}</span>
