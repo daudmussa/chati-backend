@@ -26,6 +26,7 @@ import Terms from "./pages/Terms";
 import Pricing from "./pages/Pricing";
 import Features from "./pages/Features";
 import About from "./pages/About";
+import TestUpload from "./pages/TestUpload";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -78,6 +79,7 @@ function App() {
             <Route path="/bookings" element={<FeatureProtectedRoute featureId="bookings"><Bookings /></FeatureProtectedRoute>} />
             <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="/test-upload" element={<ProtectedRoute><TestUpload /></ProtectedRoute>} />
             {/* Public customer-facing pages */}
             <Route path="/shop" element={<ShopLanding />} />
             <Route path="/shop/:storeName" element={<CustomerStore />} />

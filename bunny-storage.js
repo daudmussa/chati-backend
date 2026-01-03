@@ -3,8 +3,7 @@
  * Handles image uploads and retrieval from Bunny CDN
  */
 
-const axios = require('axios');
-const FormData = require('form-data');
+import axios from 'axios';
 
 class BunnyStorage {
   constructor() {
@@ -104,4 +103,4 @@ class BunnyStorage {
   }
 }
 
-module.exports = new BunnyStorage();
+export default new BunnyStorage();
