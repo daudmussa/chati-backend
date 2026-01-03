@@ -8,16 +8,6 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
 
-// Try to import bunny storage (optional)
-let bunnyStorage = null;
-try {
-  const bunnyModule = await import("./bunny-storage.js");
-  bunnyStorage = bunnyModule.default;
-  console.log("[startup] Bunny.net storage loaded successfully");
-} catch (error) {
-  console.log("[startup] Bunny.net storage not available:", error.message);
-}
-
 console.log("[startup] Loading env...");
 dotenv.config();
 dotenv.config({ path: '.env.railway' });
@@ -80,6 +70,76 @@ const stripQuotes = (str) => {
   if (!str) return str;
   return str.replace(/^["']|["']$/g, '');
 };
+
+// Bunny.net Storage Service (inline implementation)
+class BunnyStorage {
+  constructor() {
+    this.storageZone = process.env.BUNNY_STORAGE_ZONE;
+    this.apiKey = process.env.BUNNY_API_KEY;
+    this.cdnUrl = process.env.BUNNY_CDN_URL;
+    this.storageUrl = `https://storage.bunnycdn.com/${this.storageZone}`;
+    this.isConfigured = !!(this.storageZone && this.apiKey && this.cdnUrl);
+  }
+
+  async uploadFile(fileBuffer, fileName, folder = '') {
+    if (!this.isConfigured) {
+      throw new Error('Bunny storage is not configured');
+    }
+
+    try {
+      const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+      const filePath = folder ? `${folder}/${sanitizedFileName}` : sanitizedFileName;
+      const uploadUrl = `${this.storageUrl}/${filePath}`;
+
+      const response = await axios.put(uploadUrl, fileBuffer, {
+        headers: {
+          'AccessKey': this.apiKey,
+          'Content-Type': 'application/octet-stream'
+        }
+      });
+
+      if (response.status === 201) {
+        return {
+          success: true,
+          url: `${this.cdnUrl}/${filePath}`,
+          path: filePath
+        };
+      }
+
+      throw new Error('Upload failed');
+    } catch (error) {
+      console.error('[Bunny Storage] Upload error:', error.message);
+      throw error;
+    }
+  }
+
+  async deleteFile(filePath) {
+    if (!this.isConfigured) {
+      throw new Error('Bunny storage is not configured');
+    }
+
+    try {
+      const deleteUrl = `${this.storageUrl}/${filePath}`;
+      
+      const response = await axios.delete(deleteUrl, {
+        headers: {
+          'AccessKey': this.apiKey
+        }
+      });
+
+      return response.status === 200;
+    } catch (error) {
+      console.error('[Bunny Storage] Delete error:', error.message);
+      throw error;
+    }
+  }
+
+  getCdnUrl(filePath) {
+    return `${this.cdnUrl}/${filePath}`;
+  }
+}
+
+const bunnyStorage = new BunnyStorage();
 
 // Read secrets from environment
 const CLAUDE_API_KEY = stripQuotes(process.env.CLAUDE_API_KEY);
@@ -1211,8 +1271,8 @@ app.delete("/api/staff/:id", async (req, res) => {
 // Upload single image
 app.post("/api/upload/image", upload.single('image'), async (req, res) => {
   try {
-    if (!bunnyStorage) {
-      return res.status(503).json({ error: 'Image upload service not available' });
+    if (!bunnyStorage.isConfigured) {
+      return res.status(503).json({ error: 'Image upload service not configured. Please add BUNNY_STORAGE_ZONE, BUNNY_API_KEY, and BUNNY_CDN_URL to environment variables.' });
     }
 
     const userId = req.headers['x-user-id'];
@@ -1250,8 +1310,8 @@ app.post("/api/upload/image", upload.single('image'), async (req, res) => {
 // Delete image
 app.delete("/api/upload/image", async (req, res) => {
   try {
-    if (!bunnyStorage) {
-      return res.status(503).json({ error: 'Image upload service not available' });
+    if (!bunnyStorage.isConfigured) {
+      return res.status(503).json({ error: 'Image upload service not configured' });
     }
 
     const userId = req.headers['x-user-id'];
