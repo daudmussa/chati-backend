@@ -365,10 +365,20 @@ export async function getAllUsers() {
 export async function getBusinessSettings(userId) {
   const p = ensurePool();
   if (!p) return null;
+  
+  console.log('[db-postgres] getBusinessSettings called for userId:', userId);
+  
   const { rows } = await p.query('SELECT * FROM business_settings WHERE user_id=$1', [userId]);
   const r = rows[0];
-  if (!r) return null;
-  return {
+  
+  console.log('[db-postgres] Retrieved row:', r);
+  
+  if (!r) {
+    console.log('[db-postgres] No business settings found for user');
+    return null;
+  }
+  
+  const settings = {
     businessName: r.business_name || '',
     businessDescription: r.business_description || '',
     tone: r.tone || 'friendly',
@@ -377,11 +387,22 @@ export async function getBusinessSettings(userId) {
     supportName: r.support_name || '',
     supportPhone: r.support_phone || '',
   };
+  
+  console.log('[db-postgres] Returning settings:', settings);
+  
+  return settings;
 }
 
 export async function saveBusinessSettings(userId, settings) {
   const p = ensurePool();
   if (!p) return;
+  
+  console.log('[db-postgres] saveBusinessSettings called:', { 
+    userId, 
+    businessName: settings.businessName,
+    settings 
+  });
+  
   await p.query(`
     INSERT INTO business_settings (
       user_id, business_name, business_description, tone, sample_replies, keywords, support_name, support_phone, updated_at
@@ -405,6 +426,8 @@ export async function saveBusinessSettings(userId, settings) {
     settings.supportName || '',
     settings.supportPhone || '',
   ]);
+  
+  console.log('[db-postgres] Business settings saved successfully');
 }
 
 export async function upsertConversation(userId, storeNumber, customerNumber) {
@@ -464,14 +487,14 @@ export async function listConversations(userId) {
 }
 
 // Auth functions
-export async function createUser(email, passwordHash, name) {
+export async function createUser(email, passwordHash, name, promoCode = null) {
   const p = ensurePool();
   if (!p) return null;
   const id = crypto.randomBytes(16).toString('hex');
   await p.query(`
-    INSERT INTO users (id, email, password_hash, name, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, NOW(), NOW())
-  `, [id, email, passwordHash, name]);
+    INSERT INTO users (id, email, password_hash, name, promo_code, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+  `, [id, email, passwordHash, name, promoCode]);
   return { id, email, name, role: 'user' };
 }
 

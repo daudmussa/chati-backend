@@ -1438,11 +1438,36 @@ app.get("/api/store/by-name/:storeName", async (req, res) => {
 // Business settings API (Postgres-backed)
 app.get("/api/business/settings", async (req, res) => {
   const userId = req.headers['x-user-id'];
+  console.log('[business] GET request, userId:', userId);
   if (!userId) {
     return res.status(401).json({ error: 'User ID required' });
   }
   try {
-    const settings = (await pgGetBusinessSettings(userId)) || businessSettings;
+    let settings = await pgGetBusinessSettings(userId);
+    console.log('[business] Retrieved settings:', settings);
+    
+    // If no settings found, try to get user's name and create default settings
+    if (!settings) {
+      const user = await getUserById(userId);
+      if (user) {
+        const defaultSettings = {
+          businessName: user.name || '',
+          businessDescription: '',
+          tone: 'friendly',
+          sampleReplies: [],
+          keywords: [],
+          supportName: '',
+          supportPhone: '',
+        };
+        // Save the default settings for next time
+        await pgSaveBusinessSettings(userId, defaultSettings);
+        settings = defaultSettings;
+        console.log('[business] Created default settings with user name:', user.name);
+      } else {
+        settings = businessSettings;
+      }
+    }
+    
     res.json(settings);
   } catch (e) {
     console.error('[business] get error:', e);
@@ -1796,7 +1821,7 @@ app.put("/api/admin/users/:userId/subscription", async (req, res) => {
 // Signup endpoint
 app.post("/api/auth/signup", async (req, res) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, name, promoCode } = req.body;
     
     console.log('[auth] Signup request for email:', email);
     
@@ -1814,7 +1839,23 @@ app.post("/api/auth/signup", async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     
     // Create user
-    const user = await createUser(email, passwordHash, name || email.split('@')[0]);
+    const user = await createUser(email, passwordHash, name || email.split('@')[0], promoCode);
+    
+    console.log('[auth] User created:', user.id, 'with name:', user.name);
+    
+    // Initialize business settings with user's name as business name
+    const initialSettings = {
+      businessName: name || email.split('@')[0],
+      businessDescription: '',
+      tone: 'friendly',
+      sampleReplies: [],
+      keywords: [],
+      supportName: '',
+      supportPhone: '',
+    };
+    console.log('[auth] Saving initial business settings:', initialSettings);
+    await pgSaveBusinessSettings(user.id, initialSettings);
+    console.log('[auth] Business settings saved for user:', user.id);
     
     // Generate JWT
     const token = jwt.sign(
@@ -1923,7 +1964,10 @@ app.get("/api/auth/me", async (req, res) => {
       return res.status(403).json({ error: "Your account is currently inactive. Please contact support." });
     }
     
-    console.log('[auth] /me - User from DB:', { id: user.id, limits: user.limits });
+    // Get business settings to include businessName
+    const businessSettings = await pgGetBusinessSettings(user.id);
+    
+    console.log('[auth] /me - User from DB:', { id: user.id, limits: user.limits, businessName: businessSettings?.businessName });
     
     res.json({
       success: true,
@@ -1932,6 +1976,7 @@ app.get("/api/auth/me", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        businessName: businessSettings?.businessName || user.name,
         enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'staff', 'settings', 'billing'],
         limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }

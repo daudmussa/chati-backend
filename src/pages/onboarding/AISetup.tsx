@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,6 +18,7 @@ export default function AISetup() {
   const [loading, setLoading] = useState(false);
   
   const { toast } = useToast();
+  const { user } = useAuth();
   const { setAIPersonality, setCurrentStep } = useOnboarding();
   const navigate = useNavigate();
 
@@ -34,7 +36,10 @@ export default function AISetup() {
       // Save to backend business settings
       const response = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || ''
+        },
         body: JSON.stringify({
           businessDescription,
           tone,

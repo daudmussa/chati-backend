@@ -11,7 +11,8 @@ import { MessageSquare } from 'lucide-react';
 export default function AccountCreation() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [businessName, setBusinessName] = useState('');
+  const [name, setName] = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -23,7 +24,7 @@ export default function AccountCreation() {
     e.preventDefault();
     setError('');
 
-    if (!email || !password || !businessName) {
+    if (!email || !password || !name) {
       setError('All fields are required');
       return;
     }
@@ -35,24 +36,24 @@ export default function AccountCreation() {
 
     setLoading(true);
     try {
-      await signup(email, password, businessName);
+      await signup(email, password, name, promoCode);
       setCurrentStep(2);
       navigate('/onboarding/ai-setup');
-    } catch (err) {
-      setError('Failed to create account. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Failed to create account. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-3 text-center">
-          <div className="mx-auto w-12 h-12 bg-[#25D366] rounded-full flex items-center justify-center">
+          <Link to="/" className="mx-auto w-12 h-12 bg-[#25D366] rounded-full flex items-center justify-center hover:bg-[#20BD5A] transition-colors">
             <MessageSquare className="w-6 h-6 text-white" />
-          </div>
-          <CardTitle className="text-2xl font-bold">Create Your Account</CardTitle>
+          </Link>
+          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
           <CardDescription>
             Start automating your WhatsApp responses with AI
           </CardDescription>
@@ -65,13 +66,22 @@ export default function AccountCreation() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="businessName">Business Name</Label>
+              <Label htmlFor="name">Name</Label>
               <Input
-                id="businessName"
-                placeholder="e.g., Mama Njema Shop"
-                value={businessName}
-                onChange={(e) => setBusinessName(e.target.value)}
+                id="name"
+                placeholder="e.g., John Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="promoCode">Promo Code (Optional)</Label>
+              <Input
+                id="promoCode"
+                placeholder="Enter promo code"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value)}
               />
             </div>
             <div className="space-y-2">
@@ -106,13 +116,19 @@ export default function AccountCreation() {
               className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white"
               disabled={loading}
             >
-              {loading ? 'Creating Account...' : 'Continue'}
+              {loading ? 'Creating Account...' : 'Create Account'}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
             <Link to="/signin" className="text-sm text-gray-600 hover:text-gray-900">
               Already have an account? <span className="text-[#25D366] font-semibold">Sign In</span>
+            </Link>
+          </div>
+
+          <div className="mt-4 text-center">
+            <Link to="/" className="text-sm text-gray-500 hover:text-gray-700">
+              ← Back to home
             </Link>
           </div>
         </CardContent>

@@ -78,16 +78,23 @@ export default function Settings() {
       });
       if (response.ok) {
         const data = await response.json();
-        setBusinessName(data.businessName || '');
+        console.log('[Settings] Fetched business settings:', data);
+        setBusinessName(data.businessName || user?.businessName || user?.name || '');
         setBusinessDescription(data.businessDescription || '');
         setTone(data.tone || 'friendly');
         setSampleReplies(data.sampleReplies || []);
         setKeywords(data.keywords || []);
         setSupportName(data.supportName || '');
         setSupportPhone(data.supportPhone || '');
+      } else {
+        // If API fails, use user's name/businessName as fallback
+        console.log('[Settings] Failed to fetch, using user data as fallback');
+        setBusinessName(user?.businessName || user?.name || '');
       }
     } catch (error) {
       console.error('Failed to fetch business settings:', error);
+      // Use user's name/businessName as fallback
+      setBusinessName(user?.businessName || user?.name || '');
       toast({
         title: "Error",
         description: "Failed to load settings",

@@ -12,6 +12,7 @@ export default function SignIn() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [promoCode, setPromoCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -42,7 +43,7 @@ export default function SignIn() {
       if (isSignIn) {
         await login(email, password);
       } else {
-        await signup(email, password, name);
+        await signup(email, password, name, promoCode);
       }
       navigate('/dashboard');
     } catch (err: any) {
@@ -80,6 +81,17 @@ export default function SignIn() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   required={!isSignIn}
+                />
+              </div>
+            )}
+            {!isSignIn && (
+              <div className="space-y-2">
+                <Label htmlFor="promoCode">Promo Code (Optional)</Label>
+                <Input
+                  id="promoCode"
+                  placeholder="Enter promo code"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
                 />
               </div>
             )}
