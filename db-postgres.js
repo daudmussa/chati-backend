@@ -584,7 +584,7 @@ export async function deleteUser(userId) {
     await p.query('DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)', [userId]);
     await p.query('DELETE FROM conversations WHERE user_id = $1', [userId]);
     await p.query('DELETE FROM bookings WHERE user_id = $1', [userId]);
-    await p.query('DELETE FROM services WHERE user_id = $1', [userId]);
+    await p.query('DELETE FROM booking_services WHERE user_id = $1', [userId]);
     await p.query('DELETE FROM orders WHERE user_id = $1', [userId]);
     await p.query('DELETE FROM products WHERE user_id = $1', [userId]);
     await p.query('DELETE FROM staff WHERE user_id = $1', [userId]);
