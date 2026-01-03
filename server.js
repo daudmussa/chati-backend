@@ -5,7 +5,9 @@ import dotenv from "dotenv";
 import Twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import multer from "multer";
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
+import bunnyStorage from "./bunny-storage.js";
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -44,6 +46,21 @@ app.use((req, res, next) => {
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
+
+// Configure multer for file uploads (memory storage for Bunny CDN)
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Accept images only
+    if (!file.mimetype.startsWith('image/')) {
+      return cb(new Error('Only image files are allowed!'), false);
+    }
+    cb(null, true);
+  }
+});
 
 // Helper function to strip quotes from environment variables
 const stripQuotes = (str) => {
@@ -1171,6 +1188,71 @@ app.delete("/api/staff/:id", async (req, res) => {
   } catch (error) {
     console.error('[staff] Error deleting:', error);
     res.status(500).json({ error: 'Failed to delete staff' });
+  }
+});
+
+// ==========================================
+// Image Upload Endpoints (Bunny CDN)
+// ==========================================
+
+// Upload single image
+app.post("/api/upload/image", upload.single('image'), async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    const folder = req.body.folder || 'general';
+    const timestamp = Date.now();
+    const fileName = `${userId}_${timestamp}_${req.file.originalname}`;
+
+    console.log('[upload] Uploading image:', fileName, 'to folder:', folder);
+
+    const result = await bunnyStorage.uploadFile(
+      req.file.buffer,
+      fileName,
+      folder
+    );
+
+    console.log('[upload] Upload successful:', result.url);
+    res.json(result);
+  } catch (error) {
+    console.error('[upload] Error:', error);
+    res.status(500).json({ 
+      error: 'Failed to upload image',
+      message: error.message 
+    });
+  }
+});
+
+// Delete image
+app.delete("/api/upload/image", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { filePath } = req.body;
+    if (!filePath) {
+      return res.status(400).json({ error: 'File path required' });
+    }
+
+    console.log('[upload] Deleting image:', filePath);
+    await bunnyStorage.deleteFile(filePath);
+    
+    res.json({ success: true, message: 'Image deleted successfully' });
+  } catch (error) {
+    console.error('[upload] Delete error:', error);
+    res.status(500).json({ 
+      error: 'Failed to delete image',
+      message: error.message 
+    });
   }
 });
 
