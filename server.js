@@ -88,9 +88,6 @@ console.log("- TWILIO_AUTH_TOKEN:", TWILIO_AUTH_TOKEN ? "Set" : "MISSING");
 console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
 console.log("- BYPASS_CLAUDE:", BYPASS_CLAUDE);
 console.log("- JWT_SECRET:", JWT_SECRET !== "your-secret-key-change-in-production" ? "Set" : "Using default (CHANGE THIS)");
-console.log("- BUNNY_STORAGE_ZONE:", process.env.BUNNY_STORAGE_ZONE || "NOT SET");
-console.log("- BUNNY_API_KEY:", process.env.BUNNY_API_KEY ? `Set (${process.env.BUNNY_API_KEY.substring(0, 10)}...)` : "NOT SET");
-console.log("- BUNNY_CDN_URL:", process.env.BUNNY_CDN_URL || "NOT SET");
 
 // Bunny.net Storage Service (inline implementation)
 class BunnyStorage {
@@ -102,9 +99,11 @@ class BunnyStorage {
     this.storageUrl = `https://storage.bunnycdn.com/${this.storageZone}`;
     this.isConfigured = !!(this.storageZone && this.apiKey && this.cdnUrl);
     
-    if (this.isConfigured) {
-      console.log('[Bunny Storage] Configured with zone:', this.storageZone);
-    }
+    console.log('[Bunny Storage] Configuration:');
+    console.log('  - Storage Zone:', this.storageZone);
+    console.log('  - API Key:', this.apiKey ? `${this.apiKey.substring(0, 10)}...` : 'NOT SET');
+    console.log('  - CDN URL:', this.cdnUrl);
+    console.log('  - Is Configured:', this.isConfigured);
   }
 
   async uploadFile(fileBuffer, fileName, folder = '') {
