@@ -71,6 +71,27 @@ const stripQuotes = (str) => {
   return str.replace(/^["']|["']$/g, '');
 };
 
+// Read secrets from environment
+const CLAUDE_API_KEY = stripQuotes(process.env.CLAUDE_API_KEY);
+const TWILIO_ACCOUNT_SID = stripQuotes(process.env.TWILIO_ACCOUNT_SID);
+const TWILIO_AUTH_TOKEN = stripQuotes(process.env.TWILIO_AUTH_TOKEN);
+const TWILIO_PHONE_NUMBER = stripQuotes(process.env.TWILIO_PHONE_NUMBER);
+const BUSINESS_CONTEXT = stripQuotes(process.env.BUSINESS_CONTEXT) || "";
+const BYPASS_CLAUDE =
+  process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true";
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+
+console.log("[config] Environment check:");
+console.log("- CLAUDE_API_KEY:", CLAUDE_API_KEY ? `Set (${CLAUDE_API_KEY.substring(0, 10)}...)` : "MISSING");
+console.log("- TWILIO_ACCOUNT_SID:", TWILIO_ACCOUNT_SID ? `Set (${TWILIO_ACCOUNT_SID.substring(0, 10)}...)` : "MISSING");
+console.log("- TWILIO_AUTH_TOKEN:", TWILIO_AUTH_TOKEN ? "Set" : "MISSING");
+console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
+console.log("- BYPASS_CLAUDE:", BYPASS_CLAUDE);
+console.log("- JWT_SECRET:", JWT_SECRET !== "your-secret-key-change-in-production" ? "Set" : "Using default (CHANGE THIS)");
+console.log("- BUNNY_STORAGE_ZONE:", process.env.BUNNY_STORAGE_ZONE || "NOT SET");
+console.log("- BUNNY_API_KEY:", process.env.BUNNY_API_KEY ? "Set" : "NOT SET");
+console.log("- BUNNY_CDN_URL:", process.env.BUNNY_CDN_URL || "NOT SET");
+
 // Bunny.net Storage Service (inline implementation)
 class BunnyStorage {
   constructor() {
@@ -140,24 +161,6 @@ class BunnyStorage {
 }
 
 const bunnyStorage = new BunnyStorage();
-
-// Read secrets from environment
-const CLAUDE_API_KEY = stripQuotes(process.env.CLAUDE_API_KEY);
-const TWILIO_ACCOUNT_SID = stripQuotes(process.env.TWILIO_ACCOUNT_SID);
-const TWILIO_AUTH_TOKEN = stripQuotes(process.env.TWILIO_AUTH_TOKEN);
-const TWILIO_PHONE_NUMBER = stripQuotes(process.env.TWILIO_PHONE_NUMBER);
-const BUSINESS_CONTEXT = stripQuotes(process.env.BUSINESS_CONTEXT) || "";
-const BYPASS_CLAUDE =
-  process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true";
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
-
-console.log("[config] Environment check:");
-console.log("- CLAUDE_API_KEY:", CLAUDE_API_KEY ? `Set (${CLAUDE_API_KEY.substring(0, 10)}...)` : "MISSING");
-console.log("- TWILIO_ACCOUNT_SID:", TWILIO_ACCOUNT_SID ? `Set (${TWILIO_ACCOUNT_SID.substring(0, 10)}...)` : "MISSING");
-console.log("- TWILIO_AUTH_TOKEN:", TWILIO_AUTH_TOKEN ? "Set" : "MISSING");
-console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
-console.log("- BYPASS_CLAUDE:", BYPASS_CLAUDE);
-console.log("- JWT_SECRET:", JWT_SECRET !== "your-secret-key-change-in-production" ? "Set" : "Using default (CHANGE THIS)")
 
 let twilioClient = null;
 if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
