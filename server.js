@@ -89,7 +89,7 @@ console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
 console.log("- BYPASS_CLAUDE:", BYPASS_CLAUDE);
 console.log("- JWT_SECRET:", JWT_SECRET !== "your-secret-key-change-in-production" ? "Set" : "Using default (CHANGE THIS)");
 console.log("- BUNNY_STORAGE_ZONE:", process.env.BUNNY_STORAGE_ZONE || "NOT SET");
-console.log("- BUNNY_API_KEY:", process.env.BUNNY_API_KEY ? "Set" : "NOT SET");
+console.log("- BUNNY_API_KEY:", process.env.BUNNY_API_KEY ? `Set (${process.env.BUNNY_API_KEY.substring(0, 10)}...)` : "NOT SET");
 console.log("- BUNNY_CDN_URL:", process.env.BUNNY_CDN_URL || "NOT SET");
 
 // Bunny.net Storage Service (inline implementation)
