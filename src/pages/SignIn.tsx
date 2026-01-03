@@ -8,15 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { MessageSquare } from 'lucide-react';
 
 export default function SignIn() {
-  const [isSignIn, setIsSignIn] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [promoCode, setPromoCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { signup, login } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -28,11 +25,6 @@ export default function SignIn() {
       return;
     }
 
-    if (!isSignIn && !name) {
-      setError('Name is required for sign up');
-      return;
-    }
-
     if (password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
@@ -40,14 +32,10 @@ export default function SignIn() {
 
     setLoading(true);
     try {
-      if (isSignIn) {
-        await login(email, password);
-      } else {
-        await signup(email, password, name, promoCode);
-      }
+      await login(email, password);
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.message || (isSignIn ? 'Failed to sign in. Please check your credentials.' : 'Failed to create account. Please try again.'));
+      setError(err.message || 'Failed to sign in. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -60,41 +48,13 @@ export default function SignIn() {
           <Link to="/" className="mx-auto w-12 h-12 bg-[#25D366] rounded-full flex items-center justify-center hover:bg-[#20BD5A] transition-colors">
             <MessageSquare className="w-6 h-6 text-white" />
           </Link>
-          <CardTitle className="text-2xl font-bold">
-            {isSignIn ? 'Sign In' : 'Create Account'}
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
           <CardDescription>
-            {isSignIn 
-              ? 'Welcome back! Sign in to your account'
-              : 'Start automating your WhatsApp responses with AI'
-            }
+            Welcome back! Sign in to your account
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isSignIn && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input
-                  id="name"
-                  placeholder="e.g., John Doe"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required={!isSignIn}
-                />
-              </div>
-            )}
-            {!isSignIn && (
-              <div className="space-y-2">
-                <Label htmlFor="promoCode">Promo Code (Optional)</Label>
-                <Input
-                  id="promoCode"
-                  placeholder="Enter promo code"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value)}
-                />
-              </div>
-            )}
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
               <Input
@@ -127,32 +87,14 @@ export default function SignIn() {
               className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white"
               disabled={loading}
             >
-              {loading 
-                ? (isSignIn ? 'Signing In...' : 'Creating Account...') 
-                : (isSignIn ? 'Sign In' : 'Create Account')
-              }
+              {loading ? 'Signing In...' : 'Sign In'}
             </Button>
           </form>
 
           <div className="mt-6 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setIsSignIn(!isSignIn);
-                setError('');
-              }}
-              className="text-sm text-gray-600 hover:text-gray-900"
-            >
-              {isSignIn ? (
-                <>
-                  Don't have an account? <span className="text-[#25D366] font-semibold">Sign Up</span>
-                </>
-              ) : (
-                <>
-                  Already have an account? <span className="text-[#25D366] font-semibold">Sign In</span>
-                </>
-              )}
-            </button>
+            <Link to="/onboarding/account" className="text-sm text-gray-600 hover:text-gray-900">
+              Don't have an account? <span className="text-[#25D366] font-semibold">Sign Up</span>
+            </Link>
           </div>
 
           <div className="mt-4 text-center">

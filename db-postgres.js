@@ -501,11 +501,16 @@ export async function createUser(email, passwordHash, name, promoCode = null) {
   const p = ensurePool();
   if (!p) return null;
   const id = crypto.randomBytes(16).toString('hex');
+  
+  // Default enabled features: only conversations and bookings
+  const defaultEnabledFeatures = ['conversations', 'bookings'];
+  
   await p.query(`
-    INSERT INTO users (id, email, password_hash, name, promo_code, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-  `, [id, email, passwordHash, name, promoCode]);
-  return { id, email, name, role: 'user' };
+    INSERT INTO users (id, email, password_hash, name, promo_code, enabled_features, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+  `, [id, email, passwordHash, name, promoCode, JSON.stringify(defaultEnabledFeatures)]);
+  
+  return { id, email, name, role: 'user', enabled_features: defaultEnabledFeatures };
 }
 
 export async function getUserByEmail(email) {

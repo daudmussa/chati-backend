@@ -1903,7 +1903,7 @@ app.post("/api/auth/signup", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'staff', 'settings', 'billing'],
+        enabledFeatures: user.enabled_features || ['conversations', 'bookings'],
         limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }
     });
@@ -1958,7 +1958,7 @@ app.post("/api/auth/login", async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
-        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'staff', 'settings', 'billing'],
+        enabledFeatures: user.enabled_features || ['conversations', 'bookings'],
         limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }
     });
@@ -2006,7 +2006,7 @@ app.get("/api/auth/me", async (req, res) => {
         name: user.name,
         role: user.role,
         businessName: businessSettings?.businessName || user.name,
-        enabledFeatures: user.enabled_features || ['conversations', 'store', 'bookings', 'staff', 'settings', 'billing'],
+        enabledFeatures: user.enabled_features || ['conversations', 'bookings'],
         limits: user.limits || { maxConversations: 100, maxProducts: 50 }
       }
     });
