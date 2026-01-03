@@ -378,8 +378,18 @@ export async function getBusinessSettings(userId) {
     return null;
   }
   
+  // If business_name is empty, try to get user's name as fallback
+  let businessName = r.business_name || '';
+  if (!businessName) {
+    const userResult = await p.query('SELECT name FROM users WHERE id=$1', [userId]);
+    if (userResult.rows[0]) {
+      businessName = userResult.rows[0].name || '';
+      console.log('[db-postgres] Using user name as fallback business name:', businessName);
+    }
+  }
+  
   const settings = {
-    businessName: r.business_name || '',
+    businessName: businessName,
     businessDescription: r.business_description || '',
     tone: r.tone || 'friendly',
     sampleReplies: r.sample_replies || [],
