@@ -95,11 +95,16 @@ console.log("- BUNNY_CDN_URL:", process.env.BUNNY_CDN_URL || "NOT SET");
 // Bunny.net Storage Service (inline implementation)
 class BunnyStorage {
   constructor() {
-    this.storageZone = process.env.BUNNY_STORAGE_ZONE;
-    this.apiKey = process.env.BUNNY_API_KEY;
-    this.cdnUrl = process.env.BUNNY_CDN_URL;
+    // Fallback to hardcoded values if env vars not available (temporary for Railway issue)
+    this.storageZone = process.env.BUNNY_STORAGE_ZONE || 'chati-storage';
+    this.apiKey = process.env.BUNNY_API_KEY || 'a5528ae7-6dcc-45f5-8408d7fd897c-5c24-4dee';
+    this.cdnUrl = process.env.BUNNY_CDN_URL || 'https://chati-storage.b-cdn.net';
     this.storageUrl = `https://storage.bunnycdn.com/${this.storageZone}`;
     this.isConfigured = !!(this.storageZone && this.apiKey && this.cdnUrl);
+    
+    if (this.isConfigured) {
+      console.log('[Bunny Storage] Configured with zone:', this.storageZone);
+    }
   }
 
   async uploadFile(fileBuffer, fileName, folder = '') {
