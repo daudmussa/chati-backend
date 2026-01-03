@@ -33,13 +33,17 @@ console.log("- PGHOST exists?", !!process.env.PGHOST);
 
 const app = express();
 
-// Enable CORS for frontend
+// Enable CORS for frontend - must be first middleware
 app.use((req, res, next) => {
+  // Allow all origins (you can restrict this to specific origins in production)
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-role');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-user-id, x-user-role, Accept');
+  res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+  
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+    return res.status(200).end();
   }
   next();
 });
