@@ -15,6 +15,8 @@ import { API_ENDPOINTS } from '@/config/api';
 
 interface UserData {
   userId: string;
+  email?: string;
+  name?: string;
   storeName: string;
   storePhone: string;
   storeId: string;
