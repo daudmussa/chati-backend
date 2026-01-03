@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import { Plus, Pencil, Trash2, Package, Search, Store as StoreIcon, Save, ShoppingCart, Clock, CheckCircle2, XCircle, ArrowUpDown } from 'lucide-react';
 import { API_ENDPOINTS } from '@/config/api';
+import { ImageUpload } from '@/components/ui/image-upload';
 
 interface Product {
   id: string;
@@ -362,6 +363,7 @@ export default function Store() {
     description: '',
     price: '',
     image: '',
+    imagePath: '',
     category: '',
     inStock: true,
   });
@@ -372,6 +374,7 @@ export default function Store() {
       description: '',
       price: '',
       image: '',
+      imagePath: '',
       category: '',
       inStock: true,
     });
@@ -399,6 +402,7 @@ export default function Store() {
         description: product.description,
         price: product.price.toString(),
         image: product.image,
+        imagePath: '',
         category: product.category,
         inStock: product.inStock,
       });
@@ -779,12 +783,13 @@ export default function Store() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="image">Image URL</Label>
-                  <Input
-                    id="image"
+                  <Label htmlFor="image">Product Image</Label>
+                  <ImageUpload
                     value={formData.image}
-                    onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                    placeholder="https://..."
+                    onChange={(url, path) => {
+                      setFormData({ ...formData, image: url, imagePath: path });
+                    }}
+                    folder="products"
                   />
                 </div>
                 <div className="flex items-center gap-2">
