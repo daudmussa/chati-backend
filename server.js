@@ -7,7 +7,16 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
-import bunnyStorage from "./bunny-storage.js";
+
+// Try to import bunny storage (optional)
+let bunnyStorage = null;
+try {
+  const bunnyModule = await import("./bunny-storage.js");
+  bunnyStorage = bunnyModule.default;
+  console.log("[startup] Bunny.net storage loaded successfully");
+} catch (error) {
+  console.log("[startup] Bunny.net storage not available:", error.message);
+}
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -1202,6 +1211,10 @@ app.delete("/api/staff/:id", async (req, res) => {
 // Upload single image
 app.post("/api/upload/image", upload.single('image'), async (req, res) => {
   try {
+    if (!bunnyStorage) {
+      return res.status(503).json({ error: 'Image upload service not available' });
+    }
+
     const userId = req.headers['x-user-id'];
     if (!userId) {
       return res.status(401).json({ error: 'Authentication required' });
@@ -1237,6 +1250,10 @@ app.post("/api/upload/image", upload.single('image'), async (req, res) => {
 // Delete image
 app.delete("/api/upload/image", async (req, res) => {
   try {
+    if (!bunnyStorage) {
+      return res.status(503).json({ error: 'Image upload service not available' });
+    }
+
     const userId = req.headers['x-user-id'];
     if (!userId) {
       return res.status(401).json({ error: 'Authentication required' });
