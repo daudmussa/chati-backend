@@ -493,10 +493,10 @@ export default function Admin() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-500 mt-1">Manage all users and view system-wide statistics</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-sm md:text-base text-gray-500 mt-1">Manage all users and view system-wide statistics</p>
         </div>
 
         {/* Overview Stats */}
@@ -547,14 +547,14 @@ export default function Admin() {
         {/* Users List */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4">
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
                 All Users ({filteredAndSortedUsers.length})
               </CardTitle>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
                 {/* Search */}
-                <div className="relative w-64">
+                <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     placeholder="Search by name, phone, promo..."
@@ -564,7 +564,7 @@ export default function Admin() {
                   />
                 </div>
                 {/* Pay Date Filter */}
-                <div className="relative w-48">
+                <div className="relative w-full sm:w-48">
                   <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <Input
                     type="date"
@@ -583,7 +583,7 @@ export default function Admin() {
                   )}
                 </div>
                 {/* Staff Filter */}
-                <div className="relative w-56">
+                <div className="relative w-full sm:w-56">
                   <Select value={filterByStaff} onValueChange={setFilterByStaff}>
                     <SelectTrigger>
                       <SelectValue placeholder="Filter by staff promo..." />
@@ -608,7 +608,7 @@ export default function Admin() {
                 </div>
                 {/* Sort */}
                 <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                  <SelectTrigger className="w-40">
+                  <SelectTrigger className="w-full sm:w-40">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -649,14 +649,14 @@ export default function Admin() {
                         : 'border-gray-200 bg-white'
                     }`}
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4 flex-1">
+                    <div className="flex flex-col sm:flex-row items-start gap-4">
+                      <div className="flex items-start gap-4 flex-1 w-full">
                         <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
                           <Store className="h-6 w-6 text-white" />
                         </div>
                         
                           <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap justify-between">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 justify-between">
                             <div className="flex items-center gap-2">
                               <h3 className="font-semibold text-gray-900">{userData.storeName}</h3>
                               {userData.isCurrent && (
@@ -664,12 +664,12 @@ export default function Admin() {
                               )}
                             </div>
                             {!userData.isCurrent && (
-                              <div className="flex gap-2">
+                              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() => setChangingPassword({ userId: userData.userId, newPassword: '' })}
-                                  className="h-7 text-xs"
+                                  className="h-7 text-xs w-full sm:w-auto"
                                 >
                                   Change Password
                                 </Button>
@@ -677,7 +677,7 @@ export default function Admin() {
                                   variant="destructive"
                                   size="sm"
                                   onClick={() => deleteUserAccount(userData.userId, userData.storeName)}
-                                  className="h-7 text-xs"
+                                  className="h-7 text-xs w-full sm:w-auto"
                                 >
                                   Delete User
                                 </Button>
@@ -698,7 +698,7 @@ export default function Admin() {
                             </div>
                           </div>
 
-                          <div className="mt-3 grid grid-cols-3 gap-4">
+                          <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-4">
                             <div>
                               <p className="text-xs text-gray-500">Orders</p>
                               <p className="text-lg font-semibold text-gray-900">
@@ -719,7 +719,7 @@ export default function Admin() {
                               <Settings className="h-4 w-4 text-gray-600" />
                               <h4 className="text-sm font-semibold text-gray-700">Enabled Features</h4>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               {availableFeatures.map((feature) => (
                                 <div
                                   key={feature.id}
