@@ -959,7 +959,20 @@ app.post("/webhook", async (req, res) => {
             };
             const toneDescription = toneMap[bizSettings.tone] || 'friendly';
             
-            systemPrompt = `You are a ${toneDescription} customer service representative for this business:\n\n${bizSettings.businessDescription}\n\nRespond helpfully to customer inquiries about the business. Respond in the same language the customer uses (English or Swahili). Give concise answers using complete sentences only. Limit replies to 1-3 full sentences unless the user explicitly asks for more detail. IMPORTANT: Do NOT repeat or summarize the business description above in your reply; use it only to inform your answer.`;
+            let supportContactInfo = '';
+            if (bizSettings.supportPhone && bizSettings.supportName) {
+              supportContactInfo = `\n\nIf asked about specific details not mentioned in the business description (like specific product brands, exact specifications, pricing details, or inventory), direct them to contact ${bizSettings.supportName} at ${bizSettings.supportPhone} for detailed information.`;
+            } else if (bizSettings.supportPhone) {
+              supportContactInfo = `\n\nIf asked about specific details not mentioned in the business description (like specific product brands, exact specifications, pricing details, or inventory), direct them to contact support at ${bizSettings.supportPhone} for detailed information.`;
+            }
+            
+            systemPrompt = `You are a ${toneDescription} customer service representative for this business:\n\n${bizSettings.businessDescription}\n\nRespond helpfully to customer inquiries about the business. Respond in the same language the customer uses (English or Swahili). Give concise answers using complete sentences only. Limit replies to 1-3 full sentences unless the user explicitly asks for more detail. 
+
+CRITICAL RULES:
+1. ONLY provide information that is explicitly stated in the business description above.
+2. Do NOT make up, assume, or infer specific details like product brands, models, specifications, prices, or inventory that are not mentioned.
+3. If a customer asks for specific details not in the business description, politely acknowledge what you know generally and direct them to contact support for specifics.
+4. Do NOT repeat or summarize the entire business description in your reply; use it only to inform your answer.${supportContactInfo}`;
           }
           
           // Add booking information if enabled
