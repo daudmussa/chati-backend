@@ -210,7 +210,8 @@ app.post("/webhook", async (req, res) => {
   res.type("text/xml");
   res.send(`<Response></Response>`);
 
-  // Process asynchronously with 33 second delay
+  // Process asynchronously with 5-9 second random delay
+  const randomDelay = Math.floor(Math.random() * (9000 - 5000 + 1)) + 5000;
   setTimeout(async () => {
     try {
       // Get user credentials based on store phone number (Twilio 'To')
@@ -1035,7 +1036,7 @@ app.post("/webhook", async (req, res) => {
     } catch (err) {
       console.error("Error in message handler:", err);
     }
-  }, 33000);
+  }, randomDelay);
 });// Endpoint to get all conversations
 app.get("/api/conversations", async (req, res) => {
   try {
