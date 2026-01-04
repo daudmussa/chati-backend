@@ -309,6 +309,12 @@ app.post("/webhook", async (req, res) => {
 
       let messageToSend = "";
 
+      // Check for cancel request (English and Swahili)
+      const cancelKeywords = ['cancel', 'stop', 'ghairi', 'sitisha', 'acha'];
+      const isCancelRequest = cancelKeywords.some(keyword => 
+        incomingMsg.toLowerCase().includes(keyword)
+      );
+
       // Check for booking change/reschedule requests (English and Swahili)
       const changeKeywords = ['change', 'reschedule', 'modify', 'edit', 'update', 'badilisha', 'ahirisha'];
       const isChangeRequest = changeKeywords.some(keyword => 
@@ -324,7 +330,14 @@ app.post("/webhook", async (req, res) => {
       // Check if user is in active booking flow
       const userState = conversation.bookingState || null;
 
-      if (isChangeRequest && conversation.lastBookingId) {
+      // Handle cancel request during booking flow
+      if (isCancelRequest && userState) {
+        const lang = userState.language || conversation.language || 'en';
+        messageToSend = lang === 'sw'
+          ? "Sawa, nimeghairi mchakato wa booking. Je, kuna kitu kingine ninachoweza kukusaidia?"
+          : "Okay, I've cancelled the booking process. Is there anything else I can help you with?";
+        delete conversation.bookingState;
+      } else if (isChangeRequest && conversation.lastBookingId) {
         // Handle booking change request
         const existingBooking = userBookings.find(b => b.id === conversation.lastBookingId);
         
@@ -332,10 +345,14 @@ app.post("/webhook", async (req, res) => {
           const service = userServices.find(s => s.id === existingBooking.serviceId);
           
           if (service) {
-            // Detect language from conversation
-            const swahiliKeywords = ['ndiyo', 'ndio', 'nafasi', 'naomba', 'nataka', 'je', 'sawa', 'ahsante', 'tafadhali', 'habari', 'badilisha', 'ahirisha'];
-            const isSwahili = swahiliKeywords.some(word => incomingMsg.toLowerCase().includes(word));
-            const lang = isSwahili ? 'sw' : 'en';
+            // Use existing conversation language or detect from current message
+            let lang = conversation.language || 'en';
+            if (!conversation.language) {
+              const swahiliKeywords = ['ndiyo', 'ndio', 'nafasi', 'naomba', 'nataka', 'je', 'sawa', 'ahsante', 'tafadhali', 'habari', 'badilisha', 'ahirisha'];
+              const isSwahili = swahiliKeywords.some(word => incomingMsg.toLowerCase().includes(word));
+              lang = isSwahili ? 'sw' : 'en';
+              conversation.language = lang;
+            }
             
             conversation.bookingState = {
               step: 'awaiting_edit_choice',
@@ -373,22 +390,19 @@ app.post("/webhook", async (req, res) => {
                 `3️⃣ Both (Name and Date/Time)`;  
             }
           } else {
-            const swahiliKeywords = ['ndiyo', 'ndio', 'nafasi', 'naomba', 'nataka', 'je', 'sawa', 'ahsante', 'tafadhali', 'habari', 'badilisha', 'ahirisha'];
-            const isSwahili = swahiliKeywords.some(word => incomingMsg.toLowerCase().includes(word));
-            messageToSend = isSwahili 
+            const lang = conversation.language || 'en';
+            messageToSend = lang === 'sw' 
               ? "Samahani, sikuweza kupata huduma ya nafasi yako. Tafadhali wasiliana nasi moja kwa moja."
               : "Sorry, I couldn't find the service for your booking. Please contact us directly.";
           }
         } else if (existingBooking) {
-          const swahiliKeywords = ['ndiyo', 'ndio', 'nafasi', 'naomba', 'nataka', 'je', 'sawa', 'ahsante', 'tafadhali', 'habari', 'badilisha', 'ahirisha'];
-          const isSwahili = swahiliKeywords.some(word => incomingMsg.toLowerCase().includes(word));
-          messageToSend = isSwahili
+          const lang = conversation.language || 'en';
+          messageToSend = lang === 'sw'
             ? `Nafasi yako tayari ni ${existingBooking.status}. Tafadhali wasiliana nasi moja kwa moja kubadilisha.`
             : `Your booking is already ${existingBooking.status}. Please contact us directly to make changes.`;
         } else {
-          const swahiliKeywords = ['ndiyo', 'ndio', 'nafasi', 'naomba', 'nataka', 'je', 'sawa', 'ahsante', 'tafadhali', 'habari', 'badilisha', 'ahirisha'];
-          const isSwahili = swahiliKeywords.some(word => incomingMsg.toLowerCase().includes(word));
-          messageToSend = isSwahili
+          const lang = conversation.language || 'en';
+          messageToSend = lang === 'sw'
             ? "Sikuweza kupata nafasi yako ya hivi karibuni. Tafadhali toa nambari ya uhakikisho au fanya nafasi mpya."
             : "I couldn't find your recent booking. Please provide your booking ID or make a new booking.";
         }
@@ -396,10 +410,13 @@ app.post("/webhook", async (req, res) => {
         // User is in booking flow or asking about bookings
         
         if (!userState && isBookingInquiry) {
-          // Detect language (simple detection based on common Swahili words)
-          const swahiliKeywords = ['ndiyo', 'ndio', 'nafasi', 'naomba', 'nataka', 'je', 'sawa', 'ahsante', 'tafadhali', 'habari'];
-          const isSwahili = swahiliKeywords.some(word => incomingMsg.toLowerCase().includes(word));
-          conversation.language = isSwahili ? 'sw' : 'en';
+          // Use existing conversation language or detect from current message
+          if (!conversation.language) {
+            const swahiliKeywords = ['ndiyo', 'ndio', 'nafasi', 'naomba', 'nataka', 'je', 'sawa', 'ahsante', 'tafadhali', 'habari'];
+            const isSwahili = swahiliKeywords.some(word => incomingMsg.toLowerCase().includes(word));
+            conversation.language = isSwahili ? 'sw' : 'en';
+          }
+          const isSwahili = conversation.language === 'sw';
           
           // Initial inquiry - check if bookings are available
           if (userBookingsEnabled && userServices.length > 0) {
