@@ -77,7 +77,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="w-8 h-8 bg-[#25D366] rounded-lg flex items-center justify-center">
                 <MessageSquare className="w-5 h-5 text-white" />
               </div>
-              <span className="font-bold text-lg">WhatsApp AI</span>
+              <span className="font-bold text-lg">Chati Solutions</span>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}

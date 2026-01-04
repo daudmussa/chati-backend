@@ -170,7 +170,7 @@ export default function About() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-lg text-gray-700">
-              Chati Solutions is a registered business name in Tanzania, officially recorded with <strong>BRELA</strong> (Business Registrations and Licensing Agency).
+              {/* Chati Solutions is a registered business name in Tanzania, officially recorded with <strong>BRELA</strong> (Business Registrations and Licensing Agency). */}
             </p>
             <p className="text-lg text-gray-700">
               We empower businesses of all sizes to streamline customer communication, boost sales, and manage bookings effortlessly through WhatsApp—the world's most trusted messaging platform.
@@ -284,7 +284,7 @@ export default function About() {
                 className="bg-white/10 border-white text-white hover:bg-white/20"
                 onClick={() => navigate('/onboarding/account')}
               >
-                Start Free Trial
+                Start Now
               </Button>
             </div>
           </CardContent>
@@ -319,11 +319,6 @@ export default function About() {
                     Store Demo
                   </button>
                 </li>
-                <li>
-                  <button onClick={() => navigate('/bookings')} className="text-gray-600 hover:text-[#25D366]">
-                    Bookings Demo
-                  </button>
-                </li>
               </ul>
             </div>
             <div>
@@ -352,13 +347,12 @@ export default function About() {
                 className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mb-3"
                 onClick={() => navigate('/onboarding/account')}
               >
-                Start Free Trial
+                Start Now
               </Button>
-              <p className="text-xs text-gray-500">14-day free trial, no credit card required</p>
             </div>
           </div>
           <div className="border-t pt-8 text-center text-gray-600 text-sm">
-            <p>© 2024 Chati Solutions. Made for Tanzanian businesses.</p>
+            <p>© 2026 Chati Solutions. Made for Tanzanian businesses.</p>
           </div>
         </div>
       </footer>

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { MessageSquare, Zap, Clock, TrendingUp, CheckCircle2, ArrowRight, ShoppingBag, CalendarCheck, Menu, X } from 'lucide-react';
+import { MessageSquare, Zap, Clock, TrendingUp, CheckCircle2, ArrowRight, ShoppingBag, CalendarCheck, Menu, X, DollarSign } from 'lucide-react';
 import { useState } from 'react';
 
 export default function Landing() {
@@ -209,7 +209,7 @@ export default function Landing() {
               className="bg-[#25D366] hover:bg-[#20BD5A] text-white text-lg px-8 py-6"
               onClick={() => navigate('/onboarding/account')}
             >
-              Get Started Free
+              Get Started Now
               <ArrowRight className="w-5 h-5 ml-2" />
             </Button>
             <Button
@@ -279,53 +279,14 @@ export default function Landing() {
             className="bg-[#25D366] hover:bg-[#20BD5A] text-white text-lg px-8 py-6"
             onClick={() => navigate('/onboarding/account')}
           >
-            Start Your Free Trial
+            Start Now!
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
         </div>
       </section>
 
       {/* Pricing Preview */}
-      <section className="container mx-auto px-4 py-20">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-gray-600 max-w-2xl mx-auto">
-            Plans designed for businesses of all sizes
-          </p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-          {[
-            { name: 'Starter', price: 'TZS 50,000', messages: '500 messages/month' },
-            { name: 'Professional', price: 'TZS 150,000', messages: '2,000 messages/month', popular: true },
-            { name: 'Enterprise', price: 'TZS 400,000', messages: 'Unlimited messages' },
-          ].map((plan, index) => (
-            <Card key={index} className={plan.popular ? 'border-[#25D366] border-2 shadow-lg' : ''}>
-              {plan.popular && (
-                <div className="bg-[#25D366] text-white text-center py-2 text-sm font-semibold rounded-t-lg">
-                  Most Popular
-                </div>
-              )}
-              <CardContent className="pt-6 text-center space-y-4">
-                <h3 className="text-2xl font-bold text-gray-900">{plan.name}</h3>
-                <div>
-                  <p className="text-4xl font-bold text-gray-900">{plan.price}</p>
-                  <p className="text-gray-600">/month</p>
-                </div>
-                <p className="text-gray-600">{plan.messages}</p>
-                <Button
-                  className={plan.popular ? 'bg-[#25D366] hover:bg-[#20BD5A] text-white w-full' : 'w-full'}
-                  variant={plan.popular ? 'default' : 'outline'}
-                  onClick={() => navigate('/onboarding/account')}
-                >
-                  Get Started
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
+      
 
       {/* Store & Bookings Section */}
       <section className="container mx-auto px-4 py-20">
@@ -353,18 +314,19 @@ export default function Landing() {
               </Button>
             </CardContent>
           </Card>
-          <Card className="border-2 hover:border-[#25D366] transition-colors cursor-pointer" onClick={() => navigate('/bookings')}>
+          <Card className="border-2 hover:border-[#25D366] transition-colors cursor-pointer" onClick={() => navigate('/pricing')}>
             <CardContent className="pt-6 text-center space-y-4">
               <div className="w-16 h-16 bg-[#25D366]/10 rounded-full flex items-center justify-center mx-auto">
-                <CalendarCheck className="w-8 h-8 text-[#25D366]" />
+                <DollarSign className="w-8 h-8 text-[#25D366]" />
               </div>
-              <h3 className="text-xl font-bold text-gray-900">Book a Service</h3>
+              <h3 className="text-xl font-bold text-gray-900">Check out our pricing</h3>
               <p className="text-gray-600">
-                Schedule appointments and book services with ease through our platform
+                Browse through our plans and choose the one that fits your business needs
               </p>
-              <Button className="bg-[#25D366] hover:bg-[#20BD5A] text-white">
-                View Services
-                <ArrowRight className="w-4 h-4 ml-2" />
+              
+              <Button  className="bg-[#25D366] hover:bg-[#20BD5A] text-white" onClick={() => navigate('/pricing')} >
+                    View Pricing
+                    <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </CardContent>
           </Card>
@@ -399,11 +361,6 @@ export default function Landing() {
                     Store Demo
                   </button>
                 </li>
-                <li>
-                  <button onClick={() => navigate('/bookings')} className="text-gray-600 hover:text-[#25D366]">
-                    Bookings Demo
-                  </button>
-                </li>
               </ul>
             </div>
             <div>
@@ -432,13 +389,13 @@ export default function Landing() {
                 className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mb-3"
                 onClick={() => navigate('/onboarding/account')}
               >
-                Start Free Trial
+                Start Now!
               </Button>
-              <p className="text-xs text-gray-500">14-day free trial, no credit card required</p>
+              <p className="text-xs text-gray-500">Sign up today and start automating your business communications!</p>
             </div>
           </div>
           <div className="border-t pt-8 text-center text-gray-600 text-sm">
-            <p>© 2025 Chati Solutions.</p>
+            <p>© 2026 Chati Solutions.</p>
           </div>
         </div>
       </footer>

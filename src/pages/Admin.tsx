@@ -46,10 +46,14 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterByPayDate, setFilterByPayDate] = useState('');
+  const [filterByStaff, setFilterByStaff] = useState('');
+  const [allStaff, setAllStaff] = useState<Array<{id: string; name: string; promoCode: string; userId: string}>>([]);
   const [sortBy, setSortBy] = useState<'payDate' | 'name' | 'created'>('payDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [editingLimits, setEditingLimits] = useState<{[userId: string]: { maxConversations: number; maxProducts: number }}>({});
   const [editingSubscription, setEditingSubscription] = useState<{[userId: string]: { payDate: string | null; package: string; status: string; promoCode: string | null }}>({});
+  const [changingPassword, setChangingPassword] = useState<{userId: string; newPassword: string} | null>(null);
+  const [deletingUser, setDeletingUser] = useState<{userId: string; userName: string} | null>(null);
 
   // Helper function to format date for input[type="date"]
   const formatDateForInput = (dateString: string | null): string => {
@@ -59,6 +63,52 @@ export default function Admin() {
       return date.toISOString().split('T')[0];
     } catch {
       return '';
+    }
+  };
+
+  const fetchAllStaff = async () => {
+    try {
+      const usersResponse = await fetch(API_ENDPOINTS.ADMIN_USERS, {
+        headers: {
+          "x-user-id": user?.id || "",
+          "x-user-role": user?.role || ""
+        }
+      });
+      
+      if (!usersResponse.ok) return;
+      
+      const allUsersData = await usersResponse.json();
+      const staffList: Array<{id: string; name: string; promoCode: string; userId: string}> = [];
+      
+      for (const userData of allUsersData) {
+        try {
+          const response = await fetch(API_ENDPOINTS.STAFF, {
+            headers: {
+              "x-user-id": userData.userId
+            }
+          });
+          
+          if (response.ok) {
+            const userStaff = await response.json();
+            userStaff.forEach((staff: any) => {
+              if (staff.promoCode) {
+                staffList.push({
+                  id: staff.id,
+                  name: staff.name,
+                  promoCode: staff.promoCode,
+                  userId: userData.userId
+                });
+              }
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching staff for user:", userData.userId, error);
+        }
+      }
+      
+      setAllStaff(staffList);
+    } catch (error) {
+      console.error("Error fetching all staff:", error);
     }
   };
 
@@ -83,6 +133,7 @@ export default function Admin() {
     }
 
     fetchUsers();
+    fetchAllStaff();
   }, [user]);
 
   const fetchUsers = async () => {
@@ -295,15 +346,57 @@ export default function Admin() {
     }
   };
 
-  const deleteUserAccount = async (userId: string, userName: string) => {
-    if (!window.confirm(`Are you sure you want to delete ${userName}? This will permanently delete all their data including conversations, products, orders, and bookings. This action cannot be undone.`)) {
+  const changePassword = async () => {
+    if (!changingPassword || !changingPassword.newPassword || changingPassword.newPassword.length < 6) {
+      toast({
+        title: "Invalid Password",
+        description: "Password must be at least 6 characters long",
+        variant: "destructive",
+      });
       return;
     }
 
-    console.log('[Admin] Deleting user:', userId);
+    try {
+      const response = await fetch(API_ENDPOINTS.ADMIN_CHANGE_PASSWORD(changingPassword.userId), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+          'x-user-role': user?.role || '',
+        },
+        body: JSON.stringify({ newPassword: changingPassword.newPassword }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Success",
+          description: "Password changed successfully",
+        });
+        setChangingPassword(null);
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to change password');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to change password",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteUserAccount = async (userId: string, userName: string) => {
+    setDeletingUser({ userId, userName });
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!deletingUser) return;
+
+    console.log('[Admin] Deleting user:', deletingUser.userId);
 
     try {
-      const response = await fetch(API_ENDPOINTS.ADMIN_DELETE_USER(userId), {
+      const response = await fetch(API_ENDPOINTS.ADMIN_DELETE_USER(deletingUser.userId), {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -316,12 +409,13 @@ export default function Admin() {
 
       if (response.ok) {
         // Remove user from local state
-        setUsers(users.filter(u => u.userId !== userId));
+        setUsers(users.filter(u => u.userId !== deletingUser.userId));
 
         toast({
           title: "User Deleted",
-          description: `${userName} and all their data have been permanently deleted`,
+          description: `${deletingUser.userName} and all their data have been permanently deleted`,
         });
+        setDeletingUser(null);
       } else {
         const error = await response.json();
         console.error('[Admin] Delete error: response not ok', { status: response.status, error });
@@ -359,6 +453,14 @@ export default function Admin() {
         if (!u.payDate) return false;
         const userPayDate = formatDateForInput(u.payDate);
         if (userPayDate !== filterByPayDate) return false;
+      }
+      
+      // Staff promo code filter
+      if (filterByStaff && filterByStaff !== "all") {
+        const selectedStaff = allStaff.find(s => s.id === filterByStaff);
+        if (selectedStaff && u.promoCode !== selectedStaff.promoCode) {
+          return false;
+        }
       }
       
       return true;
@@ -480,6 +582,30 @@ export default function Admin() {
                     </button>
                   )}
                 </div>
+                {/* Staff Filter */}
+                <div className="relative w-56">
+                  <Select value={filterByStaff} onValueChange={setFilterByStaff}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Filter by staff promo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Staff</SelectItem>
+                      {allStaff.map((staff) => (
+                        <SelectItem key={staff.id} value={staff.id}>
+                          {staff.name} ({staff.promoCode})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {filterByStaff && filterByStaff !== "all" && (
+                    <button
+                      onClick={() => setFilterByStaff("")}
+                      className="absolute right-10 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
                 {/* Sort */}
                 <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
                   <SelectTrigger className="w-40">
@@ -508,7 +634,7 @@ export default function Admin() {
               <div className="text-center py-8 text-gray-500">Loading users...</div>
             ) : filteredAndSortedUsers.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                {searchQuery || filterByPayDate 
+                {searchQuery || filterByPayDate || (filterByStaff && filterByStaff !== "all")
                   ? 'No users found matching your filters' 
                   : 'No users found'}
               </div>
@@ -538,14 +664,24 @@ export default function Admin() {
                               )}
                             </div>
                             {!userData.isCurrent && (
-                              <Button
-                                variant="destructive"
-                                size="sm"
-                                onClick={() => deleteUserAccount(userData.userId, userData.storeName)}
-                                className="h-7 text-xs"
-                              >
-                                Delete User
-                              </Button>
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setChangingPassword({ userId: userData.userId, newPassword: '' })}
+                                  className="h-7 text-xs"
+                                >
+                                  Change Password
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => deleteUserAccount(userData.userId, userData.storeName)}
+                                  className="h-7 text-xs"
+                                >
+                                  Delete User
+                                </Button>
+                              </div>
                             )}
                           </div>                          <div className="mt-1 space-y-1 text-sm text-gray-600">
                             <div className="flex items-center gap-2">
@@ -880,6 +1016,94 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Change Password Dialog */}
+      {changingPassword && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4">
+            <CardHeader>
+              <CardTitle>Change User Password</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input
+                  id="newPassword"
+                  type="password"
+                  placeholder="Enter new password (min 6 characters)"
+                  value={changingPassword.newPassword}
+                  onChange={(e) => setChangingPassword({ ...changingPassword, newPassword: e.target.value })}
+                  className="mt-1"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setChangingPassword(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={changePassword}
+                  disabled={!changingPassword.newPassword || changingPassword.newPassword.length < 6}
+                >
+                  Change Password
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Delete User Confirmation Dialog */}
+      {deletingUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <Card className="w-full max-w-md mx-4 border-red-200">
+            <CardHeader className="bg-red-50">
+              <CardTitle className="text-red-900 flex items-center gap-2">
+                <span className="text-2xl">⚠️</span>
+                Delete User Account
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-6">
+              <div className="space-y-2">
+                <p className="font-semibold text-gray-900">
+                  Are you sure you want to delete <span className="text-red-600">{deletingUser.userName}</span>?
+                </p>
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-2">
+                  <p className="text-sm font-medium text-red-900">This will permanently delete:</p>
+                  <ul className="text-sm text-red-800 space-y-1 ml-4">
+                    <li>• All conversations and messages</li>
+                    <li>• All products and orders</li>
+                    <li>• All bookings and appointments</li>
+                    <li>• All staff members</li>
+                    <li>• All business settings</li>
+                    <li>• User account and credentials</li>
+                  </ul>
+                </div>
+                <p className="text-sm font-bold text-red-600 mt-3">
+                  ⚠️ This action cannot be undone!
+                </p>
+              </div>
+              <div className="flex gap-2 justify-end pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setDeletingUser(null)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={confirmDeleteUser}
+                  className="bg-red-600 hover:bg-red-700"
+                >
+                  Delete Permanently
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

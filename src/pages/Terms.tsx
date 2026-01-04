@@ -157,7 +157,7 @@ export default function Terms() {
           <CardContent className="prose prose-gray max-w-none pt-6">
             <div className="space-y-8">
               <div>
-                <p className="text-sm text-gray-500 mb-4">Last Updated: January 2024</p>
+                <p className="text-sm text-gray-500 mb-4">Last Updated: January 2026</p>
                 <p className="text-gray-600">
                   Welcome to Chati Solutions SaaS. By accessing or using our service, you agree to be bound by these Terms and Conditions.
                 </p>
@@ -176,7 +176,6 @@ export default function Terms() {
                   <li>Product catalog and online store management</li>
                   <li>Appointment booking and scheduling system</li>
                   <li>Conversation history and analytics</li>
-                  <li>Multi-tenant business management</li>
                 </ul>
               </section>
 
@@ -189,7 +188,6 @@ export default function Terms() {
                   <li>Maintaining the confidentiality of your account credentials</li>
                   <li>All activities that occur under your account</li>
                   <li>Notifying us immediately of any unauthorized access</li>
-                  <li>Ensuring your Twilio credentials are valid and properly configured</li>
                 </ul>
               </section>
 
@@ -199,7 +197,7 @@ export default function Terms() {
                 <ul className="list-disc pl-6 text-gray-600 space-y-2">
                   <li>Use the service for any illegal or unauthorized purpose</li>
                   <li>Send spam or unsolicited messages through the platform</li>
-                  <li>Violate WhatsApp's Terms of Service or Twilio's Acceptable Use Policy</li>
+                  <li>Violate WhatsApp's Terms of Service</li>
                   <li>Attempt to gain unauthorized access to our systems</li>
                   <li>Use the service to harass, abuse, or harm others</li>
                   <li>Transmit viruses, malware, or other malicious code</li>
@@ -215,7 +213,6 @@ export default function Terms() {
                 <ul className="list-disc pl-6 text-gray-600 space-y-2">
                   <li>Payments are processed monthly or annually based on your selected plan</li>
                   <li>You are responsible for all charges incurred under your account</li>
-                  <li>Twilio messaging costs are separate and billed directly by Twilio</li>
                   <li>We reserve the right to change pricing with 30 days notice</li>
                   <li>Refunds are provided on a case-by-case basis</li>
                 </ul>
@@ -294,8 +291,8 @@ export default function Terms() {
                   For questions about these Terms and Conditions, please contact us at:
                 </p>
                 <p className="text-gray-600 mt-2">
-                  Email: legal@whatsappaireply.com<br />
-                  Phone: +255 123 456 789
+                  Email: queries@chatisolutions.com<br />
+                  Phone: +255 719 958 997
                 </p>
               </section>
             </div>
@@ -330,11 +327,6 @@ export default function Terms() {
                       Store Demo
                     </button>
                   </li>
-                  <li>
-                    <button onClick={() => navigate('/bookings')} className="text-gray-600 hover:text-[#25D366]">
-                      Bookings Demo
-                    </button>
-                  </li>
                 </ul>
               </div>
               <div>
@@ -363,13 +355,12 @@ export default function Terms() {
                   className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mb-3"
                   onClick={() => navigate('/onboarding/account')}
                 >
-                  Start Free Trial
+                  Start Now
                 </Button>
-                <p className="text-xs text-gray-500">14-day free trial, no credit card required</p>
               </div>
             </div>
             <div className="border-t pt-8 text-center text-gray-600 text-sm">
-              <p>© 2024 Chati Solutions. Made for Tanzanian businesses.</p>
+              <p>© 2026 Chati Solutions. Made for Tanzanian businesses.</p>
             </div>
           </div>
         </footer>

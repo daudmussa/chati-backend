@@ -21,6 +21,7 @@ export const API_ENDPOINTS = {
   ADMIN_USER_LIMITS: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/limits`,
   ADMIN_USER_SUBSCRIPTION: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/subscription`,
   ADMIN_DELETE_USER: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}`,
+  ADMIN_CHANGE_PASSWORD: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/password`,
   
   // Conversations
   CONVERSATIONS: `${API_BASE_URL}/api/conversations`,

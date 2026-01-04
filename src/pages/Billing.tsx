@@ -98,7 +98,7 @@ export default function Billing() {
             </div>
             <Progress value={usagePercentage} className="h-3" />
             <p className="text-xs text-muted-foreground">
-              Resets on January 1, 2025
+              Resets on January 1, 2027
             </p>
           </CardContent>
         </Card>
@@ -203,9 +203,9 @@ export default function Billing() {
           <CardContent>
             <div className="space-y-4">
               {[
-                { date: 'Dec 1, 2024', amount: 'TZS 50,000', status: 'Paid', plan: 'Starter' },
-                { date: 'Nov 1, 2024', amount: 'TZS 50,000', status: 'Paid', plan: 'Starter' },
-                { date: 'Oct 1, 2024', amount: 'TZS 50,000', status: 'Paid', plan: 'Starter' },
+                { date: 'Dec 1, 2025', amount: 'TZS 50,000', status: 'Paid', plan: 'Starter' },
+                { date: 'Nov 1, 2025', amount: 'TZS 50,000', status: 'Paid', plan: 'Starter' },
+                { date: 'Oct 1, 2025', amount: 'TZS 50,000', status: 'Paid', plan: 'Starter' },
               ].map((transaction, index) => (
                 <div
                   key={index}

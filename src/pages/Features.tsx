@@ -133,26 +133,7 @@ export default function Features() {
   ];
 
   const integrations = [
-    {
-      name: 'Twilio',
-      description: 'WhatsApp Business API integration',
-      icon: MessageSquare,
-    },
-    {
-      name: 'OpenAI',
-      description: 'Advanced AI language models',
-      icon: Bot,
-    },
-    {
-      name: 'Payment Gateways',
-      description: 'M-Pesa, Airtel Money, cards',
-      icon: CreditCard,
-    },
-    {
-      name: 'Cloud Storage',
-      description: 'Secure image and file storage',
-      icon: Package,
-    },
+    
   ];
 
   const useCases = [
@@ -416,7 +397,7 @@ export default function Features() {
         </div>
 
         {/* Integrations */}
-        <div className="mb-20">
+        {/* <div className="mb-20">
           <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
             Seamless Integrations
           </h2>
@@ -436,7 +417,7 @@ export default function Features() {
               );
             })}
           </div>
-        </div>
+        </div> */}
 
         {/* How It Works */}
         <Card className="mb-20 bg-gradient-to-r from-[#25D366]/5 to-[#25D366]/10 border-[#25D366]/20">
@@ -450,7 +431,7 @@ export default function Features() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               {[
                 { step: '1', title: 'Create Account', desc: 'Sign up with your business details' },
-                { step: '2', title: 'Connect Twilio', desc: 'Link your WhatsApp Business number' },
+                { step: '2', title: 'Make a payment', desc: 'Choose the package that you want and pay for it' },
                 { step: '3', title: 'Configure AI', desc: 'Set up your business personality' },
                 { step: '4', title: 'Go Live', desc: 'Start receiving automated responses' },
               ].map((item) => (
@@ -480,7 +461,7 @@ export default function Features() {
                   variant="secondary"
                   onClick={() => navigate('/onboarding/account')}
                 >
-                  Start Free Trial
+                  Start Now!
                 </Button>
                 <Button
                   size="lg"
@@ -523,11 +504,6 @@ export default function Features() {
                       Store Demo
                     </button>
                   </li>
-                  <li>
-                    <button onClick={() => navigate('/bookings')} className="text-gray-600 hover:text-[#25D366]">
-                      Bookings Demo
-                    </button>
-                  </li>
                 </ul>
               </div>
               <div>
@@ -556,13 +532,12 @@ export default function Features() {
                   className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mb-3"
                   onClick={() => navigate('/onboarding/account')}
                 >
-                  Start Free Trial
+                  Start Now
                 </Button>
-                <p className="text-xs text-gray-500">14-day free trial, no credit card required</p>
               </div>
             </div>
             <div className="border-t pt-8 text-center text-gray-600 text-sm">
-              <p>© 2024 Chati Solutions. Made for Tanzanian businesses.</p>
+              <p>© 2026 Chati Solutions. Made for Tanzanian businesses.</p>
             </div>
           </div>
         </footer>

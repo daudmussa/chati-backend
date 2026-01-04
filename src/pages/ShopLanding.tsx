@@ -277,7 +277,7 @@ export default function ShopLanding() {
         <div className="max-w-4xl mx-auto text-center">
           <Badge className="mb-4 bg-[#25D366] text-white">
             <Zap className="w-3 h-3 mr-1" />
-            Powered by WhatsApp AI
+            Powered by Chati Solutions
           </Badge>
           <h1 className="text-5xl font-bold text-gray-900 mb-6">
             Your Store, <span className="text-[#25D366]">Simplified</span>
@@ -417,11 +417,6 @@ export default function ShopLanding() {
                     Store Demo
                   </button>
                 </li>
-                <li>
-                  <button onClick={() => navigate('/bookings')} className="text-gray-600 hover:text-[#25D366]">
-                    Bookings Demo
-                  </button>
-                </li>
               </ul>
             </div>
             <div>
@@ -450,13 +445,12 @@ export default function ShopLanding() {
                 className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mb-3"
                 onClick={() => navigate('/onboarding/account')}
               >
-                Start Free Trial
+                Start Now
               </Button>
-              <p className="text-xs text-gray-500">14-day free trial, no credit card required</p>
             </div>
           </div>
           <div className="border-t pt-8 text-center text-gray-600 text-sm">
-            <p>© 2025 Chati Solutions.</p>
+            <p>© 2026 Chati Solutions.</p>
           </div>
         </div>
       </footer>

@@ -199,8 +199,8 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">Email</h3>
-                    <p className="text-gray-600">support@chatisolutions.com</p>
-                    <p className="text-gray-600">sales@chatisolutions.com</p>
+                    <p className="text-gray-600">duadarts@gmail.com</p>
+                    {/* <p className="text-gray-600">support@chatisolutions.com</p> */}
                   </div>
                 </div>
 
@@ -210,8 +210,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">Phone</h3>
-                    <p className="text-gray-600">+255 123 456 789</p>
-                    <p className="text-gray-600">+255 987 654 321</p>
+                    <p className="text-gray-600">+255 719 958 997</p>
                   </div>
                 </div>
 
@@ -222,7 +221,7 @@ export default function Contact() {
                   <div>
                     <h3 className="font-semibold text-gray-900">Office</h3>
                     <p className="text-gray-600">
-                      123 Business Street<br />
+                      Mbezi Beach<br />
                       Dar es Salaam, Tanzania
                     </p>
                   </div>
@@ -230,25 +229,6 @@ export default function Contact() {
               </CardContent>
             </Card>
 
-            <Card className="bg-[#25D366]/5 border-[#25D366]/20">
-              <CardHeader>
-                <CardTitle>Business Hours</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Monday - Friday</span>
-                  <span className="font-semibold">8:00 AM - 6:00 PM</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Saturday</span>
-                  <span className="font-semibold">9:00 AM - 2:00 PM</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Sunday</span>
-                  <span className="font-semibold">Closed</span>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Contact Form */}
@@ -321,7 +301,7 @@ export default function Contact() {
                     />
                   </div>
 
-                  <Button type="submit" className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white">
+                  <Button  disabled type="submit" className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white">
                     <Send className="w-4 h-4 mr-2" />
                     Send Message
                   </Button>
@@ -359,11 +339,6 @@ export default function Contact() {
                       Store Demo
                     </button>
                   </li>
-                  <li>
-                    <button onClick={() => navigate('/bookings')} className="text-gray-600 hover:text-[#25D366]">
-                      Bookings Demo
-                    </button>
-                  </li>
                 </ul>
               </div>
               <div>
@@ -392,13 +367,12 @@ export default function Contact() {
                   className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mb-3"
                   onClick={() => navigate('/onboarding/account')}
                 >
-                  Start Free Trial
+                  Start Now
                 </Button>
-                <p className="text-xs text-gray-500">14-day free trial, no credit card required</p>
               </div>
             </div>
             <div className="border-t pt-8 text-center text-gray-600 text-sm">
-              <p>© 2024 Chati Solutions. Made for Tanzanian businesses.</p>
+              <p>© 2026 Chati Solutions. Made for Tanzanian businesses.</p>
             </div>
           </div>
         </footer>

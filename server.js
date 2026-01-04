@@ -259,10 +259,12 @@ app.post("/webhook", async (req, res) => {
           console.log(`[webhook] Conversation limit reached for user ${userCreds.userId}`);
           // Send a message to the customer that the business has reached their limit
           if (userTwilioClient && USER_TWILIO_PHONE_NUMBER) {
+            const fromNumber = USER_TWILIO_PHONE_NUMBER.startsWith('whatsapp:') ? USER_TWILIO_PHONE_NUMBER : `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
+            const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
             await userTwilioClient.messages.create({
               body: "We're currently at capacity and unable to start new conversations. Please try again later or contact us through another channel.",
-              from: USER_TWILIO_PHONE_NUMBER,
-              to: from,
+              from: fromNumber,
+              to: toNumber,
             });
           }
           return;
@@ -1014,7 +1016,7 @@ app.post("/webhook", async (req, res) => {
       if (userTwilioClient && from) {
         try {
           const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
-          const fromNumber = `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
+          const fromNumber = USER_TWILIO_PHONE_NUMBER.startsWith('whatsapp:') ? USER_TWILIO_PHONE_NUMBER : `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
           
           console.log(`Sending message from ${fromNumber} to ${toNumber}`);
           
@@ -1839,6 +1841,43 @@ app.delete("/api/admin/users/:userId", async (req, res) => {
   } catch (error) {
     console.error('[admin] Error deleting user:', error);
     res.status(500).json({ error: 'Failed to delete user' });
+  }
+});
+
+// Change user password (admin only)
+app.put('/api/admin/users/:userId/password', async (req, res) => {
+  const requestingUserId = req.headers['x-user-id'];
+  const requestingUserRole = req.headers['x-user-role'];
+  
+  if (!requestingUserId || requestingUserRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { userId } = req.params;
+  const { newPassword } = req.body;
+  
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters long' });
+  }
+  
+  console.log('[admin] PUT /api/admin/users/:userId/password:', { userId, requestedBy: requestingUserId });
+  
+  try {
+    // Hash the new password
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    
+    // Update password in database
+    await pool.query(
+      'UPDATE user_credentials SET password_hash = $1 WHERE user_id = $2',
+      [passwordHash, userId]
+    );
+    
+    console.log('[admin] Password changed successfully for user:', userId);
+    
+    res.json({ success: true, userId });
+  } catch (error) {
+    console.error('[admin] Error changing password:', error);
+    res.status(500).json({ error: 'Failed to change password' });
   }
 });
 

@@ -372,21 +372,21 @@ export default function Settings() {
                     )}
                   </CardTitle>
                   <CardDescription>
-                    Configure your own Twilio and Claude AI API credentials for personalized service
+                    Configure your own API credentials for personalized service
                   </CardDescription>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="bg-blue-100 border border-blue-300 rounded-lg p-4 mb-4">
-                <p className="text-sm text-blue-900">
+                {/* <p className="text-sm text-blue-900">
                   <strong>Multi-User Support:</strong> Each user can now configure their own API credentials. 
                   Your credentials are encrypted and stored securely.
-                </p>
+                </p> */}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="claudeApiKey">Claude API Key</Label>
+                <Label htmlFor="claudeApiKey"> API Key</Label>
                 <Input
                   id="claudeApiKey"
                   type="password"
@@ -394,13 +394,11 @@ export default function Settings() {
                   onChange={(e) => setClaudeApiKey(e.target.value)}
                   placeholder={hasCredentials ? "****...configured" : "sk-ant-api03-..."}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Get your API key from <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline">Anthropic Console</a>
-                </p>
+                
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="twilioAccountSid">Twilio Account SID</Label>
+                <Label htmlFor="twilioAccountSid"> Account SID</Label>
                 <Input
                   id="twilioAccountSid"
                   type="password"
@@ -411,7 +409,7 @@ export default function Settings() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="twilioAuthToken">Twilio Auth Token</Label>
+                <Label htmlFor="twilioAuthToken"> Auth Token</Label>
                 <Input
                   id="twilioAuthToken"
                   type="password"
@@ -422,7 +420,7 @@ export default function Settings() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="twilioPhoneNumber">Twilio WhatsApp Number</Label>
+                <Label htmlFor="twilioPhoneNumber">(From) WhatsApp Number</Label>
                 <Input
                   id="twilioPhoneNumber"
                   value={twilioPhoneNumber}
@@ -430,11 +428,11 @@ export default function Settings() {
                   placeholder="+255793531101"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Your Twilio WhatsApp-enabled phone number (with country code)
+                  Your WhatsApp-enabled phone number (with country code)
                 </p>
               </div>
 
-              <div className="flex items-center space-x-2 pt-2">
+              {/* <div className="flex items-center space-x-2 pt-2">
                 <input
                   type="checkbox"
                   id="bypassClaude"
@@ -445,7 +443,7 @@ export default function Settings() {
                 <Label htmlFor="bypassClaude" className="font-normal cursor-pointer">
                   Bypass Claude AI (send canned responses instead)
                 </Label>
-              </div>
+              </div> */}
 
               <div className="pt-4">
                 <Button
