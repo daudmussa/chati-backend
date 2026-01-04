@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OnboardingProvider } from "./contexts/OnboardingContext";
 import { Toaster } from "./components/ui/toaster";
+import FloatingWhatsApp from "./components/FloatingWhatsApp";
 
 // Pages
 import Landing from "./pages/Landing";
@@ -91,6 +92,7 @@ function App() {
             <Route path="/features" element={<Features />} />
           </Routes>
         </Suspense>
+        <FloatingWhatsApp />
         <Toaster />
       </OnboardingProvider>
     </AuthProvider>
