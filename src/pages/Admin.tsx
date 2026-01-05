@@ -9,9 +9,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Store, ShoppingCart, Calendar, Phone, Settings, Save, CreditCard, Package, Search, ArrowUpDown } from 'lucide-react';
+import { Users, Store, ShoppingCart, Calendar, Phone, Settings, Save, CreditCard, Package, Search, ArrowUpDown, ChevronDown, ChevronRight, Key } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '@/config/api';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface UserData {
   userId: string;
@@ -36,6 +41,11 @@ interface UserData {
   package: string;
   status: string;
   promoCode: string | null;
+  credentials?: {
+    hasCredentials: boolean;
+    twilioPhoneNumber?: string;
+    bypassClaude?: boolean;
+  };
 }
 
 export default function Admin() {
@@ -54,6 +64,13 @@ export default function Admin() {
   const [editingSubscription, setEditingSubscription] = useState<{[userId: string]: { payDate: string | null; package: string; status: string; promoCode: string | null }}>({});
   const [changingPassword, setChangingPassword] = useState<{userId: string; newPassword: string} | null>(null);
   const [deletingUser, setDeletingUser] = useState<{userId: string; userName: string} | null>(null);
+  const [expandedUsers, setExpandedUsers] = useState<{[userId: string]: boolean}>({});
+  const [editingCredentials, setEditingCredentials] = useState<{[userId: string]: {
+    claudeApiKey: string;
+    twilioAccountSid: string;
+    twilioAuthToken: string;
+    twilioPhoneNumber: string;
+  }}>({});
 
   // Helper function to format date for input[type="date"]
   const formatDateForInput = (dateString: string | null): string => {
@@ -162,7 +179,36 @@ export default function Admin() {
         const data = await response.json();
         console.log('[Admin] Users data:', data);
         console.log('[Admin] First user payDate:', data[0]?.payDate);
-        setUsers(data);
+        
+        // Fetch credentials for each user
+        const usersWithCredentials = await Promise.all(
+          data.map(async (userData: UserData) => {
+            try {
+              const credResponse = await fetch(API_ENDPOINTS.USER_CREDENTIALS, {
+                headers: {
+                  'x-user-id': userData.userId
+                }
+              });
+              
+              if (credResponse.ok) {
+                const credData = await credResponse.json();
+                return {
+                  ...userData,
+                  credentials: {
+                    hasCredentials: credData.hasCredentials || false,
+                    twilioPhoneNumber: credData.twilioPhoneNumber || '',
+                    bypassClaude: credData.bypassClaude || false
+                  }
+                };
+              }
+            } catch (error) {
+              console.error('Failed to fetch credentials for user:', userData.userId, error);
+            }
+            return userData;
+          })
+        );
+        
+        setUsers(usersWithCredentials);
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         console.error('[Admin] Error response:', errorData);
@@ -341,6 +387,60 @@ export default function Admin() {
       toast({
         title: "Error",
         description: "Failed to update user subscription",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateUserCredentials = async (userId: string) => {
+    const credentials = editingCredentials[userId];
+    if (!credentials) return;
+
+    try {
+      const response = await fetch(API_ENDPOINTS.USER_CREDENTIALS, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': userId
+        },
+        body: JSON.stringify({
+          claudeApiKey: credentials.claudeApiKey,
+          twilioAccountSid: credentials.twilioAccountSid,
+          twilioAuthToken: credentials.twilioAuthToken,
+          twilioPhoneNumber: credentials.twilioPhoneNumber,
+        }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setUsers(users.map(u => 
+          u.userId === userId ? { 
+            ...u, 
+            credentials: {
+              hasCredentials: true,
+              twilioPhoneNumber: credentials.twilioPhoneNumber,
+              bypassClaude: u.credentials?.bypassClaude || false
+            }
+          } : u
+        ));
+
+        // Clear editing state
+        const newEditingCredentials = { ...editingCredentials };
+        delete newEditingCredentials[userId];
+        setEditingCredentials(newEditingCredentials);
+
+        toast({
+          title: "Credentials Updated",
+          description: "User API credentials have been successfully updated",
+        });
+      } else {
+        throw new Error('Failed to update credentials');
+      }
+    } catch (error) {
+      console.error('[Admin] Credentials error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update user credentials",
         variant: "destructive",
       });
     }
@@ -641,28 +741,65 @@ export default function Admin() {
             ) : (
               <div className="space-y-3">
                 {filteredAndSortedUsers.map((userData) => (
-                  <div
+                  <Collapsible
                     key={userData.userId}
-                    className={`p-4 rounded-lg border ${
-                      userData.isCurrent
-                        ? 'border-blue-300 bg-blue-50'
-                        : 'border-gray-200 bg-white'
-                    }`}
+                    open={expandedUsers[userData.userId]}
+                    onOpenChange={(open) => setExpandedUsers({...expandedUsers, [userData.userId]: open})}
                   >
-                    <div className="flex flex-col sm:flex-row items-start gap-4">
-                      <div className="flex items-start gap-4 flex-1 w-full">
-                        <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Store className="h-6 w-6 text-white" />
-                        </div>
-                        
-                          <div className="flex-1 min-w-0">
-                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 justify-between">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-gray-900">{userData.storeName}</h3>
-                              {userData.isCurrent && (
-                                <Badge className="bg-blue-500">You</Badge>
+                    <div
+                      className={`rounded-lg border ${
+                        userData.isCurrent
+                          ? 'border-blue-300 bg-blue-50'
+                          : 'border-gray-200 bg-white'
+                      }`}
+                    >
+                      {/* Collapsed Header */}
+                      <CollapsibleTrigger asChild>
+                        <div className="p-4 cursor-pointer hover:bg-gray-50/50">
+                          <div className="flex items-center gap-4">
+                            <div className="h-12 w-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Store className="h-6 w-6 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-gray-900">{userData.storeName}</h3>
+                                {userData.isCurrent && (
+                                  <Badge className="bg-blue-500">You</Badge>
+                                )}
+                                {userData.credentials?.hasCredentials && (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                    <Key className="h-3 w-3 mr-1" />
+                                    API
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
+                                <Phone className="h-4 w-4" />
+                                <span>{userData.storePhone}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="text-right hidden sm:block">
+                                <div className="text-xs text-gray-500">Orders / Bookings</div>
+                                <div className="font-semibold text-gray-900">{userData.ordersCount} / {userData.bookingsCount}</div>
+                              </div>
+                              {expandedUsers[userData.userId] ? (
+                                <ChevronDown className="h-5 w-5 text-gray-400" />
+                              ) : (
+                                <ChevronRight className="h-5 w-5 text-gray-400" />
                               )}
                             </div>
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+
+                      {/* Expanded Content */}
+                      <CollapsibleContent>
+                        <div className="px-4 pb-4 pt-2 border-t">
+                    <div className="flex flex-col sm:flex-row items-start gap-4">
+                      <div className="flex items-start gap-4 flex-1 w-full">                        
+                          <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 justify-between mb-3">
                             {!userData.isCurrent && (
                               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                                 <Button
@@ -683,11 +820,8 @@ export default function Admin() {
                                 </Button>
                               </div>
                             )}
-                          </div>                          <div className="mt-1 space-y-1 text-sm text-gray-600">
-                            <div className="flex items-center gap-2">
-                              <Phone className="h-4 w-4" />
-                              <span>{userData.storePhone}</span>
-                            </div>
+                          </div>
+                          <div className="space-y-1 text-sm text-gray-600 mb-3">
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-xs bg-gray-100 px-2 py-0.5 rounded">
                                 ID: {userData.userId.substring(0, 8)}...
@@ -986,6 +1120,7 @@ export default function Admin() {
                                         promoCode: e.target.value,
                                       }
                                     })}
+                                    autoComplete="off"
                                     className="flex-1 h-8 text-sm"
                                   />
                                   {editingSubscription[userData.userId] && (
@@ -1006,10 +1141,164 @@ export default function Admin() {
                               </div>
                             </div>
                           </div>
+
+                          {/* API Credentials Section */}
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Key className="h-4 w-4 text-gray-600" />
+                              <h4 className="text-sm font-semibold text-gray-700">API Credentials</h4>
+                              {userData.credentials?.hasCredentials && (
+                                <Badge variant="default" className="bg-green-500 text-xs">Configured</Badge>
+                              )}
+                            </div>
+                            
+                            <div className="space-y-3">
+                              {/* Claude API Key */}
+                              <div className="p-3 rounded bg-violet-50 border border-violet-200">
+                                <Label className="text-sm font-medium text-violet-900 mb-2 block">
+                                  🤖 Claude API Key
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="password"
+                                    placeholder={userData.credentials?.hasCredentials ? "****...configured" : "sk-ant-api03-..."}
+                                    value={editingCredentials[userData.userId]?.claudeApiKey ?? ''}
+                                    onChange={(e) => setEditingCredentials({
+                                      ...editingCredentials,
+                                      [userData.userId]: {
+                                        claudeApiKey: e.target.value,
+                                        twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
+                                        twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
+                                        twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                      }
+                                    })}
+                                    autoComplete="off"
+                                    className="flex-1 h-8 text-sm"
+                                  />
+                                  {editingCredentials[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateUserCredentials(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Twilio Account SID */}
+                              <div className="p-3 rounded bg-sky-50 border border-sky-200">
+                                <Label className="text-sm font-medium text-sky-900 mb-2 block">
+                                  📱 Twilio Account SID
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="password"
+                                    placeholder={userData.credentials?.hasCredentials ? "****...configured" : "AC..."}
+                                    value={editingCredentials[userData.userId]?.twilioAccountSid ?? ''}
+                                    onChange={(e) => setEditingCredentials({
+                                      ...editingCredentials,
+                                      [userData.userId]: {
+                                        claudeApiKey: editingCredentials[userData.userId]?.claudeApiKey ?? '',
+                                        twilioAccountSid: e.target.value,
+                                        twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
+                                        twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                      }
+                                    })}
+                                    autoComplete="off"
+                                    className="flex-1 h-8 text-sm"
+                                  />
+                                  {editingCredentials[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateUserCredentials(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Twilio Auth Token */}
+                              <div className="p-3 rounded bg-teal-50 border border-teal-200">
+                                <Label className="text-sm font-medium text-teal-900 mb-2 block">
+                                  🔑 Twilio Auth Token
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="password"
+                                    placeholder={userData.credentials?.hasCredentials ? "****...configured" : "Enter auth token"}
+                                    value={editingCredentials[userData.userId]?.twilioAuthToken ?? ''}
+                                    onChange={(e) => setEditingCredentials({
+                                      ...editingCredentials,
+                                      [userData.userId]: {
+                                        claudeApiKey: editingCredentials[userData.userId]?.claudeApiKey ?? '',
+                                        twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
+                                        twilioAuthToken: e.target.value,
+                                        twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                      }
+                                    })}
+                                    autoComplete="off"
+                                    className="flex-1 h-8 text-sm"
+                                  />
+                                  {editingCredentials[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateUserCredentials(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Twilio Phone Number */}
+                              <div className="p-3 rounded bg-emerald-50 border border-emerald-200">
+                                <Label className="text-sm font-medium text-emerald-900 mb-2 block">
+                                  📞 WhatsApp Phone Number
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="text"
+                                    placeholder="+255793531101"
+                                    value={editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? ''}
+                                    onChange={(e) => setEditingCredentials({
+                                      ...editingCredentials,
+                                      [userData.userId]: {
+                                        claudeApiKey: editingCredentials[userData.userId]?.claudeApiKey ?? '',
+                                        twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
+                                        twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
+                                        twilioPhoneNumber: e.target.value,
+                                      }
+                                    })}
+                                    className="flex-1 h-8 text-sm"
+                                  />
+                                  {editingCredentials[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateUserCredentials(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                                <p className="text-xs text-emerald-700 mt-1">
+                                  Your WhatsApp-enabled phone number (with country code)
+                                </p>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
+                        </div>
+                      </CollapsibleContent>
+                    </div>
+                  </Collapsible>
                 ))}
               </div>
             )}
