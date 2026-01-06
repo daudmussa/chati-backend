@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card } from '@/components/ui/card';
@@ -31,9 +31,15 @@ export default function Conversations() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const selectedConversationRef = useRef<Conversation | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedConversationRef.current = selectedConversation;
+  }, [selectedConversation]);
 
   const fetchConversations = async () => {
     try {
@@ -60,15 +66,16 @@ export default function Conversations() {
       setConversations(limitedData);
       
       // If a conversation is selected, update it with fresh data
-      if (selectedConversation && limitedData.length > 0) {
-        const updated = limitedData.find((c: Conversation) => c.id === selectedConversation.id);
+      const currentSelected = selectedConversationRef.current;
+      if (currentSelected && limitedData.length > 0) {
+        const updated = limitedData.find((c: Conversation) => c.id === currentSelected.id);
         if (updated) {
           setSelectedConversation(updated);
         } else {
           // Selected conversation no longer exists, select first one
           setSelectedConversation(limitedData[0]);
         }
-      } else if (limitedData.length > 0 && !selectedConversation) {
+      } else if (limitedData.length > 0 && !currentSelected) {
         // Only auto-select first conversation if none is selected yet
         setSelectedConversation(limitedData[0]);
       } else if (limitedData.length === 0) {
