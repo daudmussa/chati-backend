@@ -59,18 +59,19 @@ export default function Conversations() {
       
       setConversations(limitedData);
       
-      // Select the first conversation if none is selected or if the selected one is no longer available
-      if (limitedData.length > 0) {
-        if (!selectedConversation || !limitedData.find((c: Conversation) => c.id === selectedConversation.id)) {
-          setSelectedConversation(limitedData[0]);
+      // If a conversation is selected, update it with fresh data
+      if (selectedConversation && limitedData.length > 0) {
+        const updated = limitedData.find((c: Conversation) => c.id === selectedConversation.id);
+        if (updated) {
+          setSelectedConversation(updated);
         } else {
-          // Update the selected conversation with fresh data
-          const updated = limitedData.find((c: Conversation) => c.id === selectedConversation.id);
-          if (updated) {
-            setSelectedConversation(updated);
-          }
+          // Selected conversation no longer exists, select first one
+          setSelectedConversation(limitedData[0]);
         }
-      } else {
+      } else if (limitedData.length > 0 && !selectedConversation) {
+        // Only auto-select first conversation if none is selected yet
+        setSelectedConversation(limitedData[0]);
+      } else if (limitedData.length === 0) {
         setSelectedConversation(null);
       }
     } catch (err) {

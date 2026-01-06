@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OnboardingProvider } from "./contexts/OnboardingContext";
 import { Toaster } from "./components/ui/toaster";
@@ -62,6 +62,11 @@ function FeatureProtectedRoute({ children, featureId }: { children: React.ReactN
 }
 
 function App() {
+  const location = useLocation();
+  
+  // Hide WhatsApp button on admin and dashboard pages
+  const hideWhatsApp = location.pathname === '/admin' || location.pathname === '/dashboard';
+  
   return (
     <AuthProvider>
       <OnboardingProvider>
@@ -92,7 +97,7 @@ function App() {
             <Route path="/features" element={<Features />} />
           </Routes>
         </Suspense>
-        <FloatingWhatsApp />
+        {!hideWhatsApp && <FloatingWhatsApp />}
         <Toaster />
       </OnboardingProvider>
     </AuthProvider>
