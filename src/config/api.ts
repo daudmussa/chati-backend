@@ -24,6 +24,7 @@ export const API_ENDPOINTS = {
   ADMIN_LOGIN_AS_USER: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/login-as`,
   ADMIN_DELETE_USER: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}`,
   ADMIN_CHANGE_PASSWORD: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/password`,
+  ADMIN_TEST_EMAIL: `${API_BASE_URL}/api/admin/test-email`,
   
   // Conversations
   CONVERSATIONS: `${API_BASE_URL}/api/conversations`,

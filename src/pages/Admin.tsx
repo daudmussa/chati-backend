@@ -694,12 +694,12 @@ export default function Admin() {
             onClick={async () => {
               try {
                 const token = localStorage.getItem('auth_token');
-                const response = await fetch(`${API_ENDPOINTS.BASE_URL}/api/admin/test-email`, {
+                const response = await fetch(API_ENDPOINTS.ADMIN_TEST_EMAIL, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
-                    'x-user-role': 'admin'
+                    'x-user-role': user?.role || 'admin'
                   },
                   body: JSON.stringify({
                     email: user?.email || 'duadarts@gmail.com',
@@ -715,9 +715,10 @@ export default function Admin() {
                     description: `Email sent to ${user?.email}. Check your inbox!`
                   });
                 } else {
+                  console.error('Email test failed:', data);
                   toast({
                     title: 'Email Test Failed',
-                    description: data.error || 'Failed to send test email',
+                    description: data.details || data.error || 'Failed to send test email',
                     variant: 'destructive'
                   });
                 }
@@ -725,7 +726,7 @@ export default function Admin() {
                 console.error('Test email error:', error);
                 toast({
                   title: 'Error',
-                  description: 'Failed to send test email',
+                  description: error instanceof Error ? error.message : 'Failed to send test email',
                   variant: 'destructive'
                 });
               }
