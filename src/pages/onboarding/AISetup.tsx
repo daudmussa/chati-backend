@@ -122,7 +122,7 @@ export default function AISetup() {
                 <SelectTrigger>
                   <SelectValue placeholder="Select a tone" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" sideOffset={4} className="z-50">
                   <SelectItem value="professional">Professional & Formal</SelectItem>
                   <SelectItem value="friendly">Friendly & Casual</SelectItem>
                   <SelectItem value="enthusiastic">Enthusiastic & Energetic</SelectItem>
