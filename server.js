@@ -2402,6 +2402,54 @@ app.post("/api/admin/test-email", async (req, res) => {
   }
 });
 
+// Send welcome email to existing user - admin only
+app.post("/api/admin/users/send-welcome-email", async (req, res) => {
+  const requestingUserRole = req.headers['x-user-role'];
+  
+  if (requestingUserRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { userId, email, name } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ error: 'Email address required' });
+  }
+  
+  try {
+    console.log('[admin-email] Sending welcome email to existing user:', email);
+    
+    if (!process.env.SENDGRID_API_KEY) {
+      return res.status(500).json({ 
+        error: 'SENDGRID_API_KEY not configured. Please set it in your environment variables.',
+        sendgridConfigured: false
+      });
+    }
+    
+    if (process.env.DISABLE_EMAIL === 'true') {
+      return res.status(500).json({ 
+        error: 'Email is disabled. Remove DISABLE_EMAIL environment variable to enable.',
+        sendgridConfigured: true,
+        emailDisabled: true
+      });
+    }
+    
+    await sendWelcomeEmail(email, name || 'User');
+    
+    console.log('[admin-email] Welcome email sent successfully to:', email);
+    res.json({ 
+      success: true, 
+      message: `Welcome email sent to ${email}`
+    });
+  } catch (error) {
+    console.error('[admin-email] Failed to send welcome email:', error);
+    res.status(500).json({ 
+      error: 'Failed to send welcome email', 
+      details: error.message
+    });
+  }
+});
+
 // Get user credentials
 app.get("/api/user/credentials", async (req, res) => {
   try {

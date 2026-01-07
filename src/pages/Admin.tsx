@@ -538,18 +538,20 @@ export default function Admin() {
   const changePassword = async () => {
     if (!changingPassword || !changingPassword.newPassword || changingPassword.newPassword.length < 6) {
       toast({
-        title: "Invalid Password",
-        description: "Password must be at least 6 characters long",
+        title: "Error",
+        description: "Password must be at least 6 characters",
         variant: "destructive",
       });
       return;
     }
-
+    
     try {
+      const token = localStorage.getItem('auth_token');
       const response = await fetch(API_ENDPOINTS.ADMIN_CHANGE_PASSWORD(changingPassword.userId), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
           'x-user-id': user?.id || '',
           'x-user-role': user?.role || '',
         },
@@ -558,18 +560,51 @@ export default function Admin() {
 
       if (response.ok) {
         toast({
-          title: "Success",
-          description: "Password changed successfully",
+          title: "Password Changed",
+          description: "User password has been updated successfully",
         });
         setChangingPassword(null);
+        fetchUsers();
       } else {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to change password');
+        throw new Error('Failed to change password');
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: "Error",
-        description: error.message || "Failed to change password",
+        description: "Failed to change password",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const sendWelcomeEmail = async (userId: string, userEmail: string, userName: string) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_ENDPOINTS.ADMIN_USERS}/send-welcome-email`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'x-user-id': user?.id || '',
+          'x-user-role': user?.role || '',
+        },
+        body: JSON.stringify({ userId, email: userEmail, name: userName }),
+      });
+
+      if (response.ok) {
+        toast({
+          title: "Email Sent",
+          description: `Welcome email sent to ${userEmail}`,
+        });
+      } else {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to send email');
+      }
+    } catch (error) {
+      console.error('[Admin] Send welcome email error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to send welcome email",
         variant: "destructive",
       });
     }
@@ -955,6 +990,15 @@ export default function Admin() {
                                 >
                                   <LogIn className="h-3 w-3 mr-1" />
                                   Login as User
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => sendWelcomeEmail(userData.userId, userData.email || '', userData.name || userData.storeName)}
+                                  className="h-7 text-xs w-full sm:w-auto"
+                                >
+                                  <Mail className="h-3 w-3 mr-1" />
+                                  Send Welcome Email
                                 </Button>
                                 <Button
                                   variant="outline"
