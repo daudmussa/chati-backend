@@ -2289,7 +2289,7 @@ app.get("/api/auth/me", async (req, res) => {
     // Get business settings to include businessName
     const businessSettings = await pgGetBusinessSettings(user.id);
     
-    console.log('[auth] /me - User from DB:', { id: user.id, limits: user.limits, businessName: businessSettings?.businessName });
+    console.log('[auth] /me - User from DB:', { id: user.id, limits: user.limits, payDate: user.pay_date, package: user.package, businessName: businessSettings?.businessName });
     
     res.json({
       success: true,
@@ -2300,7 +2300,10 @@ app.get("/api/auth/me", async (req, res) => {
         role: user.role,
         businessName: businessSettings?.businessName || user.name,
         enabledFeatures: user.enabled_features || ['conversations', 'bookings'],
-        limits: user.limits || { maxConversations: 100, maxProducts: 50 }
+        limits: user.limits || { maxConversations: 100, maxProducts: 50 },
+        payDate: user.pay_date || null,
+        package: user.package || 'starter',
+        status: user.status || 'active'
       }
     });
   } catch (error) {
