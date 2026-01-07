@@ -12,6 +12,9 @@ interface User {
     maxConversations: number;
     maxProducts: number;
   };
+  payDate?: string | null;
+  package?: string;
+  status?: string;
 }
 
 interface AuthContextType {
