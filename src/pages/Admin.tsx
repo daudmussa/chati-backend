@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, Store, ShoppingCart, Calendar, Phone, Settings, Save, CreditCard, Package, Search, ArrowUpDown, ChevronDown, ChevronRight, Key } from 'lucide-react';
+import { Users, Store, ShoppingCart, Calendar, Phone, Settings, Save, CreditCard, Package, Search, ArrowUpDown, ChevronDown, ChevronRight, Key, LogIn, Mail } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { API_ENDPOINTS } from '@/config/api';
 import {
@@ -70,6 +70,10 @@ export default function Admin() {
     twilioAccountSid: string;
     twilioAuthToken: string;
     twilioPhoneNumber: string;
+  }}>({});
+  const [editingUserInfo, setEditingUserInfo] = useState<{[userId: string]: {
+    email: string;
+    storePhone: string;
   }}>({});
 
   // Helper function to format date for input[type="date"]
@@ -446,6 +450,91 @@ export default function Admin() {
     }
   };
 
+  const updateUserInfo = async (userId: string) => {
+    const userInfo = editingUserInfo[userId];
+    if (!userInfo) return;
+
+    try {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USER_INFO(userId), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+          'x-user-role': user?.role || '',
+        },
+        body: JSON.stringify({
+          email: userInfo.email,
+          storePhone: userInfo.storePhone,
+        }),
+      });
+
+      if (response.ok) {
+        // Update local state
+        setUsers(users.map(u => 
+          u.userId === userId ? { 
+            ...u, 
+            email: userInfo.email,
+            storePhone: userInfo.storePhone,
+          } : u
+        ));
+
+        // Clear editing state
+        const newEditingUserInfo = { ...editingUserInfo };
+        delete newEditingUserInfo[userId];
+        setEditingUserInfo(newEditingUserInfo);
+
+        toast({
+          title: "User Info Updated",
+          description: "User email and phone have been successfully updated",
+        });
+      } else {
+        throw new Error('Failed to update user info');
+      }
+    } catch (error) {
+      console.error('[Admin] User info error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update user information",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loginAsUser = async (userId: string, userEmail: string) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.ADMIN_LOGIN_AS_USER(userId), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+          'x-user-role': user?.role || '',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Store the token and reload
+        localStorage.setItem('token', data.token);
+        toast({
+          title: "Logging in as user",
+          description: `Switching to ${userEmail}...`,
+        });
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 1000);
+      } else {
+        throw new Error('Failed to login as user');
+      }
+    } catch (error) {
+      console.error('[Admin] Login as user error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to login as user",
+        variant: "destructive",
+      });
+    }
+  };
+
   const changePassword = async () => {
     if (!changingPassword || !changingPassword.newPassword || changingPassword.newPassword.length < 6) {
       toast({
@@ -777,6 +866,12 @@ export default function Admin() {
                                 <Phone className="h-4 w-4" />
                                 <span>{userData.storePhone}</span>
                               </div>
+                              {userData.email && (
+                                <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
+                                  <Mail className="h-4 w-4" />
+                                  <span>{userData.email}</span>
+                                </div>
+                              )}
                             </div>
                             <div className="flex items-center gap-3">
                               <div className="text-right hidden sm:block">
@@ -802,6 +897,15 @@ export default function Admin() {
                           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 justify-between mb-3">
                             {!userData.isCurrent && (
                               <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <Button
+                                  variant="default"
+                                  size="sm"
+                                  onClick={() => loginAsUser(userData.userId, userData.email || userData.storeName)}
+                                  className="h-7 text-xs w-full sm:w-auto bg-blue-600 hover:bg-blue-700"
+                                >
+                                  <LogIn className="h-3 w-3 mr-1" />
+                                  Login as User
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -844,6 +948,78 @@ export default function Admin() {
                               <p className="text-lg font-semibold text-gray-900">
                                 {userData.bookingsCount}
                               </p>
+                            </div>
+                          </div>
+
+                          {/* User Info Section */}
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Mail className="h-4 w-4 text-gray-600" />
+                              <h4 className="text-sm font-semibold text-gray-700">User Information</h4>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              {/* Email */}
+                              <div className="p-3 rounded bg-blue-50 border border-blue-200">
+                                <Label className="text-sm font-medium text-blue-900 mb-2 block">
+                                  📧 Email
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="email"
+                                    placeholder="user@example.com"
+                                    value={editingUserInfo[userData.userId]?.email ?? userData.email ?? ''}
+                                    onChange={(e) => setEditingUserInfo({
+                                      ...editingUserInfo,
+                                      [userData.userId]: {
+                                        email: e.target.value,
+                                        storePhone: editingUserInfo[userData.userId]?.storePhone ?? userData.storePhone,
+                                      }
+                                    })}
+                                    className="flex-1 h-8 text-sm"
+                                  />
+                                  {editingUserInfo[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateUserInfo(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Phone */}
+                              <div className="p-3 rounded bg-green-50 border border-green-200">
+                                <Label className="text-sm font-medium text-green-900 mb-2 block">
+                                  📱 Phone Number
+                                </Label>
+                                <div className="flex items-center gap-2">
+                                  <Input
+                                    type="text"
+                                    placeholder="+255..."
+                                    value={editingUserInfo[userData.userId]?.storePhone ?? userData.storePhone}
+                                    onChange={(e) => setEditingUserInfo({
+                                      ...editingUserInfo,
+                                      [userData.userId]: {
+                                        email: editingUserInfo[userData.userId]?.email ?? userData.email ?? '',
+                                        storePhone: e.target.value,
+                                      }
+                                    })}
+                                    className="flex-1 h-8 text-sm"
+                                  />
+                                  {editingUserInfo[userData.userId] && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateUserInfo(userData.userId)}
+                                      className="h-8"
+                                    >
+                                      <Save className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
 

@@ -1912,6 +1912,88 @@ app.put('/api/admin/users/:userId/password', async (req, res) => {
   }
 });
 
+// Update user info (email and phone) - admin only
+app.put('/api/admin/users/:userId/info', async (req, res) => {
+  const requestingUserId = req.headers['x-user-id'];
+  const requestingUserRole = req.headers['x-user-role'];
+  
+  if (!requestingUserId || requestingUserRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { userId } = req.params;
+  const { email, storePhone } = req.body;
+  
+  console.log('[admin] PUT /api/admin/users/:userId/info:', { userId, email, storePhone, requestedBy: requestingUserId });
+  
+  try {
+    // Update user email
+    if (email) {
+      await pool.query(
+        'UPDATE user_credentials SET email = $1 WHERE user_id = $2',
+        [email, userId]
+      );
+    }
+    
+    // Update store phone
+    if (storePhone) {
+      await pool.query(
+        'UPDATE stores SET phone = $1 WHERE user_id = $2',
+        [storePhone, userId]
+      );
+    }
+    
+    console.log('[admin] User info updated successfully for user:', userId);
+    
+    res.json({ success: true, userId, email, storePhone });
+  } catch (error) {
+    console.error('[admin] Error updating user info:', error);
+    res.status(500).json({ error: 'Failed to update user info' });
+  }
+});
+
+// Login as user - admin only
+app.post('/api/admin/users/:userId/login-as', async (req, res) => {
+  const requestingUserId = req.headers['x-user-id'];
+  const requestingUserRole = req.headers['x-user-role'];
+  
+  if (!requestingUserId || requestingUserRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { userId } = req.params;
+  
+  console.log('[admin] POST /api/admin/users/:userId/login-as:', { userId, requestedBy: requestingUserId });
+  
+  try {
+    // Get the user to login as
+    const userResult = await pool.query(
+      'SELECT id, email, role FROM user_credentials WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const user = userResult.rows[0];
+    
+    // Generate token for the target user
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    console.log('[admin] Generated login token for user:', userId);
+    
+    res.json({ token, userId: user.id });
+  } catch (error) {
+    console.error('[admin] Error logging in as user:', error);
+    res.status(500).json({ error: 'Failed to login as user' });
+  }
+});
+
 // Health check endpoint
 // ========================================
 // AUTHENTICATION API

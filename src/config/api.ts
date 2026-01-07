@@ -20,6 +20,8 @@ export const API_ENDPOINTS = {
   ADMIN_USER_FEATURES: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/features`,
   ADMIN_USER_LIMITS: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/limits`,
   ADMIN_USER_SUBSCRIPTION: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/subscription`,
+  ADMIN_USER_INFO: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/info`,
+  ADMIN_LOGIN_AS_USER: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/login-as`,
   ADMIN_DELETE_USER: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}`,
   ADMIN_CHANGE_PASSWORD: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/password`,
   
