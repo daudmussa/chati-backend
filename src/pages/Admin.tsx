@@ -513,15 +513,15 @@ export default function Admin() {
 
       if (response.ok) {
         const data = await response.json();
-        // Store the token and reload
-        localStorage.setItem('token', data.token);
+        // Store the token with correct key and force full page reload
+        localStorage.setItem('auth_token', data.token);
         toast({
           title: "Logging in as user",
           description: `Switching to ${userEmail}...`,
         });
         setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 1000);
+          window.location.reload();
+        }, 500);
       } else {
         throw new Error('Failed to login as user');
       }
