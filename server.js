@@ -7,7 +7,9 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import nodemailer from "nodemailer";
+import sgMail from "@sendgrid/mail";
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
+
 
 console.log("[startup] Loading env...");
 dotenv.config();
@@ -167,57 +169,30 @@ class BunnyStorage {
 
 const bunnyStorage = new BunnyStorage();
 
-// Configure email transporter
-console.log('[Email] Initializing email transporter...');
-console.log('[Email] SMTP Config:', {
-  host: process.env.SMTP_HOST,
-  port: process.env.SMTP_PORT,
-  user: process.env.SMTP_USER,
-  passwordSet: !!process.env.SMTP_PASSWORD
-});
-
-const emailTransporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.SMTP_PORT) || 587,
-  secure: false, // true for 465, false for other ports
-  auth: {
-    user: process.env.SMTP_USER || 'duadarts@gmail.com',
-    pass: process.env.SMTP_PASSWORD || '' // Add this to .env
-  }
-});
-
-// Verify email transporter on startup
-if (process.env.SMTP_PASSWORD) {
-  emailTransporter.verify(function (error, success) {
-    if (error) {
-      console.error('[Email] ❌ SMTP connection failed:', error.message);
-    } else {
-      console.log('[Email] ✅ SMTP server is ready to send emails');
-    }
-  });
+// Configure SendGrid
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('[Email] ✅ SendGrid configured');
 } else {
-  console.log('[Email] ⚠️ SMTP_PASSWORD not set - emails will not be sent');
+  console.log('[Email] ⚠️ SENDGRID_API_KEY not set - emails will not be sent');
 }
 
-// Email sending function
+// Email sending function using SendGrid
 async function sendWelcomeEmail(toEmail, userName) {
   console.log('[Email] Attempting to send welcome email to:', toEmail);
-  console.log('[Email] SMTP configured:', {
-    host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    user: process.env.SMTP_USER,
-    passwordSet: !!process.env.SMTP_PASSWORD
-  });
   
-  // Check if email is disabled or SMTP not configured
-  if (process.env.DISABLE_EMAIL === 'true' || !process.env.SMTP_PASSWORD) {
-    console.log('[Email] Email disabled or SMTP_PASSWORD not set - skipping email');
+  // Check if email is disabled or SendGrid not configured
+  if (process.env.DISABLE_EMAIL === 'true' || !process.env.SENDGRID_API_KEY) {
+    console.log('[Email] Email disabled or SENDGRID_API_KEY not set - skipping email');
     return false;
   }
   
   const emailContent = {
-    from: `"Chati Solutions" <${process.env.SMTP_USER || 'duadarts@gmail.com'}>`,
     to: toEmail,
+    from: {
+      email: process.env.SENDGRID_FROM_EMAIL || 'duadarts@gmail.com',
+      name: 'Chati Solutions'
+    },
     subject: 'Welcome to Chati Solutions! 🎉',
     html: `
       <!DOCTYPE html>
@@ -280,30 +255,27 @@ async function sendWelcomeEmail(toEmail, userName) {
   };
   
   try {
-    console.log('[Email] Sending email via transporter...');
+    console.log('[Email] Sending email via SendGrid...');
     
     // Add timeout to prevent hanging (10 seconds)
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Email send timeout after 10 seconds')), 10000)
     );
     
-    const info = await Promise.race([
-      emailTransporter.sendMail(emailContent),
+    const result = await Promise.race([
+      sgMail.send(emailContent),
       timeoutPromise
     ]);
     
-    console.log('[Email] ✅ Email sent successfully!');
-    console.log('[Email] Message ID:', info.messageId);
-    console.log('[Email] Response:', info.response);
+    console.log('[Email] ✅ Email sent successfully via SendGrid!');
+    console.log('[Email] Status Code:', result[0]?.statusCode);
     return true;
   } catch (error) {
     console.error('[Email] ❌ Failed to send email');
     console.error('[Email] Error details:', {
       message: error.message,
       code: error.code,
-      command: error.command,
-      response: error.response,
-      responseCode: error.responseCode
+      response: error.response?.body
     });
     // Don't throw - let signup continue even if email fails
     return false;
@@ -2394,18 +2366,21 @@ app.post("/api/admin/test-email", async (req, res) => {
   
   try {
     console.log('[test-email] Testing email configuration...');
-    console.log('[test-email] SMTP_HOST:', process.env.SMTP_HOST);
-    console.log('[test-email] SMTP_PORT:', process.env.SMTP_PORT);
-    console.log('[test-email] SMTP_USER:', process.env.SMTP_USER);
-    console.log('[test-email] SMTP_PASSWORD set:', !!process.env.SMTP_PASSWORD);
+    console.log('[test-email] SendGrid API Key set:', !!process.env.SENDGRID_API_KEY);
+    console.log('[test-email] Email disabled:', process.env.DISABLE_EMAIL === 'true');
     
-    if (!process.env.SMTP_PASSWORD) {
+    if (!process.env.SENDGRID_API_KEY) {
       return res.status(500).json({ 
-        error: 'SMTP_PASSWORD not configured. Please set it in your environment variables.',
-        smtpHost: process.env.SMTP_HOST,
-        smtpPort: process.env.SMTP_PORT,
-        smtpUser: process.env.SMTP_USER,
-        smtpPasswordSet: false
+        error: 'SENDGRID_API_KEY not configured. Please set it in your environment variables.',
+        sendgridConfigured: false
+      });
+    }
+    
+    if (process.env.DISABLE_EMAIL === 'true') {
+      return res.status(500).json({ 
+        error: 'Email is disabled. Remove DISABLE_EMAIL environment variable to enable.',
+        sendgridConfigured: true,
+        emailDisabled: true
       });
     }
     
@@ -2415,23 +2390,14 @@ app.post("/api/admin/test-email", async (req, res) => {
     res.json({ 
       success: true, 
       message: `Test email sent to ${email}`,
-      smtpConfig: {
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        user: process.env.SMTP_USER
-      }
+      provider: 'SendGrid'
     });
   } catch (error) {
     console.error('[test-email] Failed to send test email:', error);
     res.status(500).json({ 
       error: 'Failed to send test email', 
       details: error.message,
-      smtpConfig: {
-        host: process.env.SMTP_HOST,
-        port: process.env.SMTP_PORT,
-        user: process.env.SMTP_USER,
-        passwordSet: !!process.env.SMTP_PASSWORD
-      }
+      sendgridConfigured: !!process.env.SENDGRID_API_KEY
     });
   }
 });
