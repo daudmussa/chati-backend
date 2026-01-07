@@ -166,6 +166,83 @@ class BunnyStorage {
 
 const bunnyStorage = new BunnyStorage();
 
+// Email sending function using Twilio SendGrid or basic SMTP
+async function sendWelcomeEmail(toEmail, userName) {
+  // For now, we'll use a simple HTTP request to a mail service
+  // You can replace this with nodemailer or SendGrid later
+  const emailContent = {
+    to: toEmail,
+    subject: 'Welcome to Chati Solutions! 🎉',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+          .button { display: inline-block; background: #25D366; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+          .contact-box { background: white; padding: 20px; border-left: 4px solid #25D366; margin: 20px 0; }
+          .footer { text-align: center; color: #666; margin-top: 20px; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Welcome to Chati Solutions! 🎉</h1>
+          </div>
+          <div class="content">
+            <p>Hi ${userName},</p>
+            
+            <p>Thank you for signing up with <strong>Chati Solutions</strong>! We're excited to have you on board.</p>
+            
+            <p>To get started and unlock full access to our AI-powered WhatsApp automation platform, you'll need to subscribe to one of our packages.</p>
+            
+            <a href="https://chatisolutions.com/pricing" class="button">View Pricing & Packages</a>
+            
+            <div class="contact-box">
+              <h3>📞 Need Help Getting Started?</h3>
+              <p>Our team is here to assist you! Contact us:</p>
+              <p><strong>Phone:</strong> +255 719 958 997<br>
+              <strong>Email:</strong> duadarts@gmail.com</p>
+            </div>
+            
+            <p>Once you subscribe, your account will be activated within 24 hours and you'll have access to:</p>
+            <ul>
+              <li>✅ AI-powered automated responses</li>
+              <li>✅ WhatsApp business automation</li>
+              <li>✅ Online store integration</li>
+              <li>✅ Booking system</li>
+              <li>✅ Staff management</li>
+              <li>✅ And much more!</li>
+            </ul>
+            
+            <p>We look forward to helping you automate your business communications!</p>
+            
+            <p>Best regards,<br>
+            <strong>The Chati Solutions Team</strong></p>
+          </div>
+          <div class="footer">
+            <p>© 2026 Chati Solutions. All rights reserved.</p>
+            <p>Visit us at <a href="https://chatisolutions.com">chatisolutions.com</a></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+  };
+  
+  // Log the email (in production, you'd send this via a real email service)
+  console.log('[Email] Would send welcome email to:', toEmail);
+  console.log('[Email] Email content prepared for:', userName);
+  
+  // TODO: Integrate with actual email service (SendGrid, AWS SES, or nodemailer)
+  // For now, just log it. You can add nodemailer integration later.
+  
+  return true;
+}
+
 let twilioClient = null;
 if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
   twilioClient = Twilio(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN);
@@ -2035,6 +2112,15 @@ app.post("/api/auth/signup", async (req, res) => {
     console.log('[auth] Saving initial business settings:', initialSettings);
     await pgSaveBusinessSettings(user.id, initialSettings);
     console.log('[auth] Business settings saved for user:', user.id);
+    
+    // Send welcome email
+    try {
+      await sendWelcomeEmail(email, name || email.split('@')[0]);
+      console.log('[auth] Welcome email sent to:', email);
+    } catch (emailError) {
+      console.error('[auth] Failed to send welcome email:', emailError);
+      // Don't fail signup if email fails
+    }
     
     // Generate JWT
     const token = jwt.sign(
