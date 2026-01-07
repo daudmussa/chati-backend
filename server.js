@@ -1966,17 +1966,15 @@ app.post('/api/admin/users/:userId/login-as', async (req, res) => {
   console.log('[admin] POST /api/admin/users/:userId/login-as:', { userId, requestedBy: requestingUserId });
   
   try {
-    // Get the user to login as
-    const userResult = await pool.query(
-      'SELECT id, email, role FROM user_credentials WHERE user_id = $1',
-      [userId]
-    );
+    // Get the user to login as (userId is the user's UUID from users table)
+    const user = await getUserById(userId);
     
-    if (userResult.rows.length === 0) {
+    if (!user) {
+      console.log('[admin] User not found:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
     
-    const user = userResult.rows[0];
+    console.log('[admin] Found user:', { id: user.id, email: user.email, role: user.role });
     
     // Generate token for the target user
     const token = jwt.sign(
