@@ -281,7 +281,17 @@ async function sendWelcomeEmail(toEmail, userName) {
   
   try {
     console.log('[Email] Sending email via transporter...');
-    const info = await emailTransporter.sendMail(emailContent);
+    
+    // Add timeout to prevent hanging (10 seconds)
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Email send timeout after 10 seconds')), 10000)
+    );
+    
+    const info = await Promise.race([
+      emailTransporter.sendMail(emailContent),
+      timeoutPromise
+    ]);
+    
     console.log('[Email] ✅ Email sent successfully!');
     console.log('[Email] Message ID:', info.messageId);
     console.log('[Email] Response:', info.response);
@@ -2170,14 +2180,10 @@ app.post("/api/auth/signup", async (req, res) => {
     await pgSaveBusinessSettings(user.id, initialSettings);
     console.log('[auth] Business settings saved for user:', user.id);
     
-    // Send welcome email
-    try {
-      await sendWelcomeEmail(email, name || email.split('@')[0]);
-      console.log('[auth] Welcome email sent to:', email);
-    } catch (emailError) {
-      console.error('[auth] Failed to send welcome email:', emailError);
-      // Don't fail signup if email fails
-    }
+    // Send welcome email asynchronously (don't wait for it)
+    sendWelcomeEmail(email, name || email.split('@')[0])
+      .then(() => console.log('[auth] Welcome email sent to:', email))
+      .catch(emailError => console.error('[auth] Failed to send welcome email:', emailError));
     
     // Generate JWT
     const token = jwt.sign(
