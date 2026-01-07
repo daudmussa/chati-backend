@@ -6,6 +6,7 @@ import Twilio from "twilio";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
+import nodemailer from "nodemailer";
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
 
 console.log("[startup] Loading env...");
@@ -166,11 +167,21 @@ class BunnyStorage {
 
 const bunnyStorage = new BunnyStorage();
 
-// Email sending function using Twilio SendGrid or basic SMTP
+// Configure email transporter
+const emailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: process.env.SMTP_PORT || 587,
+  secure: false, // true for 465, false for other ports
+  auth: {
+    user: process.env.SMTP_USER || 'duadarts@gmail.com',
+    pass: process.env.SMTP_PASSWORD || '' // Add this to .env
+  }
+});
+
+// Email sending function
 async function sendWelcomeEmail(toEmail, userName) {
-  // For now, we'll use a simple HTTP request to a mail service
-  // You can replace this with nodemailer or SendGrid later
   const emailContent = {
+    from: `"Chati Solutions" <${process.env.SMTP_USER || 'duadarts@gmail.com'}>`,
     to: toEmail,
     subject: 'Welcome to Chati Solutions! 🎉',
     html: `
@@ -233,14 +244,20 @@ async function sendWelcomeEmail(toEmail, userName) {
     `
   };
   
-  // Log the email (in production, you'd send this via a real email service)
-  console.log('[Email] Would send welcome email to:', toEmail);
-  console.log('[Email] Email content prepared for:', userName);
-  
-  // TODO: Integrate with actual email service (SendGrid, AWS SES, or nodemailer)
-  // For now, just log it. You can add nodemailer integration later.
-  
-  return true;
+  try {
+    // Only send if SMTP is configured
+    if (process.env.SMTP_PASSWORD) {
+      await emailTransporter.sendMail(emailContent);
+      console.log('[Email] Welcome email sent successfully to:', toEmail);
+    } else {
+      console.log('[Email] SMTP not configured. Email would be sent to:', toEmail);
+      console.log('[Email] To enable emails, add SMTP_PASSWORD to .env');
+    }
+    return true;
+  } catch (error) {
+    console.error('[Email] Failed to send email:', error.message);
+    throw error;
+  }
 }
 
 let twilioClient = null;
