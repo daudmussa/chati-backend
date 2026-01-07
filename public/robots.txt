@@ -1,0 +1,18 @@
+# robots.txt for Chati Solutions
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /settings
+Disallow: /conversations
+Disallow: /bookings
+Disallow: /store
+Disallow: /staff
+Disallow: /billing
+Disallow: /cart
+
+# Sitemap location
+Sitemap: https://chati.solutions/sitemap.xml
+
+# Crawl-delay
+Crawl-delay: 10

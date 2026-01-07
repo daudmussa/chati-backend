@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import SEO from '@/components/SEO';
 import { 
   Store, 
   MessageSquare, 
@@ -271,6 +272,13 @@ export default function ShopLanding() {
 
       {/* Hero Section */}
       <section className="container mx-auto px-4 py-16">
+        <SEO 
+          title="Online Store with WhatsApp Integration | Create Your Shop | Chati Solutions"
+          description="Create your online store with WhatsApp integration. Sell products, manage inventory, and accept orders through WhatsApp. Perfect for Tanzanian businesses."
+          keywords="online store Tanzania, WhatsApp store, create online shop Tanzania, e-commerce Tanzania, WhatsApp shopping, sell products online Tanzania"
+          canonical="https://chati.solutions/shop"
+        />
+        
         <div className="max-w-4xl mx-auto text-center">
           <Badge className="mb-4 bg-[#25D366] text-white">
             <Zap className="w-3 h-3 mr-1" />

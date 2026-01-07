@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/use-toast';
 import { Mail, Phone, MapPin, Send, MessageSquare, ShoppingBag, Menu, X } from 'lucide-react';
+import SEO from '@/components/SEO';
 
 export default function Contact() {
   const navigate = useNavigate();
@@ -31,6 +32,13 @@ export default function Contact() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <SEO 
+        title="Contact Us - Get in Touch with Chati Solutions | WhatsApp: +255719958997"
+        description="Contact Chati Solutions for AI-powered WhatsApp business automation. Phone: +255719958997, Email: duadarts@gmail.com. Get support for your business automation needs."
+        keywords="contact Chati Solutions, WhatsApp automation support Tanzania, business automation contact, customer service Tanzania"
+        canonical="https://chati.solutions/contact"
+      />
+      
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">

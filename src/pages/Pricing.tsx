@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import SEO from '@/components/SEO';
 import { Check, Zap, TrendingUp, Crown, MessageSquare, ShoppingBag, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
@@ -238,6 +239,13 @@ export default function Pricing() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <SEO 
+          title="Pricing - WhatsApp Business Automation Plans | Chati Solutions Tanzania"
+          description="Affordable WhatsApp business automation pricing. Plans from TZS 45,000/month. AI conversations, online store, booking system. No hidden fees. Perfect for Tanzanian businesses."
+          keywords="WhatsApp automation pricing Tanzania, business automation cost, WhatsApp chatbot price Tanzania, affordable business automation, online store pricing Tanzania"
+          canonical="https://chati.solutions/pricing"
+        />
+        
         {/* Hero Section */}
         <div className="text-center mb-16">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">

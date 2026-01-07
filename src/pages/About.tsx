@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2, MessageSquare, ShoppingBag, Menu, X } from "lucide-react";
 import { useState } from "react";
+import SEO from '@/components/SEO';
 
 export default function About() {
   const navigate = useNavigate();
@@ -150,6 +151,13 @@ export default function About() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <SEO 
+          title="About Us - Chati Solutions | AI WhatsApp Automation for Tanzania"
+          description="Learn about Chati Solutions, the leading AI-powered WhatsApp business automation platform for Tanzanian businesses. Automate customer service, manage online sales, and accept bookings."
+          keywords="about Chati Solutions, WhatsApp automation Tanzania, business automation company Tanzania, AI customer service Tanzania"
+          canonical="https://chati.solutions/about"
+        />
+        
         {/* Hero Section */}
         <div className="text-center mb-16">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">

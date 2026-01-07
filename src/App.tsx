@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { OnboardingProvider } from "./contexts/OnboardingContext";
 import { Toaster } from "./components/ui/toaster";
@@ -68,39 +69,41 @@ function App() {
   const hideWhatsApp = location.pathname === '/admin' || location.pathname === '/dashboard';
   
   return (
-    <AuthProvider>
-      <OnboardingProvider>
-        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/signin" element={<SignIn />} />
-            <Route path="/onboarding/account" element={<AccountCreation />} />
-            <Route path="/onboarding/ai-setup" element={<ProtectedRoute><AISetup /></ProtectedRoute>} />
-            <Route path="/onboarding/confirmation" element={<ProtectedRoute><Confirmation /></ProtectedRoute>} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/conversations" element={<FeatureProtectedRoute featureId="conversations"><Conversations /></FeatureProtectedRoute>} />
-            <Route path="/settings" element={<FeatureProtectedRoute featureId="settings"><Settings /></FeatureProtectedRoute>} />
-            {/* <Route path="/billing" element={<FeatureProtectedRoute featureId="billing"><Billing /></FeatureProtectedRoute>} /> */}
-            <Route path="/store" element={<FeatureProtectedRoute featureId="store"><Store /></FeatureProtectedRoute>} />
-            <Route path="/bookings" element={<FeatureProtectedRoute featureId="bookings"><Bookings /></FeatureProtectedRoute>} />
-            <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-            <Route path="/test-upload" element={<ProtectedRoute><TestUpload /></ProtectedRoute>} />
-            {/* Public customer-facing pages */}
-            <Route path="/shop" element={<ShopLanding />} />
-            <Route path="/shop/:storeName" element={<CustomerStore />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/features" element={<Features />} />
-          </Routes>
-        </Suspense>
-        {!hideWhatsApp && <FloatingWhatsApp />}
-        <Toaster />
-      </OnboardingProvider>
-    </AuthProvider>
+    <HelmetProvider>
+      <AuthProvider>
+        <OnboardingProvider>
+          <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+            <Routes>
+              <Route path="/" element={<Landing />} />
+              <Route path="/signin" element={<SignIn />} />
+              <Route path="/onboarding/account" element={<AccountCreation />} />
+              <Route path="/onboarding/ai-setup" element={<ProtectedRoute><AISetup /></ProtectedRoute>} />
+              <Route path="/onboarding/confirmation" element={<ProtectedRoute><Confirmation /></ProtectedRoute>} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/conversations" element={<FeatureProtectedRoute featureId="conversations"><Conversations /></FeatureProtectedRoute>} />
+              <Route path="/settings" element={<FeatureProtectedRoute featureId="settings"><Settings /></FeatureProtectedRoute>} />
+              {/* <Route path="/billing" element={<FeatureProtectedRoute featureId="billing"><Billing /></FeatureProtectedRoute>} /> */}
+              <Route path="/store" element={<FeatureProtectedRoute featureId="store"><Store /></FeatureProtectedRoute>} />
+              <Route path="/bookings" element={<FeatureProtectedRoute featureId="bookings"><Bookings /></FeatureProtectedRoute>} />
+              <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+              <Route path="/test-upload" element={<ProtectedRoute><TestUpload /></ProtectedRoute>} />
+              {/* Public customer-facing pages */}
+              <Route path="/shop" element={<ShopLanding />} />
+              <Route path="/shop/:storeName" element={<CustomerStore />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/features" element={<Features />} />
+            </Routes>
+          </Suspense>
+          {!hideWhatsApp && <FloatingWhatsApp />}
+          <Toaster />
+        </OnboardingProvider>
+      </AuthProvider>
+    </HelmetProvider>
   );
 }
 

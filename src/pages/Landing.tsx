@@ -3,10 +3,29 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { MessageSquare, Zap, Clock, TrendingUp, CheckCircle2, ArrowRight, ShoppingBag, CalendarCheck, Menu, X, DollarSign } from 'lucide-react';
 import { useState } from 'react';
+import SEO from '@/components/SEO';
 
 export default function Landing() {
   const navigate = useNavigate();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Chati Solutions - AI-Powered WhatsApp Business Automation",
+    "description": "Automate your WhatsApp customer service 24/7 with AI. Manage online store, accept bookings, and grow your Tanzanian business.",
+    "url": "https://chati.solutions/",
+    "mainEntity": {
+      "@type": "Service",
+      "name": "WhatsApp Business Automation",
+      "provider": {
+        "@type": "Organization",
+        "name": "Chati Solutions"
+      },
+      "areaServed": "Tanzania",
+      "serviceType": "Business Automation"
+    }
+  };
 
   const features = [
     {
@@ -44,6 +63,8 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50">
+      <SEO structuredData={structuredData} />
+      
       {/* Header */}
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">

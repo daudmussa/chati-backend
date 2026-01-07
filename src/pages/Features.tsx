@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
+import SEO from '@/components/SEO';
 import {
   MessageSquare,
   Bot,
@@ -301,6 +302,13 @@ export default function Features() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+        <SEO 
+          title="Features - AI WhatsApp Automation, Online Store & Booking System | Chati Solutions"
+          description="Explore Chati Solutions features: AI-powered WhatsApp automation, online store management, booking system, staff management, and analytics. Perfect for Tanzanian businesses."
+          keywords="WhatsApp AI features, business automation features, online store features, booking system Tanzania, WhatsApp chatbot features, automated customer service"
+          canonical="https://chati.solutions/features"
+        />
+        
         {/* Hero Section */}
         <div className="text-center mb-16">
           <Badge className="mb-4 bg-[#25D366] hover:bg-[#20BD5A]">
