@@ -209,9 +209,9 @@ async function sendWelcomeEmail(toEmail, userName) {
     passwordSet: !!process.env.SMTP_PASSWORD
   });
   
-  if (!process.env.SMTP_PASSWORD) {
-    console.log('[Email] SMTP_PASSWORD not set - email will not be sent');
-    console.log('[Email] To enable emails, add SMTP_PASSWORD to your .env file');
+  // Check if email is disabled or SMTP not configured
+  if (process.env.DISABLE_EMAIL === 'true' || !process.env.SMTP_PASSWORD) {
+    console.log('[Email] Email disabled or SMTP_PASSWORD not set - skipping email');
     return false;
   }
   
