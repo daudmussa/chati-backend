@@ -168,9 +168,17 @@ class BunnyStorage {
 const bunnyStorage = new BunnyStorage();
 
 // Configure email transporter
+console.log('[Email] Initializing email transporter...');
+console.log('[Email] SMTP Config:', {
+  host: process.env.SMTP_HOST,
+  port: process.env.SMTP_PORT,
+  user: process.env.SMTP_USER,
+  passwordSet: !!process.env.SMTP_PASSWORD
+});
+
 const emailTransporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.gmail.com',
-  port: process.env.SMTP_PORT || 587,
+  port: parseInt(process.env.SMTP_PORT) || 587,
   secure: false, // true for 465, false for other ports
   auth: {
     user: process.env.SMTP_USER || 'duadarts@gmail.com',
@@ -178,8 +186,35 @@ const emailTransporter = nodemailer.createTransport({
   }
 });
 
+// Verify email transporter on startup
+if (process.env.SMTP_PASSWORD) {
+  emailTransporter.verify(function (error, success) {
+    if (error) {
+      console.error('[Email] ❌ SMTP connection failed:', error.message);
+    } else {
+      console.log('[Email] ✅ SMTP server is ready to send emails');
+    }
+  });
+} else {
+  console.log('[Email] ⚠️ SMTP_PASSWORD not set - emails will not be sent');
+}
+
 // Email sending function
 async function sendWelcomeEmail(toEmail, userName) {
+  console.log('[Email] Attempting to send welcome email to:', toEmail);
+  console.log('[Email] SMTP configured:', {
+    host: process.env.SMTP_HOST,
+    port: process.env.SMTP_PORT,
+    user: process.env.SMTP_USER,
+    passwordSet: !!process.env.SMTP_PASSWORD
+  });
+  
+  if (!process.env.SMTP_PASSWORD) {
+    console.log('[Email] SMTP_PASSWORD not set - email will not be sent');
+    console.log('[Email] To enable emails, add SMTP_PASSWORD to your .env file');
+    return false;
+  }
+  
   const emailContent = {
     from: `"Chati Solutions" <${process.env.SMTP_USER || 'duadarts@gmail.com'}>`,
     to: toEmail,
@@ -245,18 +280,23 @@ async function sendWelcomeEmail(toEmail, userName) {
   };
   
   try {
-    // Only send if SMTP is configured
-    if (process.env.SMTP_PASSWORD) {
-      await emailTransporter.sendMail(emailContent);
-      console.log('[Email] Welcome email sent successfully to:', toEmail);
-    } else {
-      console.log('[Email] SMTP not configured. Email would be sent to:', toEmail);
-      console.log('[Email] To enable emails, add SMTP_PASSWORD to .env');
-    }
+    console.log('[Email] Sending email via transporter...');
+    const info = await emailTransporter.sendMail(emailContent);
+    console.log('[Email] ✅ Email sent successfully!');
+    console.log('[Email] Message ID:', info.messageId);
+    console.log('[Email] Response:', info.response);
     return true;
   } catch (error) {
-    console.error('[Email] Failed to send email:', error.message);
-    throw error;
+    console.error('[Email] ❌ Failed to send email');
+    console.error('[Email] Error details:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode
+    });
+    // Don't throw - let signup continue even if email fails
+    return false;
   }
 }
 
@@ -2320,6 +2360,64 @@ app.put("/api/user/credentials", async (req, res) => {
   } catch (error) {
     console.error("[credentials] Error saving credentials:", error);
     res.status(500).json({ error: "Failed to save credentials", details: error.message });
+  }
+});
+
+// Test email endpoint - ADMIN ONLY
+app.post("/api/admin/test-email", async (req, res) => {
+  const requestingUserRole = req.headers['x-user-role'];
+  
+  if (requestingUserRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { email, name } = req.body;
+  
+  if (!email) {
+    return res.status(400).json({ error: 'Email address required' });
+  }
+  
+  try {
+    console.log('[test-email] Testing email configuration...');
+    console.log('[test-email] SMTP_HOST:', process.env.SMTP_HOST);
+    console.log('[test-email] SMTP_PORT:', process.env.SMTP_PORT);
+    console.log('[test-email] SMTP_USER:', process.env.SMTP_USER);
+    console.log('[test-email] SMTP_PASSWORD set:', !!process.env.SMTP_PASSWORD);
+    
+    if (!process.env.SMTP_PASSWORD) {
+      return res.status(500).json({ 
+        error: 'SMTP_PASSWORD not configured. Please set it in your environment variables.',
+        smtpHost: process.env.SMTP_HOST,
+        smtpPort: process.env.SMTP_PORT,
+        smtpUser: process.env.SMTP_USER,
+        smtpPasswordSet: false
+      });
+    }
+    
+    await sendWelcomeEmail(email, name || 'Test User');
+    
+    console.log('[test-email] Test email sent successfully to:', email);
+    res.json({ 
+      success: true, 
+      message: `Test email sent to ${email}`,
+      smtpConfig: {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER
+      }
+    });
+  } catch (error) {
+    console.error('[test-email] Failed to send test email:', error);
+    res.status(500).json({ 
+      error: 'Failed to send test email', 
+      details: error.message,
+      smtpConfig: {
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        user: process.env.SMTP_USER,
+        passwordSet: !!process.env.SMTP_PASSWORD
+      }
+    });
   }
 });
 

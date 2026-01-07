@@ -683,9 +683,58 @@ export default function Admin() {
   return (
     <DashboardLayout>
       <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-sm md:text-base text-gray-500 mt-1">Manage all users and view system-wide statistics</p>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+            <p className="text-sm md:text-base text-gray-500 mt-1">Manage all users and view system-wide statistics</p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={async () => {
+              try {
+                const token = localStorage.getItem('auth_token');
+                const response = await fetch(`${API_ENDPOINTS.BASE_URL}/api/admin/test-email`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                    'x-user-role': 'admin'
+                  },
+                  body: JSON.stringify({
+                    email: user?.email || 'duadarts@gmail.com',
+                    name: user?.name || 'Admin'
+                  })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                  toast({
+                    title: 'Test Email Sent',
+                    description: `Email sent to ${user?.email}. Check your inbox!`
+                  });
+                } else {
+                  toast({
+                    title: 'Email Test Failed',
+                    description: data.error || 'Failed to send test email',
+                    variant: 'destructive'
+                  });
+                }
+              } catch (error) {
+                console.error('Test email error:', error);
+                toast({
+                  title: 'Error',
+                  description: 'Failed to send test email',
+                  variant: 'destructive'
+                });
+              }
+            }}
+            className="gap-2"
+          >
+            <Mail className="h-4 w-4" />
+            Test Email
+          </Button>
         </div>
 
         {/* Overview Stats */}
