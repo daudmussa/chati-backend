@@ -2197,7 +2197,10 @@ app.post("/api/auth/signup", async (req, res) => {
         name: user.name,
         role: user.role,
         enabledFeatures: user.enabled_features || ['conversations', 'bookings'],
-        limits: user.limits || { maxConversations: 100, maxProducts: 50 }
+        limits: user.limits || { maxConversations: 100, maxProducts: 50 },
+        payDate: user.pay_date || null,
+        package: user.package || 'starter',
+        status: user.status || 'active'
       }
     });
   } catch (error) {
@@ -2252,7 +2255,10 @@ app.post("/api/auth/login", async (req, res) => {
         name: user.name,
         role: user.role,
         enabledFeatures: user.enabled_features || ['conversations', 'bookings'],
-        limits: user.limits || { maxConversations: 100, maxProducts: 50 }
+        limits: user.limits || { maxConversations: 100, maxProducts: 50 },
+        payDate: user.pay_date || null,
+        package: user.package || 'starter',
+        status: user.status || 'active'
       }
     });
   } catch (error) {
