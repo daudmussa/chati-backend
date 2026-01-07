@@ -74,10 +74,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-[#25D366] rounded-lg flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-lg">Chati Solutions</span>
+              <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain" />
             </div>
             <button
               onClick={() => setSidebarOpen(false)}

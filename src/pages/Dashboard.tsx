@@ -118,9 +118,9 @@ export default function Dashboard() {
                     </a>
                   </div>
                 </div>
-                <p className="text-sm">
+                {/* <p className="text-sm">
                   After payment, your account will be activated within 24 hours.
-                </p>
+                </p> */}
               </div>
             </AlertDescription>
           </Alert>

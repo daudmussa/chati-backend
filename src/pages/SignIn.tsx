@@ -45,8 +45,8 @@ export default function SignIn() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-3 text-center">
-          <Link to="/" className="mx-auto w-12 h-12 bg-[#25D366] rounded-full flex items-center justify-center hover:bg-[#20BD5A] transition-colors">
-            <MessageSquare className="w-6 h-6 text-white" />
+          <Link to="/" className="mx-auto flex items-center justify-center hover:opacity-80 transition-opacity">
+            <img src="/icon.png" alt="Chati Solutions" className="w-16 h-16 object-contain" />
           </Link>
           <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
           <CardDescription>

@@ -48,10 +48,7 @@ export default function Landing() {
       <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-[#25D366] rounded-lg flex items-center justify-center">
-              <MessageSquare className="w-6 h-6 text-white" />
-            </div>
-            <span className="font-bold text-xl">Chati Solutions</span>
+            <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain" />
           </div>
           
           {/* Desktop Navigation */}
@@ -338,7 +335,9 @@ export default function Landing() {
         <div className="container mx-auto px-4 py-12">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
             <div>
-              <h3 className="font-bold text-gray-900 mb-4">Chati Solutions</h3>
+              <div className="flex items-center gap-2 mb-4">
+                <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain" />
+              </div>
               <p className="text-gray-600 text-sm">
                 Automate your business communications with AI-powered responses, online store, and booking system.
               </p>
