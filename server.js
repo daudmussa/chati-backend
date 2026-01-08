@@ -193,37 +193,79 @@ async function sendWelcomeEmail(toEmail, userName) {
       email: process.env.SENDGRID_FROM_EMAIL || 'duadarts@gmail.com',
       name: 'Chati Solutions'
     },
-    subject: 'Welcome to Chati Solutions! 🎉',
+    replyTo: {
+      email: 'duadarts@gmail.com',
+      name: 'Chati Solutions Support'
+    },
+    subject: 'Welcome to Chati Solutions - Your Account is Ready',
+    // Plain text version to avoid spam filters
+    text: `Hi ${userName},
+
+Thank you for signing up with Chati Solutions! We're excited to have you on board.
+
+To get started and unlock full access to our AI-powered WhatsApp automation platform, you'll need to subscribe to one of our packages.
+
+View Pricing & Packages: https://chati.solutions/pricing
+
+Need Help Getting Started?
+Our team is here to assist you! Contact us:
+Phone: +255 719 958 997
+Email: duadarts@gmail.com
+
+Once you subscribe, your account will be activated within 24 hours and you'll have access to:
+- AI-powered automated responses
+- WhatsApp business automation
+- Online store integration
+- Booking system
+- Staff management
+- And much more!
+
+We look forward to helping you automate your business communications!
+
+Best regards,
+The Chati Solutions Team
+
+---
+© 2026 Chati Solutions. All rights reserved.
+Visit us at https://chati.solutions
+
+To unsubscribe from these emails, reply with "unsubscribe".`,
     html: `
       <!DOCTYPE html>
-      <html>
+      <html lang="en">
       <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Welcome to Chati Solutions</title>
         <style>
-          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
           .container { max-width: 600px; margin: 0 auto; padding: 20px; }
           .header { background: linear-gradient(135deg, #25D366 0%, #20BD5A 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }
-          .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; }
+          .content { background: white; padding: 30px; border-radius: 0 0 10px 10px; }
           .button { display: inline-block; background: #25D366; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: 600; }
-          .contact-box { background: white; padding: 20px; border-left: 4px solid #25D366; margin: 20px 0; }
-          .footer { text-align: center; color: #666; margin-top: 20px; font-size: 12px; }
+          .contact-box { background: #f9f9f9; padding: 20px; border-left: 4px solid #25D366; margin: 20px 0; border-radius: 5px; }
+          .footer { text-align: center; color: #666; margin-top: 20px; font-size: 12px; padding: 20px; }
+          .footer a { color: #25D366; text-decoration: none; }
+          ul { padding-left: 20px; }
+          li { margin: 8px 0; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Welcome to Chati Solutions! 🎉</h1>
+            <h1 style="margin: 0;">Welcome to Chati Solutions</h1>
           </div>
           <div class="content">
             <p>Hi ${userName},</p>
             
-            <p>Thank you for signing up with <strong>Chati Solutions</strong>! We're excited to have you on board.</p>
+            <p>Thank you for signing up with Chati Solutions! We're excited to have you on board.</p>
             
             <p>To get started and unlock full access to our AI-powered WhatsApp automation platform, you'll need to subscribe to one of our packages.</p>
             
-            <a href="https://chatisolutions.com/pricing" class="button">View Pricing & Packages</a>
+            <a href="https://chati.solutions/pricing" class="button" style="color: white;">View Pricing & Packages</a>
             
             <div class="contact-box">
-              <h3>📞 Need Help Getting Started?</h3>
+              <h3 style="margin-top: 0;">Need Help Getting Started?</h3>
               <p>Our team is here to assist you! Contact us:</p>
               <p><strong>Phone:</strong> +255 719 958 997<br>
               <strong>Email:</strong> duadarts@gmail.com</p>
@@ -231,12 +273,12 @@ async function sendWelcomeEmail(toEmail, userName) {
             
             <p>Once you subscribe, your account will be activated within 24 hours and you'll have access to:</p>
             <ul>
-              <li>✅ AI-powered automated responses</li>
-              <li>✅ WhatsApp business automation</li>
-              <li>✅ Online store integration</li>
-              <li>✅ Booking system</li>
-              <li>✅ Staff management</li>
-              <li>✅ And much more!</li>
+              <li>AI-powered automated responses</li>
+              <li>WhatsApp business automation</li>
+              <li>Online store integration</li>
+              <li>Booking system</li>
+              <li>Staff management</li>
+              <li>And much more!</li>
             </ul>
             
             <p>We look forward to helping you automate your business communications!</p>
@@ -245,13 +287,23 @@ async function sendWelcomeEmail(toEmail, userName) {
             <strong>The Chati Solutions Team</strong></p>
           </div>
           <div class="footer">
-            <p>© 2026 Chati Solutions. All rights reserved.</p>
-            <p>Visit us at <a href="https://chatisolutions.com">chatisolutions.com</a></p>
+            <p>&copy; 2026 Chati Solutions. All rights reserved.</p>
+            <p>Visit us at <a href="https://chati.solutions">chati.solutions</a></p>
+            <p style="font-size: 11px; color: #999; margin-top: 10px;">
+              This email was sent to ${toEmail} because you signed up for Chati Solutions.<br>
+              To unsubscribe, reply with "unsubscribe".
+            </p>
           </div>
         </div>
       </body>
       </html>
-    `
+    `,
+    // Anti-spam headers
+    trackingSettings: {
+      clickTracking: { enable: false },
+      openTracking: { enable: false }
+    },
+    categories: ['welcome', 'onboarding']
   };
   
   try {
