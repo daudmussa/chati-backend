@@ -2090,6 +2090,8 @@ app.put('/api/admin/users/:userId/info', async (req, res) => {
   console.log('[admin] PUT /api/admin/users/:userId/info:', { userId, email, storePhone, requestedBy: requestingUserId });
   
   try {
+    const pool = ensurePool();
+    
     // Update user email in users table
     if (email) {
       const emailResult = await pool.query(
