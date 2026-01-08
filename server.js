@@ -2090,20 +2090,36 @@ app.put('/api/admin/users/:userId/info', async (req, res) => {
   console.log('[admin] PUT /api/admin/users/:userId/info:', { userId, email, storePhone, requestedBy: requestingUserId });
   
   try {
-    // Update user email
+    // Update user email in users table
     if (email) {
-      await pool.query(
-        'UPDATE user_credentials SET email = $1 WHERE user_id = $2',
+      const emailResult = await pool.query(
+        'UPDATE users SET email = $1, updated_at = NOW() WHERE id = $2 RETURNING id',
         [email, userId]
       );
+      console.log('[admin] Email updated, rows affected:', emailResult.rowCount);
+      
+      if (emailResult.rowCount === 0) {
+        console.error('[admin] No user found with id:', userId);
+        return res.status(404).json({ error: 'User not found' });
+      }
     }
     
-    // Update store phone
+    // Update store phone in store_settings table
     if (storePhone) {
-      await pool.query(
-        'UPDATE stores SET phone = $1 WHERE user_id = $2',
+      const phoneResult = await pool.query(
+        'UPDATE store_settings SET store_phone = $1, updated_at = NOW() WHERE user_id = $2 RETURNING user_id',
         [storePhone, userId]
       );
+      console.log('[admin] Store phone updated, rows affected:', phoneResult.rowCount);
+      
+      // If no store settings exist, create them
+      if (phoneResult.rowCount === 0) {
+        console.log('[admin] No store settings found, creating new entry');
+        await pool.query(
+          'INSERT INTO store_settings (user_id, store_id, store_name, store_phone) VALUES ($1, $2, $3, $4) ON CONFLICT (user_id) DO UPDATE SET store_phone = $4',
+          [userId, `store_${userId}`, 'My Store', storePhone]
+        );
+      }
     }
     
     console.log('[admin] User info updated successfully for user:', userId);
@@ -2111,7 +2127,8 @@ app.put('/api/admin/users/:userId/info', async (req, res) => {
     res.json({ success: true, userId, email, storePhone });
   } catch (error) {
     console.error('[admin] Error updating user info:', error);
-    res.status(500).json({ error: 'Failed to update user info' });
+    console.error('[admin] Error details:', error.message, error.stack);
+    res.status(500).json({ error: 'Failed to update user info', details: error.message });
   }
 });
 
