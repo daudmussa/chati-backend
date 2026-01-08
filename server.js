@@ -191,45 +191,41 @@ async function sendWelcomeEmail(toEmail, userName) {
     to: toEmail,
     from: {
       email: process.env.SENDGRID_FROM_EMAIL || 'duadarts@gmail.com',
-      name: 'Chati Solutions'
+      name: 'Chati Solutions Team'
     },
     replyTo: {
-      email: 'duadarts@gmail.com',
+      email: process.env.SENDGRID_FROM_EMAIL || 'duadarts@gmail.com',
       name: 'Chati Solutions Support'
     },
     subject: 'Welcome to Chati Solutions - Your Account is Ready',
+    // Additional anti-spam headers
+    headers: {
+      'X-Entity-Ref-ID': `user-${Date.now()}`,
+      'List-Unsubscribe': '<mailto:duadarts@gmail.com?subject=unsubscribe>',
+    },
     // Plain text version to avoid spam filters
     text: `Hi ${userName},
 
-Thank you for signing up with Chati Solutions! We're excited to have you on board.
+Thank you for creating an account with Chati Solutions.
 
-To get started and unlock full access to our AI-powered WhatsApp automation platform, you'll need to subscribe to one of our packages.
+Your account has been successfully set up. To activate your account and start using our platform, please select a subscription plan that fits your needs.
 
-View Pricing & Packages: https://chati.solutions/pricing
+View available plans: https://chati.solutions/pricing
 
-Need Help Getting Started?
-Our team is here to assist you! Contact us:
+If you need assistance, our support team is available:
 Phone: +255 719 958 997
 Email: duadarts@gmail.com
 
-Once you subscribe, your account will be activated within 24 hours and you'll have access to:
-- AI-powered automated responses
-- WhatsApp business automation
-- Online store integration
-- Booking system
-- Staff management
-- And much more!
-
-We look forward to helping you automate your business communications!
+Once you subscribe, your account will be activated within 24 hours.
 
 Best regards,
 The Chati Solutions Team
 
----
-© 2026 Chati Solutions. All rights reserved.
-Visit us at https://chati.solutions
+Chati Solutions
+https://chati.solutions
+© 2026 All rights reserved.
 
-To unsubscribe from these emails, reply with "unsubscribe".`,
+To unsubscribe, reply with "unsubscribe".`,
     html: `
       <!DOCTYPE html>
       <html lang="en">
@@ -258,30 +254,20 @@ To unsubscribe from these emails, reply with "unsubscribe".`,
           <div class="content">
             <p>Hi ${userName},</p>
             
-            <p>Thank you for signing up with Chati Solutions! We're excited to have you on board.</p>
+            <p>Thank you for creating an account with Chati Solutions.</p>
             
-            <p>To get started and unlock full access to our AI-powered WhatsApp automation platform, you'll need to subscribe to one of our packages.</p>
+            <p>Your account has been successfully set up. To activate your account and start using our platform, please select a subscription plan that fits your needs.</p>
             
-            <a href="https://chati.solutions/pricing" class="button" style="color: white;">View Pricing & Packages</a>
+            <a href="https://chati.solutions/pricing" class="button" style="color: white;">View Available Plans</a>
             
             <div class="contact-box">
-              <h3 style="margin-top: 0;">Need Help Getting Started?</h3>
-              <p>Our team is here to assist you! Contact us:</p>
+              <h3 style="margin-top: 0;">Need Assistance?</h3>
+              <p>Our support team is available to help:</p>
               <p><strong>Phone:</strong> +255 719 958 997<br>
               <strong>Email:</strong> duadarts@gmail.com</p>
             </div>
             
-            <p>Once you subscribe, your account will be activated within 24 hours and you'll have access to:</p>
-            <ul>
-              <li>AI-powered automated responses</li>
-              <li>WhatsApp business automation</li>
-              <li>Online store integration</li>
-              <li>Booking system</li>
-              <li>Staff management</li>
-              <li>And much more!</li>
-            </ul>
-            
-            <p>We look forward to helping you automate your business communications!</p>
+            <p>Once you subscribe, your account will be activated within 24 hours.</p>
             
             <p>Best regards,<br>
             <strong>The Chati Solutions Team</strong></p>
@@ -303,7 +289,16 @@ To unsubscribe from these emails, reply with "unsubscribe".`,
       clickTracking: { enable: false },
       openTracking: { enable: false }
     },
-    categories: ['welcome', 'onboarding']
+    mailSettings: {
+      bypassListManagement: {
+        enable: false
+      }
+    },
+    categories: ['transactional', 'welcome'],
+    customArgs: {
+      user_type: 'new_signup',
+      email_type: 'welcome'
+    }
   };
   
   try {
