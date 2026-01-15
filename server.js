@@ -2057,21 +2057,28 @@ app.put('/api/admin/users/:userId/password', async (req, res) => {
   console.log('[admin] PUT /api/admin/users/:userId/password:', { userId, requestedBy: requestingUserId });
   
   try {
+    const pool = ensurePool();
+
     // Hash the new password
     const passwordHash = await bcrypt.hash(newPassword, 10);
     
-    // Update password in database
-    await pool.query(
-      'UPDATE user_credentials SET password_hash = $1 WHERE user_id = $2',
+    // Update password in correct table (users)
+    const result = await pool.query(
+      'UPDATE users SET password_hash = $1, updated_at = NOW() WHERE id = $2 RETURNING id',
       [passwordHash, userId]
     );
+
+    if (result.rowCount === 0) {
+      console.error('[admin] No user found to change password for id:', userId);
+      return res.status(404).json({ error: 'User not found' });
+    }
     
     console.log('[admin] Password changed successfully for user:', userId);
     
     res.json({ success: true, userId });
   } catch (error) {
     console.error('[admin] Error changing password:', error);
-    res.status(500).json({ error: 'Failed to change password' });
+    res.status(500).json({ error: 'Failed to change password', details: error.message });
   }
 });
 
