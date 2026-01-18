@@ -1166,7 +1166,7 @@ CRITICAL RULES:
             "https://api.anthropic.com/v1/messages",
             {
               model: "claude-3-haiku-20240307",
-              max_tokens: 280,
+              max_tokens: 310,
               system: systemPrompt,
               messages: conversation.messages,
             },
