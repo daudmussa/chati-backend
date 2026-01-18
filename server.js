@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
+import sharp from "sharp";
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
 
 
@@ -1489,18 +1490,85 @@ app.post("/api/upload/image", upload.single('image'), async (req, res) => {
 
     const folder = req.body.folder || 'general';
     const timestamp = Date.now();
-    const fileName = `${userId}_${timestamp}_${req.file.originalname}`;
+    const originalName = req.file.originalname.replace(/\.[^/.]+$/, ''); // Remove extension
+    const fileName = `${userId}_${timestamp}_${originalName}.webp`;
 
-    console.log('[upload] Uploading image:', fileName, 'to folder:', folder);
+    console.log('[upload] Compressing image:', req.file.originalname);
+
+    // Compress image aggressively to 30-100kb
+    let compressedBuffer;
+    let quality = 75; // Starting quality
+    let targetMaxSize = 100 * 1024; // 100KB target
+    let targetMinSize = 30 * 1024; // 30KB minimum
+    
+    try {
+      // First attempt: resize to max 1200px width/height and compress
+      compressedBuffer = await sharp(req.file.buffer)
+        .resize(1200, 1200, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .webp({ quality: quality })
+        .toBuffer();
+
+      console.log(`[upload] Initial compression: ${compressedBuffer.length} bytes (${(compressedBuffer.length / 1024).toFixed(2)}KB)`);
+
+      // If still too large, reduce quality iteratively
+      while (compressedBuffer.length > targetMaxSize && quality > 20) {
+        quality -= 10;
+        compressedBuffer = await sharp(req.file.buffer)
+          .resize(1200, 1200, {
+            fit: 'inside',
+            withoutEnlargement: true
+          })
+          .webp({ quality: quality })
+          .toBuffer();
+        
+        console.log(`[upload] Re-compressed at quality ${quality}: ${(compressedBuffer.length / 1024).toFixed(2)}KB`);
+      }
+
+      // If still too large, reduce dimensions
+      if (compressedBuffer.length > targetMaxSize) {
+        let width = 800;
+        while (compressedBuffer.length > targetMaxSize && width > 400) {
+          compressedBuffer = await sharp(req.file.buffer)
+            .resize(width, width, {
+              fit: 'inside',
+              withoutEnlargement: true
+            })
+            .webp({ quality: 60 })
+            .toBuffer();
+          
+          console.log(`[upload] Re-compressed at ${width}px: ${(compressedBuffer.length / 1024).toFixed(2)}KB`);
+          width -= 100;
+        }
+      }
+
+      console.log(`[upload] Final size: ${(compressedBuffer.length / 1024).toFixed(2)}KB (quality: ${quality})`);
+
+    } catch (compressionError) {
+      console.error('[upload] Compression error:', compressionError);
+      return res.status(500).json({ 
+        error: 'Failed to compress image',
+        message: compressionError.message 
+      });
+    }
+
+    console.log('[upload] Uploading compressed image:', fileName, 'to folder:', folder);
 
     const result = await bunnyStorage.uploadFile(
-      req.file.buffer,
+      compressedBuffer,
       fileName,
       folder
     );
 
     console.log('[upload] Upload successful:', result.url);
-    res.json(result);
+    res.json({
+      ...result,
+      originalSize: req.file.size,
+      compressedSize: compressedBuffer.length,
+      compressionRatio: ((1 - compressedBuffer.length / req.file.size) * 100).toFixed(2) + '%'
+    });
   } catch (error) {
     console.error('[upload] Error:', error);
     res.status(500).json({ 
