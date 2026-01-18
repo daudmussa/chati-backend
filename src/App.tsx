@@ -65,8 +65,13 @@ function FeatureProtectedRoute({ children, featureId }: { children: React.ReactN
 function App() {
   const location = useLocation();
   
-  // Hide WhatsApp button on admin and dashboard pages
-  const hideWhatsApp = location.pathname === '/admin' || location.pathname === '/dashboard';
+  // Hide WhatsApp button on admin, dashboard, shop, and cart pages
+  const hideWhatsApp = 
+    location.pathname === '/admin' || 
+    location.pathname === '/dashboard' ||
+    location.pathname === '/cart' ||
+    location.pathname === '/shop' ||
+    location.pathname.startsWith('/shop/');
   
   return (
     <HelmetProvider>
