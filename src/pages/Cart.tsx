@@ -35,6 +35,7 @@ export default function Cart() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [businessPhone, setBusinessPhone] = useState('');
+  const [storeName, setStoreName] = useState('');
   const [loadingPhone, setLoadingPhone] = useState(true);
 
   useEffect(() => {
@@ -49,12 +50,15 @@ export default function Cart() {
       try {
         const storeInfo = JSON.parse(storeInfoStr);
         setBusinessPhone(storeInfo.storePhone || '+255719958997');
+        setStoreName(storeInfo.storeName || '');
       } catch (e) {
         console.error('Failed to parse store info:', e);
         setBusinessPhone('+255719958997');
+        setStoreName('');
       }
     } else {
       setBusinessPhone('+255719958997');
+      setStoreName('');
     }
     setLoadingPhone(false);
   }, []);
@@ -274,7 +278,7 @@ export default function Cart() {
               </div>
               <span className="font-bold text-xl">Shopping Cart</span>
             </div>
-            <Link to="/shop">
+            <Link to={storeName ? `/shop/${storeName}` : '/shop'}>
               <Button variant="outline">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Continue Shopping
