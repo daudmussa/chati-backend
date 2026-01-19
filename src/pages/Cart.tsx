@@ -210,7 +210,10 @@ export default function Cart() {
 
     const message = generateWhatsAppMessage();
     const whatsappUrl = `https://wa.me/${businessPhone.replace(/[^0-9]/g, '')}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+    
+    // Use window.location.href for better iOS compatibility
+    // This works better on iPhone than window.open
+    window.location.href = whatsappUrl;
     
     toast({
       title: "Order sent!",
