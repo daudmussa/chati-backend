@@ -264,6 +264,19 @@ export async function initSchema() {
     );
   `);
   
+  // Categories table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      UNIQUE(user_id, name)
+    );
+  `);
+  
   console.log('[postgres] schema initialized');
 }
 
@@ -1075,6 +1088,68 @@ export async function deleteStaff(staffId, userId) {
   const p = ensurePool();
   if (!p) return false;
   await p.query('DELETE FROM staff WHERE id=$1 AND user_id=$2', [staffId, userId]);
+  return true;
+}
+
+// ========================================
+// Categories CRUD
+// ========================================
+
+export async function listCategories(userId) {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(
+    'SELECT id, name, description, created_at as "createdAt", updated_at as "updatedAt" FROM categories WHERE user_id=$1 ORDER BY name ASC',
+    [userId]
+  );
+  return rows;
+}
+
+export async function getCategoryById(categoryId, userId) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query(
+    'SELECT id, name, description, created_at as "createdAt", updated_at as "updatedAt" FROM categories WHERE id=$1 AND user_id=$2',
+    [categoryId, userId]
+  );
+  return rows[0] || null;
+}
+
+export async function saveCategory(userId, categoryData) {
+  const p = ensurePool();
+  if (!p) return null;
+  
+  if (categoryData.id) {
+    // Update existing category
+    await p.query(
+      `UPDATE categories SET name=$1, description=$2, updated_at=NOW() WHERE id=$3 AND user_id=$4`,
+      [categoryData.name, categoryData.description || null, categoryData.id, userId]
+    );
+    return {
+      id: categoryData.id,
+      name: categoryData.name,
+      description: categoryData.description || null,
+    };
+  } else {
+    // Create new category
+    const id = crypto.randomBytes(16).toString('hex');
+    await p.query(
+      `INSERT INTO categories (id, user_id, name, description, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+      [id, userId, categoryData.name, categoryData.description || null]
+    );
+    return {
+      id,
+      name: categoryData.name,
+      description: categoryData.description || null,
+    };
+  }
+}
+
+export async function deleteCategory(categoryId, userId) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query('DELETE FROM categories WHERE id=$1 AND user_id=$2', [categoryId, userId]);
   return true;
 }
 

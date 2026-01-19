@@ -41,6 +41,11 @@ export const API_ENDPOINTS = {
   STAFF: `${API_BASE_URL}/api/staff`,
   STAFF_BY_ID: (id: string) => `${API_BASE_URL}/api/staff/${id}`,
   
+  // Categories
+  CATEGORIES: `${API_BASE_URL}/api/categories`,
+  CATEGORIES_BY_STORE: (storeName: string) => `${API_BASE_URL}/api/categories/by-store/${encodeURIComponent(storeName)}`,
+  CATEGORY_BY_ID: (id: string) => `${API_BASE_URL}/api/categories/${id}`,
+  
   // Image Upload
   UPLOAD_IMAGE: `${API_BASE_URL}/api/upload/image`,
   DELETE_IMAGE: `${API_BASE_URL}/api/upload/image`,

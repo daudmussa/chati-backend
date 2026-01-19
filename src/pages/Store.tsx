@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -41,26 +41,13 @@ interface Order {
   createdAt: string;
 }
 
-const categories = [
-  'Electronics',
-  'Clothing & Fashion',
-  'Food & Beverages',
-  'Home & Garden',
-  'Health & Beauty',
-  'Sports & Outdoors',
-  'Books & Stationery',
-  'Toys & Games',
-  'Automotive',
-  'Jewelry & Accessories',
-  'Pet Supplies',
-  'Baby & Kids',
-  'Furniture',
-  'Art & Crafts',
-  'Music & Instruments',
-  'Services',
-  'Digital Products',
-  'Other',
-];
+interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
 
 const mockProducts: Product[] = [
   {
@@ -106,11 +93,17 @@ export default function Store() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [activeTab, setActiveTab] = useState('products');
+  
+  // Category management state
+  const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [categoryFormData, setCategoryFormData] = useState({ name: '', description: '' });
   
   // Orders filters
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
@@ -140,6 +133,7 @@ export default function Store() {
       fetchStoreSettings();
       fetchProducts();
       fetchOrders();
+      fetchCategories();
     }
   }, [user?.id]);
 
@@ -174,6 +168,23 @@ export default function Store() {
       }
     } catch (error) {
       console.error('Failed to fetch orders:', error);
+    }
+  };
+
+  const fetchCategories = async () => {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(API_ENDPOINTS.CATEGORIES, {
+        headers: {
+          'x-user-id': user.id,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
     }
   };
 
@@ -440,7 +451,7 @@ export default function Store() {
       title: formData.title,
       description: formData.description,
       price: parseFloat(formData.price),
-      image: formData.image || 'https://images.unsplash.com/photo-1560393464-5c69a73c5770?w=400&q=80',
+      image: formData.image || 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image',
       category: formData.category,
       inStock: formData.inStock,
     };
@@ -512,6 +523,107 @@ export default function Store() {
       toast({
         title: "Error",
         description: "Failed to delete product",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Category management functions
+  const handleOpenCategoryDialog = (category?: Category) => {
+    if (category) {
+      setEditingCategory(category);
+      setCategoryFormData({ name: category.name, description: category.description || '' });
+    } else {
+      setEditingCategory(null);
+      setCategoryFormData({ name: '', description: '' });
+    }
+    setIsCategoryDialogOpen(true);
+  };
+
+  const handleSaveCategory = async () => {
+    if (!categoryFormData.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a category name",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const endpoint = editingCategory 
+        ? API_ENDPOINTS.CATEGORY_BY_ID(editingCategory.id)
+        : API_ENDPOINTS.CATEGORIES;
+      const method = editingCategory ? 'PUT' : 'POST';
+      
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+        },
+        body: JSON.stringify(categoryFormData),
+      });
+
+      if (response.ok) {
+        const savedCategory = await response.json();
+        if (editingCategory) {
+          setCategories(categories.map(c => c.id === editingCategory.id ? savedCategory : c));
+          toast({ title: "Category updated", description: "Category has been updated successfully" });
+        } else {
+          setCategories([...categories, savedCategory]);
+          toast({ title: "Category added", description: "New category has been added" });
+        }
+        setIsCategoryDialogOpen(false);
+        setCategoryFormData({ name: '', description: '' });
+        setEditingCategory(null);
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to save category' }));
+        throw new Error(errorData.error || 'Failed to save category');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save category",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    // Check if any products use this category
+    const productsUsingCategory = products.filter(p => {
+      const cat = categories.find(c => c.id === id);
+      return cat && p.category === cat.name;
+    });
+
+    if (productsUsingCategory.length > 0) {
+      toast({
+        title: "Cannot delete category",
+        description: `This category is used by ${productsUsingCategory.length} product(s). Please reassign or delete those products first.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(API_ENDPOINTS.CATEGORY_BY_ID(id), {
+        method: 'DELETE',
+        headers: {
+          'x-user-id': user?.id || '',
+        },
+      });
+
+      if (response.ok) {
+        setCategories(categories.filter(c => c.id !== id));
+        toast({ title: "Category deleted", description: "Category has been removed" });
+      } else {
+        throw new Error('Failed to delete category');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete category",
         variant: "destructive",
       });
     }
@@ -693,7 +805,7 @@ export default function Store() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-3xl grid-cols-3">
             <TabsTrigger value="products" className="flex items-center gap-2">
               <Package className="w-4 h-4" />
               Products
@@ -702,6 +814,10 @@ export default function Store() {
                   {products.length}/{user.limits.maxProducts}
                 </Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="flex items-center gap-2">
+              <StoreIcon className="w-4 h-4" />
+              Categories ({categories.length})
             </TabsTrigger>
             <TabsTrigger value="orders" className="flex items-center gap-2">
               <ShoppingCart className="w-4 h-4" />
@@ -776,8 +892,13 @@ export default function Store() {
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map((cat) => (
-                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                          <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                         ))}
+                        {categories.length === 0 && (
+                          <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                            No categories yet. Create one in the Categories tab.
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
@@ -836,7 +957,7 @@ export default function Store() {
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
               {categories.map((cat) => (
-                <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -869,9 +990,13 @@ export default function Store() {
               <Card key={product.id} className="overflow-hidden">
                 <div className="aspect-square relative">
                   <img
-                    src={product.image}
+                    src={product.image || 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image'}
                     alt={product.title}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.src = 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
+                    }}
                   />
                   {!product.inStock && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
@@ -1124,6 +1249,129 @@ export default function Store() {
                   </PaginationItem>
                 </PaginationContent>
               </Pagination>
+            )}
+          </TabsContent>
+
+          <TabsContent value="categories" className="space-y-4 mt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
+                <p className="text-muted-foreground mt-1">
+                  Manage product categories for your store
+                </p>
+              </div>
+              <Dialog open={isCategoryDialogOpen} onOpenChange={setIsCategoryDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                    onClick={() => handleOpenCategoryDialog()}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Category
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px]">
+                  <DialogHeader>
+                    <DialogTitle>{editingCategory ? 'Edit Category' : 'Add New Category'}</DialogTitle>
+                    <DialogDescription>
+                      {editingCategory ? 'Update category details' : 'Add a new category to organize your products'}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="category-name">Category Name *</Label>
+                      <Input
+                        id="category-name"
+                        value={categoryFormData.name}
+                        onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
+                        placeholder="e.g., Electronics, Clothing"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="category-description">Description (Optional)</Label>
+                      <Textarea
+                        id="category-description"
+                        value={categoryFormData.description}
+                        onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
+                        placeholder="Brief description of this category"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsCategoryDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={handleSaveCategory}
+                      className="bg-[#25D366] hover:bg-[#20BD5A]"
+                    >
+                      {editingCategory ? 'Update' : 'Add'} Category
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {categories.length === 0 ? (
+              <Card className="p-12">
+                <div className="text-center">
+                  <StoreIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No categories yet</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Create categories to organize your products
+                  </p>
+                  <Button
+                    onClick={() => handleOpenCategoryDialog()}
+                    className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Category
+                  </Button>
+                </div>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {categories.map((category) => {
+                  const productCount = products.filter(p => p.category === category.name).length;
+                  return (
+                    <Card key={category.id}>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{category.name}</CardTitle>
+                            <Badge variant="secondary" className="mt-2">
+                              {productCount} {productCount === 1 ? 'product' : 'products'}
+                            </Badge>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleOpenCategoryDialog(category)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteCategory(category.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      {category.description && (
+                        <CardContent>
+                          <p className="text-sm text-muted-foreground">{category.description}</p>
+                        </CardContent>
+                      )}
+                    </Card>
+                  );
+                })}
+              </div>
             )}
           </TabsContent>
         </Tabs>

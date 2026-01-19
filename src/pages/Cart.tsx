@@ -307,9 +307,13 @@ export default function Cart() {
                 <CardContent className="p-4">
                   <div className="flex gap-4">
                     <img
-                      src={item.image}
+                      src={item.image || 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image'}
                       alt={item.title}
                       className="w-24 h-24 object-cover rounded-lg"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.src = 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
+                      }}
                     />
                     <div className="flex-1">
                       <div className="flex items-start justify-between">

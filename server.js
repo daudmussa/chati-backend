@@ -9,7 +9,7 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
 import sharp from "sharp";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -1465,6 +1465,106 @@ app.delete("/api/staff/:id", async (req, res) => {
   } catch (error) {
     console.error('[staff] Error deleting:', error);
     res.status(500).json({ error: 'Failed to delete staff' });
+  }
+});
+
+// ========================================
+// CATEGORIES API
+// ========================================
+
+app.get("/api/categories", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const categories = await listCategories(userId);
+    res.json(categories);
+  } catch (error) {
+    console.error('[categories] Error fetching:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+app.get("/api/categories/by-store/:storeName", async (req, res) => {
+  try {
+    const { storeName } = req.params;
+    const store = await pgGetStoreByName(storeName);
+    
+    if (!store) {
+      return res.status(404).json({ error: 'Store not found' });
+    }
+    
+    const categories = await listCategories(store.userId);
+    res.json(categories);
+  } catch (error) {
+    console.error('[categories] Error fetching by store:', error);
+    res.status(500).json({ error: 'Failed to fetch categories' });
+  }
+});
+
+app.get("/api/categories/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  const { id } = req.params;
+  try {
+    const category = await getCategoryById(id, userId);
+    if (!category) {
+      return res.status(404).json({ error: 'Category not found' });
+    }
+    res.json(category);
+  } catch (error) {
+    console.error('[categories] Error fetching by id:', error);
+    res.status(500).json({ error: 'Failed to fetch category' });
+  }
+});
+
+app.post("/api/categories", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const category = await saveCategory(userId, req.body);
+    console.log('[categories] Category created:', category.id);
+    res.json(category);
+  } catch (error) {
+    console.error('[categories] Error creating:', error);
+    res.status(500).json({ error: 'Failed to create category' });
+  }
+});
+
+app.put("/api/categories/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  const { id } = req.params;
+  try {
+    const category = await saveCategory(userId, { ...req.body, id });
+    console.log('[categories] Category updated:', id);
+    res.json(category);
+  } catch (error) {
+    console.error('[categories] Error updating:', error);
+    res.status(500).json({ error: 'Failed to update category' });
+  }
+});
+
+app.delete("/api/categories/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  const { id } = req.params;
+  try {
+    await deleteCategory(id, userId);
+    console.log('[categories] Category deleted:', id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[categories] Error deleting:', error);
+    res.status(500).json({ error: 'Failed to delete category' });
   }
 });
 

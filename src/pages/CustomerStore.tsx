@@ -38,16 +38,11 @@ interface CartItem extends Product {
   quantity: number;
 }
 
-const categories = [
-  'All',
-  'Electronics',
-  'Clothing',
-  'Food & Beverages',
-  'Home & Garden',
-  'Health & Beauty',
-  'Services',
-  'Other',
-];
+interface Category {
+  id: string;
+  name: string;
+  description?: string;
+}
 
 const mockProducts: Product[] = [
   {
@@ -191,6 +186,9 @@ export default function CustomerStore() {
   // Products state
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  
+  // Categories state
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // Fetch store settings and products on mount
   useEffect(() => {
@@ -216,8 +214,9 @@ export default function CustomerStore() {
         setStoreSettings(data);
         setTempStoreName(data.storeName);
         
-        // Fetch products for this store
+        // Fetch products and categories for this store
         fetchProducts(data.storeName || storeNameParam);
+        fetchCategories(data.storeName || storeNameParam);
       } else if (response.status === 404) {
         setStoreNotFound(true);
       }
@@ -245,6 +244,23 @@ export default function CustomerStore() {
       setProducts([]);
     } finally {
       setLoadingProducts(false);
+    }
+  };
+
+  const fetchCategories = async (storeName: string) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.CATEGORIES_BY_STORE(storeName));
+      
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      } else {
+        console.error('Failed to fetch categories');
+        setCategories([]);
+      }
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      setCategories([]);
     }
   };
 
@@ -488,8 +504,9 @@ export default function CustomerStore() {
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="All">All Categories</SelectItem>
                     {categories.map((cat) => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -535,9 +552,13 @@ export default function CustomerStore() {
                   <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                     <div className="aspect-square relative">
                       <img
-                        src={product.image}
+                        src={product.image || 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image'}
                         alt={product.title}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
+                        }}
                       />
                       {!product.inStock && (
                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
