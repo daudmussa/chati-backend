@@ -824,6 +824,13 @@ export async function updateOrderStatus(userId, orderId, status) {
   return true;
 }
 
+export async function deleteOrder(userId, orderId) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query('DELETE FROM orders WHERE id=$1 AND user_id=$2', [orderId, userId]);
+  return true;
+}
+
 // ========================================
 // Booking Functions
 // ========================================

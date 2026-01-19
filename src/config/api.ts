@@ -14,6 +14,7 @@ export const API_ENDPOINTS = {
   PRODUCTS_BY_STORE: (storeName: string) => `${API_BASE_URL}/api/products/by-store/${encodeURIComponent(storeName)}`,
   PRODUCT_BY_ID: (id: string) => `${API_BASE_URL}/api/products/${id}`,
   ORDERS: `${API_BASE_URL}/api/orders`,
+  ORDER_BY_ID: (id: string) => `${API_BASE_URL}/api/orders/${id}`,
   
   // Admin
   ADMIN_USERS: `${API_BASE_URL}/api/admin/users`,

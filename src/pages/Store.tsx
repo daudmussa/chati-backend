@@ -368,6 +368,33 @@ export default function Store() {
     }
   };
 
+  const handleDeleteOrder = async (orderId: string) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.ORDER_BY_ID(orderId), {
+        method: 'DELETE',
+        headers: {
+          'x-user-id': user?.id || '',
+        },
+      });
+
+      if (response.ok) {
+        setOrders(orders.filter(o => o.id !== orderId));
+        toast({
+          title: "Order deleted",
+          description: "Order has been removed successfully",
+        });
+      } else {
+        throw new Error('Failed to delete order');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete order",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Form state
   const [formData, setFormData] = useState({
     title: '',
@@ -1211,6 +1238,28 @@ export default function Store() {
                             >
                               <XCircle className="w-4 h-4 mr-1" />
                               Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteOrder(order.id)}
+                              className="text-gray-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        )}
+                        {order.status !== 'pending' && (
+                          <div className="flex flex-col gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteOrder(order.id)}
+                              className="text-gray-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="w-4 h-4 mr-1" />
+                              Delete
                             </Button>
                           </div>
                         )}

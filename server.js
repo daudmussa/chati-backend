@@ -9,7 +9,7 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
 import sharp from "sharp";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -2014,6 +2014,24 @@ app.put("/api/orders/:id", async (req, res) => {
   } catch (error) {
     console.error('[orders] Error updating status:', error);
     res.status(500).json({ error: 'Failed to update order status' });
+  }
+});
+
+app.delete("/api/orders/:id", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  
+  const { id } = req.params;
+  
+  try {
+    await deleteOrder(userId, id);
+    console.log('[orders] Order deleted:', id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[orders] Error deleting order:', error);
+    res.status(500).json({ error: 'Failed to delete order' });
   }
 });
 
