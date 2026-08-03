@@ -2608,20 +2608,20 @@ app.post("/api/admin/test-email", async (req, res) => {
   
   try {
     console.log('[test-email] Testing email configuration...');
-    console.log('[test-email] SendGrid API Key set:', !!process.env.SENDGRID_API_KEY);
+    console.log('[test-email] Gmail App Password set:', !!process.env.GMAIL_APP_PASSWORD);
     console.log('[test-email] Email disabled:', process.env.DISABLE_EMAIL === 'true');
     
-    if (!process.env.SENDGRID_API_KEY) {
+    if (!process.env.GMAIL_APP_PASSWORD) {
       return res.status(500).json({ 
-        error: 'SENDGRID_API_KEY not configured. Please set it in your environment variables.',
-        sendgridConfigured: false
+        error: 'GMAIL_APP_PASSWORD not configured. Please set it in your environment variables.',
+        gmailConfigured: false
       });
     }
     
     if (process.env.DISABLE_EMAIL === 'true') {
       return res.status(500).json({ 
         error: 'Email is disabled. Remove DISABLE_EMAIL environment variable to enable.',
-        sendgridConfigured: true,
+        gmailConfigured: true,
         emailDisabled: true
       });
     }
@@ -2632,14 +2632,14 @@ app.post("/api/admin/test-email", async (req, res) => {
     res.json({ 
       success: true, 
       message: `Test email sent to ${email}`,
-      provider: 'SendGrid'
+      provider: 'Gmail SMTP'
     });
   } catch (error) {
     console.error('[test-email] Failed to send test email:', error);
     res.status(500).json({ 
       error: 'Failed to send test email', 
       details: error.message,
-      sendgridConfigured: !!process.env.SENDGRID_API_KEY
+      gmailConfigured: !!process.env.GMAIL_APP_PASSWORD
     });
   }
 });
@@ -2661,17 +2661,17 @@ app.post("/api/admin/users/send-welcome-email", async (req, res) => {
   try {
     console.log('[admin-email] Sending welcome email to existing user:', email);
     
-    if (!process.env.SENDGRID_API_KEY) {
+    if (!process.env.GMAIL_APP_PASSWORD) {
       return res.status(500).json({ 
-        error: 'SENDGRID_API_KEY not configured. Please set it in your environment variables.',
-        sendgridConfigured: false
+        error: 'GMAIL_APP_PASSWORD not configured. Please set it in your environment variables.',
+        gmailConfigured: false
       });
     }
     
     if (process.env.DISABLE_EMAIL === 'true') {
       return res.status(500).json({ 
         error: 'Email is disabled. Remove DISABLE_EMAIL environment variable to enable.',
-        sendgridConfigured: true,
+        gmailConfigured: true,
         emailDisabled: true
       });
     }
