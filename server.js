@@ -1160,7 +1160,7 @@ CRITICAL RULES:
           const claudeResponse = await axios.post(
             "https://api.anthropic.com/v1/messages",
             {
-              model: "claude-3-haiku-20240307",
+              model: "claude-3-5-haiku-latest",
               max_tokens: 310,
               system: systemPrompt,
               messages: conversation.messages,
