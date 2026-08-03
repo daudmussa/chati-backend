@@ -1180,6 +1180,10 @@ CRITICAL RULES:
             
           } catch (err) {
             console.error("Error calling Claude:", err.message);
+            if (err.response) {
+              console.error("Claude HTTP status:", err.response.status);
+              console.error("Claude response body:", JSON.stringify(err.response.data));
+            }
             messageToSend = "Thanks for your message! Our team will review that and get back to you soon.";
           }
         }
