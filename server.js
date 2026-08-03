@@ -169,7 +169,9 @@ const gmailTransporter = nodemailer.createTransport({
   auth: {
     user: process.env.GMAIL_USER || 'chatisolutions@gmail.com',
     pass: process.env.GMAIL_APP_PASSWORD
-  }
+  },
+  connectionTimeout: 5000,
+  socketTimeout: 30000
 });
 
 if (process.env.GMAIL_APP_PASSWORD) {
@@ -283,9 +285,13 @@ To unsubscribe, reply with "unsubscribe".`,
   
   try {
     console.log('[Email] Sending email via Gmail SMTP...');
+    console.log('[Email] SMTP config:', {
+      user: process.env.GMAIL_USER?.replace(/(.{3}).+/g, '$1***'),
+      hasPassword: !!process.env.GMAIL_APP_PASSWORD
+    });
     
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Email send timeout after 10 seconds')), 10000)
+      setTimeout(() => reject(new Error('Email send timeout after 30 seconds')), 30000)
     );
     
     const result = await Promise.race([
