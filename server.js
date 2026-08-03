@@ -7,7 +7,6 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import nodemailer from "nodemailer";
-import sgMail from "@sendgrid/mail";
 import sharp from "sharp";
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById } from "./db-postgres.js";
 
@@ -164,41 +163,42 @@ class BunnyStorage {
 
 const bunnyStorage = new BunnyStorage();
 
-// Configure SendGrid
-if (process.env.SENDGRID_API_KEY) {
-  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-  console.log('[Email] ✅ SendGrid configured');
+// Configure Gmail SMTP transporter
+const gmailTransporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER || 'chatisolutions@gmail.com',
+    pass: process.env.GMAIL_APP_PASSWORD
+  }
+});
+
+if (process.env.GMAIL_APP_PASSWORD) {
+  console.log('[Email] ✅ Gmail SMTP configured');
 } else {
-  console.log('[Email] ⚠️ SENDGRID_API_KEY not set - emails will not be sent');
+  console.log('[Email] ⚠️ GMAIL_APP_PASSWORD not set - emails will not be sent');
 }
 
-// Email sending function using SendGrid
+// Email sending function using Gmail SMTP
 async function sendWelcomeEmail(toEmail, userName) {
   console.log('[Email] Attempting to send welcome email to:', toEmail);
   
-  // Check if email is disabled or SendGrid not configured
-  if (process.env.DISABLE_EMAIL === 'true' || !process.env.SENDGRID_API_KEY) {
-    console.log('[Email] Email disabled or SENDGRID_API_KEY not set - skipping email');
+  if (process.env.DISABLE_EMAIL === 'true' || !process.env.GMAIL_APP_PASSWORD) {
+    console.log('[Email] Email disabled or GMAIL_APP_PASSWORD not set - skipping email');
     return false;
   }
   
-  const emailContent = {
-    to: toEmail,
+  const mailOptions = {
     from: {
-      email: process.env.SENDGRID_FROM_EMAIL || 'chatisolutions@gmail.com',
-      name: 'Chati Solutions Team'
+      name: 'Chati Solutions Team',
+      address: process.env.GMAIL_USER || 'chatisolutions@gmail.com'
     },
-    replyTo: {
-      email: process.env.SENDGRID_FROM_EMAIL || 'chatisolutions@gmail.com',
-      name: 'Chati Solutions Support'
-    },
+    to: toEmail,
+    replyTo: process.env.GMAIL_USER || 'chatisolutions@gmail.com',
     subject: 'Welcome to Chati Solutions - Your Account is Ready',
-    // Additional anti-spam headers
     headers: {
       'X-Entity-Ref-ID': `user-${Date.now()}`,
-      'List-Unsubscribe': '<mailto:chatisolutions@gmail.com?subject=unsubscribe>',
+      'List-Unsubscribe': '<mailto:chatisolutions@gmail.com?subject=unsubscribe>'
     },
-    // Plain text version to avoid spam filters
     text: `Hi ${userName},
 
 Thank you for creating an account with Chati Solutions.
@@ -278,39 +278,23 @@ To unsubscribe, reply with "unsubscribe".`,
         </div>
       </body>
       </html>
-    `,
-    // Anti-spam headers
-    trackingSettings: {
-      clickTracking: { enable: false },
-      openTracking: { enable: false }
-    },
-    mailSettings: {
-      bypassListManagement: {
-        enable: false
-      }
-    },
-    categories: ['transactional', 'welcome'],
-    customArgs: {
-      user_type: 'new_signup',
-      email_type: 'welcome'
-    }
+    `
   };
   
   try {
-    console.log('[Email] Sending email via SendGrid...');
+    console.log('[Email] Sending email via Gmail SMTP...');
     
-    // Add timeout to prevent hanging (10 seconds)
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Email send timeout after 10 seconds')), 10000)
     );
     
     const result = await Promise.race([
-      sgMail.send(emailContent),
+      gmailTransporter.sendMail(mailOptions),
       timeoutPromise
     ]);
     
-    console.log('[Email] ✅ Email sent successfully via SendGrid!');
-    console.log('[Email] Status Code:', result[0]?.statusCode);
+    console.log('[Email] ✅ Email sent successfully via Gmail!');
+    console.log('[Email] Message ID:', result.messageId);
     return true;
   } catch (error) {
     console.error('[Email] ❌ Failed to send email');
