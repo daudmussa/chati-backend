@@ -41,6 +41,7 @@ interface UserData {
   package: string;
   status: string;
   promoCode: string | null;
+  paymentsEnabled: boolean;
   credentials?: {
     hasCredentials: boolean;
     twilioPhoneNumber?: string;
@@ -283,6 +284,40 @@ export default function Admin() {
       toast({
         title: "Error",
         description: error.message || "Failed to update user features",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const togglePayments = async (userId: string, enabled: boolean) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.ADMIN_USER_PAYMENTS(userId), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || '',
+          'x-user-role': user?.role || '',
+        },
+        body: JSON.stringify({ enabled }),
+      });
+
+      if (response.ok) {
+        setUsers(users.map(u => 
+          u.userId === userId ? { ...u, paymentsEnabled: enabled } : u
+        ));
+
+        toast({
+          title: "Payment Settings Updated",
+          description: `Payments ${enabled ? 'enabled' : 'disabled'} for this user`,
+        });
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to update payment settings');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update payment settings",
         variant: "destructive",
       });
     }
@@ -737,7 +772,7 @@ export default function Admin() {
                     'x-user-role': user?.role || 'admin'
                   },
                   body: JSON.stringify({
-                    email: user?.email || 'duadarts@gmail.com',
+                    email: user?.email || 'chatisolutions@gmail.com',
                     name: user?.name || 'Admin'
                   })
                 });
@@ -1149,6 +1184,32 @@ export default function Admin() {
                                   />
                                 </div>
                               ))}
+                            </div>
+                          </div>
+
+                          {/* Payment Settings */}
+                          <div className="mt-4 pt-4 border-t border-gray-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <CreditCard className="h-4 w-4 text-gray-600" />
+                              <h4 className="text-sm font-semibold text-gray-700">Payment Settings</h4>
+                            </div>
+                            <div className="flex items-center justify-between p-3 rounded bg-gray-50">
+                              <div>
+                                <Label
+                                  htmlFor={`${userData.userId}-payments`}
+                                  className="text-sm font-medium cursor-pointer"
+                                >
+                                  Enable Payments
+                                </Label>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Allow user to configure Snippe and accept payments for bookings
+                                </p>
+                              </div>
+                              <Switch
+                                id={`${userData.userId}-payments`}
+                                checked={userData.paymentsEnabled || false}
+                                onCheckedChange={(checked) => togglePayments(userData.userId, checked)}
+                              />
                             </div>
                           </div>
 

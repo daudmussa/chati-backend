@@ -15,6 +15,7 @@ interface User {
   payDate?: string | null;
   package?: string;
   status?: string;
+  paymentsEnabled?: boolean;
 }
 
 interface AuthContextType {

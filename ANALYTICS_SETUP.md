@@ -204,4 +204,4 @@ gtag('event', 'purchase', {
 ---
 
 **Questions?**
-Contact: duadarts@gmail.com | WhatsApp: +255719958997
+Contact: chatisolutions@gmail.com | WhatsApp: +255719958997

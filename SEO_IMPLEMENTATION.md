@@ -80,7 +80,7 @@
 - ✅ Geo-targeting meta tags (TZ)
 - ✅ Local keywords (Tanzania, Tanzanian businesses)
 - ✅ Phone number: +255719958997
-- ✅ Email: duadarts@gmail.com
+- ✅ Email: chatisolutions@gmail.com
 - ✅ Pricing in TZS
 
 ## 🚀 Next Steps for SEO Improvement
@@ -227,7 +227,7 @@
 
 For SEO monitoring and improvements:
 - Phone: +255719958997
-- Email: duadarts@gmail.com
+- Email: chatisolutions@gmail.com
 
 ## 🎓 Additional Resources
 

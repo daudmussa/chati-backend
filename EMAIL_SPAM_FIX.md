@@ -27,7 +27,7 @@ Your emails are landing in spam because:
 - Added unsubscribe instructions
 
 ### 4. Added Reply-To Header
-- Recipients can now reply directly to duadarts@gmail.com
+- Recipients can now reply directly to chatisolutions@gmail.com
 - Improves trust and deliverability
 
 ### 5. Disabled Tracking
@@ -93,13 +93,13 @@ If you don't have a domain yet, verify your Gmail:
 2. Click **Verify a Single Sender**
 3. Enter:
    - **From Name:** Chati Solutions
-   - **From Email:** duadarts@gmail.com
-   - **Reply To:** duadarts@gmail.com
+   - **From Email:** chatisolutions@gmail.com
+   - **Reply To:** chatisolutions@gmail.com
    - **Nickname:** Chati Main
    - **Address:** Your business address in Tanzania
 
 #### Step 2: Check Gmail
-1. SendGrid will send verification email to duadarts@gmail.com
+1. SendGrid will send verification email to chatisolutions@gmail.com
 2. Click the verification link
 3. Status should change to "Verified"
 
@@ -128,7 +128,7 @@ Check in SendGrid dashboard:
 
 ### 3. Ask Recipients to Whitelist
 In your onboarding, ask users to:
-1. Add duadarts@gmail.com (or your domain) to contacts
+1. Add chatisolutions@gmail.com (or your domain) to contacts
 2. Mark first email as "Not Spam" if it lands there
 3. Move email from Promotions to Primary inbox (Gmail)
 
@@ -237,7 +237,7 @@ railway variables --set SENDGRID_FROM_EMAIL=your-verified-email@domain.com
 
 ### Your Contact
 - Phone: +255 719 958 997
-- Email: duadarts@gmail.com
+- Email: chatisolutions@gmail.com
 
 ## 📋 Checklist
 

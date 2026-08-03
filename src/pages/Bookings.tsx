@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/components/ui/use-toast';
-import { Plus, Calendar, Clock, User, Phone, Search, CheckCircle2, XCircle, AlertCircle, Pencil, Trash2, Power, Download } from 'lucide-react';
+import { Plus, Calendar, Clock, User, Phone, Search, CheckCircle2, XCircle, AlertCircle, Pencil, Trash2, Power, Download, CreditCard, ExternalLink, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { API_ENDPOINTS } from '@/config/api';
 
@@ -38,6 +39,9 @@ interface Booking {
   status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
   notes: string;
   createdAt: string;
+  paymentStatus?: 'unpaid' | 'pending' | 'paid' | 'failed';
+  paymentReference?: string;
+  paymentUrl?: string;
 }
 
 const mockServices: BookingService[] = [
@@ -466,6 +470,63 @@ export default function Bookings() {
     );
   };
 
+  const getPaymentStatusBadge = (paymentStatus: Booking['paymentStatus']) => {
+    switch (paymentStatus) {
+      case 'paid':
+        return <Badge className="bg-green-500 text-white flex items-center"><CheckCircle2 className="w-3 h-3 mr-1" />Paid</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-500 text-white flex items-center"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
+      case 'failed':
+        return <Badge variant="destructive" className="flex items-center"><XCircle className="w-3 h-3 mr-1" />Failed</Badge>;
+      case 'unpaid':
+      default:
+        return <Badge variant="outline" className="bg-gray-100 text-gray-600 flex items-center"><CreditCard className="w-3 h-3 mr-1" />Unpaid</Badge>;
+    }
+  };
+
+  const [paymentDialog, setPaymentDialog] = useState<{ open: boolean; booking: Booking | null }>({ open: false, booking: null });
+  const [paymentType, setPaymentType] = useState('mobile');
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
+
+  const handleCreateBookingPayment = async () => {
+    if (!paymentDialog.booking) return;
+
+    setProcessingPayment(true);
+    try {
+      const res = await fetch(API_ENDPOINTS.PAYMENT_BOOKING(paymentDialog.booking.id), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': user?.id || ''
+        },
+        body: JSON.stringify({
+          paymentType,
+          customerPhone: paymentDialog.booking.customerPhone,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast({ title: 'Payment Initiated', description: `Reference: ${data.reference}. Customer can now pay via ${paymentType === 'mobile' ? 'mobile money' : 'card'}.` });
+        
+        if (data.paymentUrl) {
+          setPaymentUrl(data.paymentUrl);
+        }
+        
+        setPaymentDialog({ open: false, booking: null });
+        loadBookings();
+      } else {
+        toast({ title: 'Payment Failed', description: data.error || 'Failed to create payment', variant: 'destructive' });
+      }
+    } catch (error) {
+      toast({ title: 'Error', description: 'Failed to process payment', variant: 'destructive' });
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
   const filteredBookings = bookings.filter(booking => {
     const matchesSearch = booking.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       booking.customerPhone.includes(searchQuery) ||
@@ -613,7 +674,10 @@ export default function Bookings() {
                                 {booking.customerPhone}
                               </p>
                             </div>
-                            {getStatusBadge(booking.status)}
+                            <div className="flex flex-col items-end gap-1">
+                              {getStatusBadge(booking.status)}
+                              {user?.paymentsEnabled && getPaymentStatusBadge(booking.paymentStatus)}
+                            </div>
                           </div>
                           <div className="flex flex-wrap gap-4 text-sm">
                             <span className="flex items-center gap-1 text-gray-600">
@@ -634,11 +698,76 @@ export default function Bookings() {
                               Note: {booking.notes}
                             </p>
                           )}
+                          {booking.paymentUrl && booking.paymentStatus === 'pending' && (
+                            <a
+                              href={booking.paymentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              Payment Link
+                            </a>
+                          )}
                           <p className="text-xs text-muted-foreground">
                             Created: {format(new Date(booking.createdAt), 'MMM d, yyyy h:mm a')}
                           </p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap">
+                          {user?.paymentsEnabled && booking.status !== 'cancelled' && booking.paymentStatus !== 'paid' && (
+                            <Dialog open={paymentDialog.open && paymentDialog.booking?.id === booking.id} onOpenChange={(open) => setPaymentDialog({ open, booking: open ? booking : null })}>
+                              <DialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                                  disabled={booking.paymentStatus === 'pending'}
+                                >
+                                  <CreditCard className="w-4 h-4 mr-1" />
+                                  {booking.paymentStatus === 'pending' ? 'Payment Pending' : 'Request Payment'}
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Request Payment - {booking.serviceName}</DialogTitle>
+                                  <DialogDescription>
+                                    TZS {booking.price.toLocaleString()} - {booking.customerName}
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4">
+                                  <RadioGroup value={paymentType} onValueChange={setPaymentType}>
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="mobile" id="mobile-booking" />
+                                      <Label htmlFor="mobile-booking" className="flex items-center gap-2">
+                                        <Phone className="w-4 h-4" />
+                                        Mobile Money (M-Pesa, Airtel, Tigo)
+                                      </Label>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <RadioGroupItem value="card" id="card-booking" />
+                                      <Label htmlFor="card-booking" className="flex items-center gap-2">
+                                        <CreditCard className="w-4 h-4" />
+                                        Card Payment (Visa/Mastercard)
+                                      </Label>
+                                    </div>
+                                  </RadioGroup>
+                                  <Button
+                                    onClick={handleCreateBookingPayment}
+                                    disabled={processingPayment}
+                                    className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                                  >
+                                    {processingPayment ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Processing...
+                                      </>
+                                    ) : (
+                                      `Create Payment Request - TZS ${booking.price.toLocaleString()}`
+                                    )}
+                                  </Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          )}
                           {booking.status === 'pending' && (
                             <>
                               <Button

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Send, Users, Calendar, CheckCircle, AlertCircle, Phone, Mail } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -6,9 +7,11 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { API_ENDPOINTS } from '@/config/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalMessages: 0,
     aiReplies: 0,
@@ -103,8 +106,22 @@ export default function Dashboard() {
                 <p className="font-medium">
                   You need to subscribe to a package to get full access to all features.
                 </p>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => navigate('/billing')}
+                    className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                  >
+                    Subscribe Now
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/payment-settings')}
+                  >
+                    Configure Payment
+                  </Button>
+                </div>
                 <div className="bg-white rounded-lg p-4 space-y-2 border border-red-200">
-                  <p className="font-semibold text-red-900 mb-2">Contact us to activate your account:</p>
+                  <p className="font-semibold text-red-900 mb-2">Need help? Contact us:</p>
                   <div className="flex items-center gap-2 text-sm">
                     <Phone className="h-4 w-4 text-red-600" />
                     <a href="tel:+255719958997" className="font-medium hover:underline">
@@ -113,14 +130,11 @@ export default function Dashboard() {
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Mail className="h-4 w-4 text-red-600" />
-                    <a href="mailto:duadarts@gmail.com" className="font-medium hover:underline">
-                      duadarts@gmail.com
+                    <a href="mailto:chatisolutions@gmail.com" className="font-medium hover:underline">
+                      chatisolutions@gmail.com
                     </a>
                   </div>
                 </div>
-                {/* <p className="text-sm">
-                  After payment, your account will be activated within 24 hours.
-                </p> */}
               </div>
             </AlertDescription>
           </Alert>

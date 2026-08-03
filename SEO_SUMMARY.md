@@ -49,7 +49,7 @@
 - **Focus**: Contact information and support
 - **Keywords**: contact support, customer service Tanzania
 - **Phone**: +255719958997
-- **Email**: duadarts@gmail.com
+- **Email**: chatisolutions@gmail.com
 
 #### 🛍️ Shop Landing
 - **Title**: "Online Store with WhatsApp Integration | Create Your Shop"
@@ -221,7 +221,7 @@
 ## 📞 Support & Questions
 
 ### Need Help?
-- **Email**: duadarts@gmail.com
+- **Email**: chatisolutions@gmail.com
 - **WhatsApp**: +255719958997
 - **Website**: chati.solutions
 
@@ -287,4 +287,4 @@ You now have a **solid SEO foundation** for Chati Solutions. The technical imple
 ---
 
 **Questions? Let's talk!**
-📧 duadarts@gmail.com | 📱 +255719958997
+📧 chatisolutions@gmail.com | 📱 +255719958997

@@ -285,6 +285,6 @@ Each page should have:
 ---
 
 **Need Content Help?**
-Contact: duadarts@gmail.com | WhatsApp: +255719958997
+Contact: chatisolutions@gmail.com | WhatsApp: +255719958997
 
 Start with 1-2 blog posts per week. Quality matters more than quantity!

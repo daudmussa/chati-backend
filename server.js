@@ -9,18 +9,14 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sgMail from "@sendgrid/mail";
 import sharp from "sharp";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
 dotenv.config();
 dotenv.config({ path: '.env.railway' });
 
-// Railway fallback: set DATABASE_URL directly if not present
-if (!process.env.DATABASE_URL && process.env.NODE_ENV === 'production') {
-  process.env.DATABASE_URL = 'postgresql://postgres:GiWEMBYWQdFsbVaydlZcNpuAOhIqYXMt@trolley.proxy.rlwy.net:23856/railway';
-  console.log("[startup] Set DATABASE_URL from hardcoded Railway fallback (public proxy)");
-}
+// DATABASE_URL is injected by Railway via ${{Postgres.DATABASE_URL}}
 
 console.log("[startup] Env loaded, checking DATABASE_URL...");
 console.log("- DATABASE_URL exists?", !!process.env.DATABASE_URL);
@@ -191,18 +187,18 @@ async function sendWelcomeEmail(toEmail, userName) {
   const emailContent = {
     to: toEmail,
     from: {
-      email: process.env.SENDGRID_FROM_EMAIL || 'duadarts@gmail.com',
+      email: process.env.SENDGRID_FROM_EMAIL || 'chatisolutions@gmail.com',
       name: 'Chati Solutions Team'
     },
     replyTo: {
-      email: process.env.SENDGRID_FROM_EMAIL || 'duadarts@gmail.com',
+      email: process.env.SENDGRID_FROM_EMAIL || 'chatisolutions@gmail.com',
       name: 'Chati Solutions Support'
     },
     subject: 'Welcome to Chati Solutions - Your Account is Ready',
     // Additional anti-spam headers
     headers: {
       'X-Entity-Ref-ID': `user-${Date.now()}`,
-      'List-Unsubscribe': '<mailto:duadarts@gmail.com?subject=unsubscribe>',
+      'List-Unsubscribe': '<mailto:chatisolutions@gmail.com?subject=unsubscribe>',
     },
     // Plain text version to avoid spam filters
     text: `Hi ${userName},
@@ -215,7 +211,7 @@ View available plans: https://chati.solutions/pricing
 
 If you need assistance, our support team is available:
 Phone: +255 719 958 997
-Email: duadarts@gmail.com
+Email: chatisolutions@gmail.com
 
 Once you subscribe, your account will be activated within 24 hours.
 
@@ -265,7 +261,7 @@ To unsubscribe, reply with "unsubscribe".`,
               <h3 style="margin-top: 0;">Need Assistance?</h3>
               <p>Our support team is available to help:</p>
               <p><strong>Phone:</strong> +255 719 958 997<br>
-              <strong>Email:</strong> duadarts@gmail.com</p>
+              <strong>Email:</strong> chatisolutions@gmail.com</p>
             </div>
             
             <p>Once you subscribe, your account will be activated within 24 hours.</p>
@@ -2546,7 +2542,8 @@ app.get("/api/auth/me", async (req, res) => {
         limits: user.limits || { maxConversations: 100, maxProducts: 50 },
         payDate: user.pay_date || null,
         package: user.package || 'starter',
-        status: user.status || 'active'
+        status: user.status || 'active',
+        paymentsEnabled: user.payments_enabled || false,
       }
     });
   } catch (error) {
@@ -2812,6 +2809,396 @@ app.get("/api/version", (req, res) => {
     buildTime: "2026-01-01T15:45:00Z"
   });
 });
+
+// ========================================
+// PAYMENT SETTINGS API (per-user Snippe configuration)
+// ========================================
+
+// Save payment settings (Snippe API keys)
+app.put("/api/payment/settings", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const { snippeApiKey, snippeWebhookSecret, snippeEnabled } = req.body;
+
+    await pgSavePaymentSettings(userId, {
+      snippeApiKey,
+      snippeWebhookSecret,
+      snippeEnabled: snippeEnabled || false,
+    });
+
+    console.log('[payment] Settings saved for user:', userId);
+    res.json({ success: true, message: "Payment settings saved" });
+  } catch (error) {
+    console.error('[payment] Error saving settings:', error);
+    res.status(500).json({ error: "Failed to save payment settings" });
+  }
+});
+
+// Get payment settings
+app.get("/api/payment/settings", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const settings = await pgGetPaymentSettings(userId);
+    res.json({
+      success: true,
+      settings: settings || {
+        snippeApiKey: null,
+        snippeWebhookSecret: null,
+        snippeEnabled: false,
+      }
+    });
+  } catch (error) {
+    console.error('[payment] Error fetching settings:', error);
+    res.status(500).json({ error: "Failed to fetch payment settings" });
+  }
+});
+
+// Admin: Toggle payments for a user
+app.put("/api/admin/users/:userId/payments", async (req, res) => {
+  const requestingUserRole = req.headers['x-user-role'];
+  
+  if (requestingUserRole !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  const { userId } = req.params;
+  const { enabled } = req.body;
+  
+  console.log('[admin] Toggle payments for user:', userId, enabled);
+  
+  try {
+    await updateUserPaymentsEnabled(userId, enabled);
+    res.json({ success: true, userId, paymentsEnabled: enabled });
+  } catch (error) {
+    console.error('[admin] Error toggling payments:', error);
+    res.status(500).json({ error: 'Failed to update payment settings' });
+  }
+});
+
+// Create payment for a booking
+app.post("/api/payment/booking/:bookingId", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const { bookingId } = req.params;
+    const { paymentType, customerPhone, customerEmail, customerName } = req.body;
+
+    // Get booking details
+    const booking = await getBookingById(bookingId, userId);
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+
+    if (booking.paymentStatus === 'paid') {
+      return res.status(400).json({ error: "Booking already paid" });
+    }
+
+    // Check if user has payments enabled
+    const user = await getUserById(userId);
+    if (!user?.payments_enabled) {
+      return res.status(403).json({ error: "Payments not enabled for your account. Contact admin." });
+    }
+
+    // Get user's Snippe API key
+    const settings = await pgGetPaymentSettings(userId);
+    const apiKey = settings?.snippeApiKey || process.env.SNIPPE_API_KEY;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: "Snippe API key not configured. Please configure payment settings or contact admin." });
+    }
+
+    // Create payment via Snippe API
+    const snippeResponse = await fetch("https://api.snippe.sh/v1/payments", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `chati-booking-${bookingId}-${Date.now()}`,
+      },
+      body: JSON.stringify({
+        amount: Math.round(booking.price),
+        currency: "TZS",
+        payment_type: paymentType || 'mobile',
+        customer: {
+          phone_number: customerPhone || booking.customerPhone,
+          email: customerEmail,
+          name: customerName || booking.customerName,
+        },
+        metadata: {
+          user_id: userId,
+          booking_id: bookingId,
+          service_name: booking.serviceName,
+        },
+        callback_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/bookings?payment=pending`,
+        webhook_url: `${process.env.SERVER_URL || "http://localhost:3000"}/api/payment/webhook`,
+      }),
+    });
+
+    const snippeData = await snippeResponse.json();
+
+    if (!snippeResponse.ok) {
+      console.error('[snippe] Booking payment failed:', snippeData);
+      return res.status(snippeResponse.status).json({
+        error: snippeData.message || "Failed to create payment",
+        details: snippeData,
+      });
+    }
+
+    // Update booking with payment info
+    await updateBookingPaymentStatus(
+      userId,
+      bookingId,
+      'pending',
+      snippeData.reference,
+      snippeData.payment_url
+    );
+
+    // Save transaction
+    await createPaymentTransaction({
+      userId,
+      snippeReference: snippeData.reference,
+      amount: booking.price,
+      currency: "TZS",
+      paymentType: paymentType || 'mobile',
+      planType: 'booking',
+      status: snippeData.status || 'pending',
+      customerPhone: customerPhone || booking.customerPhone,
+      customerEmail,
+      customerName: customerName || booking.customerName,
+      metadata: { bookingId, snippeData },
+    });
+
+    console.log('[snippe] Booking payment created:', snippeData.reference);
+    res.json({
+      success: true,
+      reference: snippeData.reference,
+      status: snippeData.status,
+      paymentUrl: snippeData.payment_url,
+      qrCode: snippeData.qr_code,
+    });
+  } catch (error) {
+    console.error('[snippe] Error creating booking payment:', error);
+    res.status(500).json({ error: "Failed to create booking payment" });
+  }
+});
+
+// ========================================
+// SNIPPE PAYMENT API
+// ========================================
+
+// Create a payment via Snippe
+app.post("/api/payment/create", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const { amount, paymentType, planType, customerPhone, customerEmail, customerName } = req.body;
+
+    if (!amount || !paymentType) {
+      return res.status(400).json({ error: "Amount and payment type are required" });
+    }
+
+    // Get user's Snippe API key
+    const settings = await pgGetPaymentSettings(userId);
+    const apiKey = settings?.snippeApiKey || process.env.SNIPPE_API_KEY;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: "Snippe API key not configured. Please configure payment settings or contact admin." });
+    }
+
+    // Create payment via Snippe API
+    const snippeResponse = await fetch("https://api.snippe.sh/v1/payments", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `chati-${userId}-${Date.now()}`,
+      },
+      body: JSON.stringify({
+        amount: Math.round(amount),
+        currency: "TZS",
+        payment_type: paymentType,
+        customer: {
+          phone_number: customerPhone,
+          email: customerEmail,
+          name: customerName,
+        },
+        metadata: {
+          user_id: userId,
+          plan_type: planType,
+        },
+        callback_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/billing?payment=pending`,
+        webhook_url: `${process.env.SERVER_URL || "http://localhost:3000"}/api/payment/webhook`,
+      }),
+    });
+
+    const snippeData = await snippeResponse.json();
+
+    if (!snippeResponse.ok) {
+      console.error('[snippe] Payment creation failed:', snippeData);
+      return res.status(snippeResponse.status).json({
+        error: snippeData.message || "Failed to create payment",
+        details: snippeData,
+      });
+    }
+
+    // Save transaction to database
+    const transaction = await createPaymentTransaction({
+      userId,
+      snippeReference: snippeData.reference,
+      amount,
+      currency: "TZS",
+      paymentType,
+      planType,
+      status: snippeData.status || "pending",
+      customerPhone,
+      customerEmail,
+      customerName,
+      metadata: { snippeData },
+    });
+
+    console.log('[snippe] Payment created:', snippeData.reference);
+    res.json({
+      success: true,
+      reference: snippeData.reference,
+      status: snippeData.status,
+      paymentUrl: snippeData.payment_url,
+      qrCode: snippeData.qr_code,
+      transaction,
+    });
+  } catch (error) {
+    console.error('[snippe] Error creating payment:', error);
+    res.status(500).json({ error: "Failed to create payment" });
+  }
+});
+
+// Snippe webhook handler
+app.post("/api/payment/webhook", async (req, res) => {
+  try {
+    const { event, data } = req.body;
+
+    console.log('[webhook] Snippe webhook received:', event, data?.reference);
+
+    if (!data?.reference) {
+      return res.status(400).json({ error: "Missing reference" });
+    }
+
+    // Update transaction status
+    const statusMap = {
+      "payment.completed": "completed",
+      "payment.failed": "failed",
+      "payment.pending": "pending",
+      "payment.refunded": "refunded",
+    };
+
+    const newStatus = statusMap[event] || data.status;
+    await updatePaymentTransaction(data.reference, { status: newStatus });
+
+    // Get transaction to determine what type of payment this is
+    const transaction = await getPaymentTransactionByReference(data.reference);
+    if (!transaction) {
+      console.log('[webhook] No transaction found for reference:', data.reference);
+      return res.json({ success: true });
+    }
+
+    const { userId, planType, metadata } = transaction;
+
+    // Handle booking payments
+    if (planType === 'booking' && metadata?.booking_id) {
+      const bookingId = metadata.booking_id;
+      const bookingPaymentStatus = event === "payment.completed" ? 'paid' : event === "payment.failed" ? 'failed' : 'pending';
+      
+      await updateBookingPaymentStatus(userId, bookingId, bookingPaymentStatus, data.reference);
+      console.log('[webhook] Booking payment updated:', bookingId, bookingPaymentStatus);
+    }
+
+    // If payment completed, activate user subscription
+    if (event === "payment.completed") {
+      // Determine package and features based on plan type
+      const planConfig = getPlanConfig(planType);
+      if (planConfig) {
+        const payDate = new Date().toISOString();
+        await updateUserSubscription(userId, {
+          payDate,
+          package: planConfig.package,
+          status: "active",
+        });
+
+        // Update enabled features
+        const pool = ensurePool();
+        if (pool) {
+          await pool.query(
+            'UPDATE users SET enabled_features = $1 WHERE id = $2',
+            [JSON.stringify(planConfig.features), userId]
+          );
+        }
+
+        console.log('[webhook] Subscription activated for user:', userId, planConfig.package);
+      }
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[webhook] Error processing webhook:', error);
+    res.status(500).json({ error: "Webhook processing failed" });
+  }
+});
+
+// Get user's payment transactions
+app.get("/api/payment/transactions", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const transactions = await getPaymentTransactionsByUserId(userId);
+    res.json({ success: true, transactions });
+  } catch (error) {
+    console.error('[payment] Error fetching transactions:', error);
+    res.status(500).json({ error: "Failed to fetch transactions" });
+  }
+});
+
+// Helper function to get plan configuration
+function getPlanConfig(planType) {
+  const plans = {
+    starter: {
+      package: "starter",
+      features: ["conversations", "settings", "billing"],
+    },
+    business: {
+      package: "business",
+      features: ["conversations", "bookings", "settings", "billing"],
+    },
+    store: {
+      package: "store",
+      features: ["store", "settings", "billing"],
+    },
+    "starter+store": {
+      package: "starter+store",
+      features: ["conversations", "store", "settings", "billing"],
+    },
+    "business+store": {
+      package: "business+store",
+      features: ["conversations", "bookings", "store", "settings", "billing"],
+    },
+  };
+  return plans[planType] || null;
+}
 
 // Global error handlers
 process.on("uncaughtException", (err) => {

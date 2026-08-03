@@ -21,6 +21,7 @@ export const API_ENDPOINTS = {
   ADMIN_USER_FEATURES: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/features`,
   ADMIN_USER_LIMITS: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/limits`,
   ADMIN_USER_SUBSCRIPTION: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/subscription`,
+  ADMIN_USER_PAYMENTS: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/payments`,
   ADMIN_USER_INFO: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/info`,
   ADMIN_LOGIN_AS_USER: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}/login-as`,
   ADMIN_DELETE_USER: (userId: string) => `${API_BASE_URL}/api/admin/users/${userId}`,
@@ -56,6 +57,13 @@ export const API_ENDPOINTS = {
   
   // User Credentials
   USER_CREDENTIALS: `${API_BASE_URL}/api/user/credentials`,
+  
+  // Payment
+  PAYMENT_SETTINGS: `${API_BASE_URL}/api/payment/settings`,
+  PAYMENT_CREATE: `${API_BASE_URL}/api/payment/create`,
+  PAYMENT_BOOKING: (bookingId: string) => `${API_BASE_URL}/api/payment/booking/${bookingId}`,
+  PAYMENT_TRANSACTIONS: `${API_BASE_URL}/api/payment/transactions`,
+  PAYMENT_WEBHOOK: `${API_BASE_URL}/api/payment/webhook`,
   
   // Health
   HEALTH: `${API_BASE_URL}/health`,

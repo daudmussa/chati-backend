@@ -107,6 +107,12 @@ export async function initSchema() {
     ADD COLUMN IF NOT EXISTS promo_code TEXT;
   `);
   
+  // Migration: Add payments_enabled column if it doesn't exist
+  await p.query(`
+    ALTER TABLE users 
+    ADD COLUMN IF NOT EXISTS payments_enabled BOOLEAN DEFAULT FALSE;
+  `);
+  
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_credentials (
       user_id TEXT PRIMARY KEY,
@@ -237,9 +243,26 @@ export async function initSchema() {
       price NUMERIC(10,2) NOT NULL,
       status TEXT DEFAULT 'pending',
       notes TEXT,
+      payment_status TEXT DEFAULT 'unpaid',
+      payment_reference TEXT,
+      payment_url TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+  `);
+  
+  // Migration: Add payment columns to bookings if they don't exist
+  await p.query(`
+    ALTER TABLE bookings 
+    ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid';
+  `);
+  await p.query(`
+    ALTER TABLE bookings 
+    ADD COLUMN IF NOT EXISTS payment_reference TEXT;
+  `);
+  await p.query(`
+    ALTER TABLE bookings 
+    ADD COLUMN IF NOT EXISTS payment_url TEXT;
   `);
   
   // Booking settings table
@@ -274,6 +297,37 @@ export async function initSchema() {
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW(),
       UNIQUE(user_id, name)
+    );
+  `);
+  
+  // Payment settings table (per-user Snippe API keys)
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS payment_settings (
+      user_id TEXT PRIMARY KEY,
+      snippe_api_key TEXT,
+      snippe_webhook_secret TEXT,
+      snippe_enabled BOOLEAN DEFAULT FALSE,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
+  // Payment transactions table
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS payment_transactions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      snippe_reference TEXT UNIQUE,
+      amount NUMERIC(10,2) NOT NULL,
+      currency TEXT DEFAULT 'TZS',
+      payment_type TEXT NOT NULL,
+      plan_type TEXT,
+      status TEXT DEFAULT 'pending',
+      customer_phone TEXT,
+      customer_email TEXT,
+      customer_name TEXT,
+      metadata JSONB,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
     );
   `);
   
@@ -368,7 +422,7 @@ export async function getAllUsers() {
   const p = ensurePool();
   if (!p) return [];
   const { rows } = await p.query(`
-    SELECT id, email, name, role, enabled_features, limits, pay_date, package, status, promo_code, created_at 
+    SELECT id, email, name, role, enabled_features, limits, pay_date, package, status, promo_code, payments_enabled, created_at 
     FROM users 
     ORDER BY created_at DESC
   `);
@@ -536,8 +590,15 @@ export async function getUserByEmail(email) {
 export async function getUserById(id) {
   const p = ensurePool();
   if (!p) return null;
-  const { rows } = await p.query('SELECT id, email, name, role, enabled_features, limits, pay_date, package, status, promo_code, created_at FROM users WHERE id=$1', [id]);
+  const { rows } = await p.query('SELECT id, email, name, role, enabled_features, limits, pay_date, package, status, promo_code, payments_enabled, created_at FROM users WHERE id=$1', [id]);
   return rows[0] || null;
+}
+
+export async function updateUserPaymentsEnabled(userId, enabled) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query('UPDATE users SET payments_enabled = $1, updated_at = NOW() WHERE id = $2', [enabled, userId]);
+  return true;
 }
 
 export async function updateUserFeatures(userId, features) {
@@ -927,6 +988,9 @@ export async function listBookings(userId) {
     price: parseFloat(r.price),
     status: r.status,
     notes: r.notes || '',
+    paymentStatus: r.payment_status || 'unpaid',
+    paymentReference: r.payment_reference,
+    paymentUrl: r.payment_url,
     createdAt: r.created_at,
   }));
 }
@@ -938,8 +1002,8 @@ export async function createBooking(userId, booking) {
   const id = crypto.randomBytes(12).toString('hex');
   
   await p.query(`
-    INSERT INTO bookings (id, user_id, customer_name, customer_phone, service_id, service_name, date_booked, time_slot, price, status, notes, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+    INSERT INTO bookings (id, user_id, customer_name, customer_phone, service_id, service_name, date_booked, time_slot, price, status, notes, payment_status, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
   `, [
     id,
     userId,
@@ -951,7 +1015,8 @@ export async function createBooking(userId, booking) {
     booking.timeSlot,
     booking.price,
     booking.status || 'pending',
-    booking.notes || ''
+    booking.notes || '',
+    booking.paymentStatus || 'unpaid'
   ]);
   
   return { ...booking, id, createdAt: new Date().toISOString() };
@@ -980,6 +1045,18 @@ export async function updateBooking(userId, bookingId, updates) {
   if (updates.notes !== undefined) {
     fields.push(`notes = $${paramCount++}`);
     values.push(updates.notes);
+  }
+  if (updates.paymentStatus !== undefined) {
+    fields.push(`payment_status = $${paramCount++}`);
+    values.push(updates.paymentStatus);
+  }
+  if (updates.paymentReference !== undefined) {
+    fields.push(`payment_reference = $${paramCount++}`);
+    values.push(updates.paymentReference);
+  }
+  if (updates.paymentUrl !== undefined) {
+    fields.push(`payment_url = $${paramCount++}`);
+    values.push(updates.paymentUrl);
   }
   
   if (fields.length === 0) return false;
@@ -1168,4 +1245,192 @@ export async function updateBookingStatus(userId, bookingId, status) {
     [status, bookingId, userId]
   );
   return true;
+}
+
+export async function updateBookingPaymentStatus(userId, bookingId, paymentStatus, paymentReference = null, paymentUrl = null) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query(
+    'UPDATE bookings SET payment_status=$1, payment_reference=$2, payment_url=$3, updated_at=NOW() WHERE id=$4 AND user_id=$5',
+    [paymentStatus, paymentReference, paymentUrl, bookingId, userId]
+  );
+  return true;
+}
+
+export async function getBookingById(bookingId, userId) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query(
+    'SELECT * FROM bookings WHERE id=$1 AND user_id=$2',
+    [bookingId, userId]
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    customerName: r.customer_name,
+    customerPhone: r.customer_phone,
+    serviceId: r.service_id,
+    serviceName: r.service_name,
+    dateBooked: r.date_booked,
+    timeSlot: r.time_slot,
+    price: parseFloat(r.price),
+    status: r.status,
+    notes: r.notes || '',
+    paymentStatus: r.payment_status || 'unpaid',
+    paymentReference: r.payment_reference,
+    paymentUrl: r.payment_url,
+    createdAt: r.created_at,
+  };
+}
+
+// ========================================
+// Payment Settings (Snippe API keys per user)
+// ========================================
+
+export async function savePaymentSettings(userId, settings) {
+  const p = ensurePool();
+  if (!p) return null;
+  await p.query(`
+    INSERT INTO payment_settings (user_id, snippe_api_key, snippe_webhook_secret, snippe_enabled, updated_at)
+    VALUES ($1, $2, $3, $4, NOW())
+    ON CONFLICT (user_id) DO UPDATE SET
+      snippe_api_key = EXCLUDED.snippe_api_key,
+      snippe_webhook_secret = EXCLUDED.snippe_webhook_secret,
+      snippe_enabled = EXCLUDED.snippe_enabled,
+      updated_at = NOW();
+  `, [
+    userId,
+    encrypt(settings.snippeApiKey),
+    encrypt(settings.snippeWebhookSecret),
+    settings.snippeEnabled || false,
+  ]);
+  return { snippeEnabled: settings.snippeEnabled || false };
+}
+
+export async function getPaymentSettings(userId) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query('SELECT * FROM payment_settings WHERE user_id=$1', [userId]);
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    userId: r.user_id,
+    snippeApiKey: decrypt(r.snippe_api_key),
+    snippeWebhookSecret: decrypt(r.snippe_webhook_secret),
+    snippeEnabled: r.snippe_enabled,
+    updatedAt: r.updated_at,
+  };
+}
+
+// ========================================
+// Payment Transactions
+// ========================================
+
+export async function createPaymentTransaction(transaction) {
+  const p = ensurePool();
+  if (!p) return null;
+  const id = transaction.id || crypto.randomBytes(16).toString('hex');
+  await p.query(
+    `INSERT INTO payment_transactions (id, user_id, snippe_reference, amount, currency, payment_type, plan_type, status, customer_phone, customer_email, customer_name, metadata, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())`,
+    [
+      id,
+      transaction.userId,
+      transaction.snippeReference || null,
+      transaction.amount,
+      transaction.currency || 'TZS',
+      transaction.paymentType,
+      transaction.planType || null,
+      transaction.status || 'pending',
+      transaction.customerPhone || null,
+      transaction.customerEmail || null,
+      transaction.customerName || null,
+      transaction.metadata ? JSON.stringify(transaction.metadata) : null,
+    ]
+  );
+  return { id, ...transaction };
+}
+
+export async function updatePaymentTransaction(snippeReference, updates) {
+  const p = ensurePool();
+  if (!p) return false;
+  const fields = [];
+  const values = [];
+  let paramCount = 1;
+
+  if (updates.status !== undefined) {
+    fields.push(`status = $${paramCount++}`);
+    values.push(updates.status);
+  }
+  if (updates.snippeReference !== undefined) {
+    fields.push(`snippe_reference = $${paramCount++}`);
+    values.push(updates.snippeReference);
+  }
+  if (updates.metadata !== undefined) {
+    fields.push(`metadata = $${paramCount++}`);
+    values.push(JSON.stringify(updates.metadata));
+  }
+
+  if (fields.length === 0) return false;
+  fields.push(`updated_at = NOW()`);
+  values.push(snippeReference);
+
+  await p.query(
+    `UPDATE payment_transactions SET ${fields.join(', ')} WHERE snippe_reference = $${paramCount++}`,
+    values
+  );
+  return true;
+}
+
+export async function getPaymentTransactionsByUserId(userId) {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(
+    'SELECT * FROM payment_transactions WHERE user_id=$1 ORDER BY created_at DESC',
+    [userId]
+  );
+  return rows.map(r => ({
+    id: r.id,
+    userId: r.user_id,
+    snippeReference: r.snippe_reference,
+    amount: r.amount,
+    currency: r.currency,
+    paymentType: r.payment_type,
+    planType: r.plan_type,
+    status: r.status,
+    customerPhone: r.customer_phone,
+    customerEmail: r.customer_email,
+    customerName: r.customer_name,
+    metadata: r.metadata,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function getPaymentTransactionByReference(snippeReference) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query(
+    'SELECT * FROM payment_transactions WHERE snippe_reference=$1',
+    [snippeReference]
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    userId: r.user_id,
+    snippeReference: r.snippe_reference,
+    amount: r.amount,
+    currency: r.currency,
+    paymentType: r.payment_type,
+    planType: r.plan_type,
+    status: r.status,
+    customerPhone: r.customer_phone,
+    customerEmail: r.customer_email,
+    customerName: r.customer_name,
+    metadata: r.metadata,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
 }

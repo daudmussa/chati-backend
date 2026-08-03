@@ -5,9 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import SEO from '@/components/SEO';
 import { Check, Zap, TrendingUp, Crown, MessageSquare, ShoppingBag, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Pricing() {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const plans = [
@@ -293,7 +295,7 @@ export default function Pricing() {
                         : ''
                     }`}
                     variant={plan.popular ? 'default' : 'outline'}
-                    onClick={() => navigate('/onboarding/account')}
+                    onClick={() => isAuthenticated ? navigate('/billing') : navigate('/onboarding/account')}
                   >
                     {plan.cta}
                   </Button>
