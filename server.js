@@ -407,11 +407,6 @@ app.post("/webhook", async (req, res) => {
       }
 
       console.log(`[webhook] Using ${userCreds ? 'user-specific' : 'default'} credentials for ${from}`);
-      if (userCreds?.twilioPhoneNumber) {
-        console.log(`[webhook] User DB twilioPhoneNumber ends with: ...${userCreds.twilioPhoneNumber.slice(-4)}`);
-      }
-      console.log(`[webhook] USER_TWILIO_PHONE_NUMBER ends with: ...${USER_TWILIO_PHONE_NUMBER?.slice(-4)}`);
-      console.log(`[webhook] TWILIO_ACCOUNT_SID ends with: ...${TWILIO_ACCOUNT_SID?.slice(-4)}`);
 
       // Check conversation limit before creating new conversation
       if (!conversationHistory.has(from) && userCreds?.userId) {
