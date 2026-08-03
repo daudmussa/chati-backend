@@ -13,21 +13,19 @@ import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumb
 
 
 console.log("[startup] Loading env...");
-dotenv.config();
+// Override Railway's broken internal DATABASE_URL (postgres.railway.internal)
+// with the working public proxy from .env
+dotenv.config({ override: true });
 dotenv.config({ path: '.env.railway' });
-
-// DATABASE_URL is injected by Railway via ${{Postgres.DATABASE_URL}}
 
 console.log("[startup] Env loaded, checking DATABASE_URL...");
 console.log("- DATABASE_URL exists?", !!process.env.DATABASE_URL);
-console.log("- DATABASE_URL value:", process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 30) + '...' : 'NOT SET');
 console.log("[startup] Initializing app...");
 // Initialize Postgres schema (if DATABASE_URL is set)
 await initSchema();
 console.log("[debug] Raw process.env check:");
 console.log("- process.env.CLAUDE_API_KEY exists?", !!process.env.CLAUDE_API_KEY);
 console.log("- process.env.TWILIO_ACCOUNT_SID exists?", !!process.env.TWILIO_ACCOUNT_SID);
-console.log("- First 20 chars of CLAUDE_API_KEY:", process.env.CLAUDE_API_KEY?.substring(0, 20));
 console.log("- PGHOST exists?", !!process.env.PGHOST);
 
 const app = express();
