@@ -606,7 +606,12 @@ export async function getUserById(id) {
   const p = ensurePool();
   if (!p) return null;
   const { rows } = await p.query('SELECT id, email, name, role, enabled_features, limits, pay_date, package, status, promo_code, payments_enabled, created_at FROM users WHERE id=$1', [id]);
-  return rows[0] || null;
+  const user = rows[0];
+  if (!user) return null;
+  return {
+    ...user,
+    paymentsEnabled: user.payments_enabled || false,
+  };
 }
 
 export async function updateUserPaymentsEnabled(userId, enabled) {
@@ -1333,7 +1338,7 @@ export async function getPaymentSettings(userId) {
     userId: r.user_id,
     snippeApiKey: decrypt(r.snippe_api_key),
     snippeWebhookSecret: decrypt(r.snippe_webhook_secret),
-    snippeEnabled: r.snippe_enabled,
+    snippeEnabled: r.snippe_enabled || false,
     updatedAt: r.updated_at,
   };
 }

@@ -387,9 +387,18 @@ app.post("/webhook", async (req, res) => {
           const paymentSettings = await pgGetPaymentSettings(userCreds.userId);
           userPaymentsEnabled = (user?.paymentsEnabled || false) && (paymentSettings?.snippeEnabled || false);
           
+          console.log('[webhook] Payment check:', {
+            userId: userCreds.userId,
+            userPaymentsEnabled: user?.paymentsEnabled,
+            snippeEnabled: paymentSettings?.snippeEnabled,
+            combined: userPaymentsEnabled,
+          });
+          
           if (userPaymentsEnabled) {
             userPaymentItems = await getPaymentItemsByUserId(userCreds.userId);
+            console.log('[webhook] Loaded payment items:', userPaymentItems.length);
             userPaymentItems = userPaymentItems.filter(item => item.isActive);
+            console.log('[webhook] Active payment items:', userPaymentItems.length);
           }
         } catch (e) {
           console.warn('[webhook] Failed to load booking/payment settings:', e.message);
