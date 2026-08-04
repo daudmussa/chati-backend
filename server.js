@@ -3290,17 +3290,26 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
 
     // Create Snippe payment
     const snippePayload = {
-      reference,
-      amount: item.amount,
-      currency: item.currency || 'TZS',
-      customer_name: customerName,
-      customer_email: customerEmail,
-      customer_phone: customerPhone,
       payment_type: paymentType,
+      details: {
+        amount: item.amount,
+        currency: item.currency || 'TZS',
+      },
+      phone_number: customerPhone,
+      customer: {
+        firstname: customerName?.split(' ')[0] || 'Customer',
+        lastname: customerName?.split(' ').slice(1).join(' ') || '',
+        email: customerEmail,
+      },
       description: item.description || item.name,
+      metadata: {
+        itemId: item.id,
+        itemName: item.name,
+        type: 'payment_item',
+      },
     };
 
-    const snippeRes = await fetch('https://api.snippe.sh/v1/payment/create', {
+    const snippeRes = await fetch('https://api.snippe.sh/v1/payments', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -3335,9 +3344,9 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
     console.log('[payment] Item payment created:', reference);
     res.json({
       success: true,
-      reference,
-      paymentUrl: snippeData.payment_url,
-      ussdCode: snippeData.ussd_code,
+      reference: snippeData.data?.reference || reference,
+      paymentUrl: snippeData.data?.payment_url,
+      ussdCode: snippeData.data?.ussd_code,
       message: paymentType === 'mobile' ? 'Check your phone for USSD prompt' : 'Redirect to payment page',
     });
   } catch (error) {
