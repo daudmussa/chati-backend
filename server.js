@@ -382,9 +382,11 @@ app.post("/webhook", async (req, res) => {
           userBookings = await listBookings(userCreds.userId);
           
           // Load payment items if payments are enabled
-          // Need to get the actual user record to check paymentsEnabled
+          // Need to check BOTH users.payments_enabled AND payment_settings.snippe_enabled
           const user = await getUserById(userCreds.userId);
-          userPaymentsEnabled = user?.paymentsEnabled || false;
+          const paymentSettings = await pgGetPaymentSettings(userCreds.userId);
+          userPaymentsEnabled = (user?.paymentsEnabled || false) && (paymentSettings?.snippeEnabled || false);
+          
           if (userPaymentsEnabled) {
             userPaymentItems = await getPaymentItemsByUserId(userCreds.userId);
             userPaymentItems = userPaymentItems.filter(item => item.isActive);
