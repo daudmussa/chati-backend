@@ -1193,74 +1193,73 @@ app.post("/webhook", async (req, res) => {
               messageToSend = lang === 'sw'
                 ? "Tafadhali toa jina na nambari ya simu kwa mpangilio huu:\nJina, Nambari ya Simu, Email (hiari)"
                 : "Please provide name and phone number in this format:\nName, Phone Number, Email (optional)";
-              return;
-            }
-            
-            const customerName = details[0];
-            const customerPhone = details[1].startsWith('+') ? details[1] : `+${details[1]}`;
-            const customerEmail = details[2] || '';
-            
-            try {
-              // Create payment via Snippe
-              const paymentRes = await fetch(`${process.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/item/${paymentState.itemId}/pay`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-user-id': userCreds.userId,
-                },
-                body: JSON.stringify({
-                  paymentType: 'mobile',
-                  customerPhone,
-                  customerEmail,
-                  customerName,
-                }),
-              });
+            } else {
+              const customerName = details[0];
+              const customerPhone = details[1].startsWith('+') ? details[1] : `+${details[1]}`;
+              const customerEmail = details[2] || '';
               
-              const paymentData = await paymentRes.json();
-              
-              if (paymentRes.ok && paymentData.success) {
-                let confirmMsg = lang === 'sw'
-                  ? `✅ *Malipo Yameanzishwa!*\n\n` +
-                    `📦 Kipengele: ${paymentState.itemName}\n` +
-                    `💰 Kiasi: ${paymentState.currency} ${paymentState.amount.toLocaleString()}\n` +
-                    `👤 Jina: ${customerName}\n` +
-                    `📱 Simu: ${customerPhone}\n\n` +
-                    `🔖 Marejeo: ${paymentData.reference}\n\n` +
-                    `${paymentData.message}\n\n` +
-                    `Utapokea ujumbe wa USSD kwenye simu yako au bofya link:\n${paymentData.paymentUrl || 'N/A'}`
-                  : `✅ *Payment Initiated!*\n\n` +
-                    `📦 Item: ${paymentState.itemName}\n` +
-                    `💰 Amount: ${paymentState.currency} ${paymentState.amount.toLocaleString()}\n` +
-                    `👤 Name: ${customerName}\n` +
-                    `📱 Phone: ${customerPhone}\n\n` +
-                    `🔖 Reference: ${paymentData.reference}\n\n` +
-                    `${paymentData.message}\n\n` +
-                    `Click to pay: ${paymentData.paymentUrl || 'N/A'}`;
+              try {
+                // Create payment via Snippe
+                const paymentRes = await fetch(`${process.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/item/${paymentState.itemId}/pay`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-user-id': userCreds.userId,
+                  },
+                  body: JSON.stringify({
+                    paymentType: 'mobile',
+                    customerPhone,
+                    customerEmail,
+                    customerName,
+                  }),
+                });
                 
-                messageToSend = confirmMsg;
-                delete conversation.paymentState;
-              } else {
+                const paymentData = await paymentRes.json();
+                
+                if (paymentRes.ok && paymentData.success) {
+                  let confirmMsg = lang === 'sw'
+                    ? `✅ *Malipo Yameanzishwa!*\n\n` +
+                      `📦 Kipengele: ${paymentState.itemName}\n` +
+                      `💰 Kiasi: ${paymentState.currency} ${paymentState.amount.toLocaleString()}\n` +
+                      `👤 Jina: ${customerName}\n` +
+                      `📱 Simu: ${customerPhone}\n\n` +
+                      `🔖 Marejeo: ${paymentData.reference}\n\n` +
+                      `${paymentData.message}\n\n` +
+                      `Utapokea ujumbe wa USSD kwenye simu yako au bofya link:\n${paymentData.paymentUrl || 'N/A'}`
+                    : `✅ *Payment Initiated!*\n\n` +
+                      `📦 Item: ${paymentState.itemName}\n` +
+                      `💰 Amount: ${paymentState.currency} ${paymentState.amount.toLocaleString()}\n` +
+                      `👤 Name: ${customerName}\n` +
+                      `📱 Phone: ${customerPhone}\n\n` +
+                      `🔖 Reference: ${paymentData.reference}\n\n` +
+                      `${paymentData.message}\n\n` +
+                      `Click to pay: ${paymentData.paymentUrl || 'N/A'}`;
+                  
+                  messageToSend = confirmMsg;
+                  delete conversation.paymentState;
+                } else {
+                  messageToSend = lang === 'sw'
+                    ? `Samahani, sikuweza kuanzisha malipo. Jaribu tena au wasiliana nasi.\n\nHitilafu: ${paymentData.error || 'Unknown error'}`
+                    : `Sorry, I couldn't initiate the payment. Please try again or contact us.\n\nError: ${paymentData.error || 'Unknown error'}`;
+                  delete conversation.paymentState;
+                }
+              } catch (error) {
+                console.error('[webhook] Error creating payment:', error);
                 messageToSend = lang === 'sw'
-                  ? `Samahani, sikuweza kuanzisha malipo. Jaribu tena au wasiliana nasi.\n\nHitilafu: ${paymentData.error || 'Unknown error'}`
-                  : `Sorry, I couldn't initiate the payment. Please try again or contact us.\n\nError: ${paymentData.error || 'Unknown error'}`;
+                  ? "Samahani, kulikuwa na hitilafu kuchakata malipo yako. Tafadhali jaribu tena baadaye."
+                  : "Sorry, there was an error processing your payment. Please try again later.";
                 delete conversation.paymentState;
               }
-            } catch (error) {
-              console.error('[webhook] Error creating payment:', error);
-              messageToSend = lang === 'sw'
-                ? "Samahani, kulikuwa na hitilafu kuchakata malipo yako. Tafadhali jaribu tena baadaye."
-                : "Sorry, there was an error processing your payment. Please try again later.";
-              delete conversation.paymentState;
             }
           }
-        } else {
+        }
         // Check for redirection keywords BEFORE processing with AI
-        const lowerMsg = incomingMsg.toLowerCase();
-        const hasRedirectionKeyword = bizSettings.keywords.some(keyword => 
-          lowerMsg.includes(keyword.toLowerCase())
-        );
+          const lowerMsg = incomingMsg.toLowerCase();
+          const hasRedirectionKeyword = bizSettings.keywords.some(keyword => 
+            lowerMsg.includes(keyword.toLowerCase())
+          );
 
-        if (hasRedirectionKeyword && bizSettings.supportPhone) {
+          if (hasRedirectionKeyword && bizSettings.supportPhone) {
           // User mentioned a redirection keyword and we have support contact
           const conversation = conversationHistory.get(from) || {};
           const lang = conversation.language || 'en';
