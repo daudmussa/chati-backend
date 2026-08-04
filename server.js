@@ -382,7 +382,9 @@ app.post("/webhook", async (req, res) => {
           userBookings = await listBookings(userCreds.userId);
           
           // Load payment items if payments are enabled
-          userPaymentsEnabled = userCreds?.paymentsEnabled || false;
+          // Need to get the actual user record to check paymentsEnabled
+          const user = await getUserById(userCreds.userId);
+          userPaymentsEnabled = user?.paymentsEnabled || false;
           if (userPaymentsEnabled) {
             userPaymentItems = await getPaymentItemsByUserId(userCreds.userId);
             userPaymentItems = userPaymentItems.filter(item => item.isActive);
