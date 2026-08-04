@@ -8,6 +8,7 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
+import crypto from "crypto";
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem } from "./db-postgres.js";
 
 
