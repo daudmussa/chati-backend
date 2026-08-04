@@ -31,32 +31,18 @@ export default function CustomerPaymentItems() {
   const fetchItems = async () => {
     try {
       setLoading(true);
-      // First get the store to find the user ID
-      const storeRes = await fetch(API_ENDPOINTS.STORE_BY_NAME(storeName!), {
+      // Fetch payment items by store name (public endpoint)
+      const itemsRes = await fetch(`${API_ENDPOINTS.PAYMENT_ITEMS_BY_STORE(storeName!)}`, {
         headers: { 'x-user-id': '' }
       });
       
-      if (!storeRes.ok) {
-        throw new Error('Store not found');
+      if (!itemsRes.ok) {
+        throw new Error('Failed to fetch payment items');
       }
       
-      const storeData = await storeRes.json();
-      setBusinessName(storeData.store?.storeName || 'Business');
-      
-      // Get payment items for this store
-      const userId = storeData.store?.userId;
-      if (!userId) {
-        throw new Error('User ID not found');
-      }
-      
-      const itemsRes = await fetch(`${API_ENDPOINTS.PAYMENT_ITEMS}?userId=${userId}`, {
-        headers: { 'x-user-id': userId }
-      });
-      
-      if (itemsRes.ok) {
-        const itemsData = await itemsRes.json();
-        setItems(itemsData.items?.filter((item: PaymentItem) => item.isActive) || []);
-      }
+      const itemsData = await itemsRes.json();
+      setBusinessName(itemsData.store?.storeName || 'Business');
+      setItems(itemsData.items || []);
     } catch (error) {
       console.error('Error fetching payment items:', error);
       toast({ 
@@ -72,7 +58,7 @@ export default function CustomerPaymentItems() {
   const handleRequestPayment = async (item: PaymentItem) => {
     setRequesting(item.id);
     try {
-      // Get customer details (in a real scenario, you'd have a form or be logged in)
+      // Get customer details
       const customerName = prompt('Please enter your name:');
       if (!customerName) {
         setRequesting(null);
@@ -87,12 +73,16 @@ export default function CustomerPaymentItems() {
       
       const customerEmail = prompt('Please enter your email (optional):') || '';
       
-      // Get the store owner's user ID
+      // Get the store owner's user ID from the store endpoint
       const storeRes = await fetch(API_ENDPOINTS.STORE_BY_NAME(storeName!), {
         headers: { 'x-user-id': '' }
       });
       const storeData = await storeRes.json();
       const userId = storeData.store?.userId;
+      
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
       
       // Create payment
       const res = await fetch(API_ENDPOINTS.PAYMENT_ITEM_PAY(item.id), {

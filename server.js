@@ -1165,7 +1165,10 @@ app.post("/webhook", async (req, res) => {
               // Send direct payment page link
               const storeSettings = await pgGetStoreSettings(userCreds.userId);
               if (storeSettings && storeSettings.storeName) {
-                const paymentUrl = `${process.env.VITE_API_URL || 'http://localhost:5173'}/shop/${storeSettings.storeName}/payments`;
+                const baseUrl = process.env.VITE_API_URL?.includes('localhost') 
+                  ? 'https://chatisolutions.com' 
+                  : (process.env.VITE_API_URL || 'https://chatisolutions.com');
+                const paymentUrl = `${baseUrl}/shop/${storeSettings.storeName}/payments`;
                 messageToSend = lang === 'sw'
                   ? `Bofya link hii kuchagua na kulipa: ${paymentUrl}`
                   : `Click this link to select and pay: ${paymentUrl}`;
@@ -3093,6 +3096,24 @@ app.get("/api/payment/items", async (req, res) => {
     res.json({ success: true, items });
   } catch (error) {
     console.error('[payment-items] Error fetching items:', error);
+    res.status(500).json({ error: "Failed to fetch payment items" });
+  }
+});
+
+// Get payment items by store name (public endpoint for customer-facing pages)
+app.get("/api/payment/items/by-store/:storeName", async (req, res) => {
+  try {
+    const { storeName } = req.params;
+    const store = await pgGetStoreByName(storeName);
+    if (!store) {
+      return res.status(404).json({ error: "Store not found" });
+    }
+
+    const items = await getPaymentItemsByUserId(store.userId);
+    const activeItems = items.filter(item => item.isActive);
+    res.json({ success: true, items: activeItems, store });
+  } catch (error) {
+    console.error('[payment-items] Error fetching items by store:', error);
     res.status(500).json({ error: "Failed to fetch payment items" });
   }
 });
