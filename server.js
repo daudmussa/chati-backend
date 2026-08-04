@@ -1099,6 +1099,7 @@ app.post("/webhook", async (req, res) => {
         );
         
         const paymentState = conversation.paymentState || null;
+        let paymentHandled = false;
         
         // Handle cancel during payment flow
         if (isCancelRequest && paymentState) {
@@ -1107,6 +1108,7 @@ app.post("/webhook", async (req, res) => {
             ? "Sawa, nimeghairi mchakato wa malipo. Je, kuna kitu kingine ninachoweza kukusaidia?"
             : "Okay, I've cancelled the payment process. Is there anything else I can help you with?";
           delete conversation.paymentState;
+          paymentHandled = true;
         } else if (paymentState || isPaymentInquiry) {
           // Use already loaded userPaymentItems and userPaymentsEnabled
           
@@ -1136,10 +1138,12 @@ app.post("/webhook", async (req, res) => {
               
               conversation.paymentState = { step: 'awaiting_item', language: lang };
               messageToSend = itemsText;
+              paymentHandled = true;
             } else {
               messageToSend = lang === 'sw'
                 ? "Samahani, hakuna vipengele vya malipo vinavyopatikana kwa sasa. Tafadhali wasiliana nasi moja kwa moja."
                 : "Sorry, there are no payment items available at the moment. Please contact us directly for assistance.";
+              paymentHandled = true;
             }
           } else if (paymentState && paymentState.step === 'awaiting_item') {
             const lang = paymentState.language || 'en';
@@ -1158,6 +1162,7 @@ app.post("/webhook", async (req, res) => {
                   : "Sorry, I couldn't find the store link. Please contact us directly.";
               }
               delete conversation.paymentState;
+              paymentHandled = true;
             } else {
               const itemNum = parseInt(incomingMsg.trim());
               
@@ -1177,10 +1182,12 @@ app.post("/webhook", async (req, res) => {
                 messageToSend = lang === 'sw'
                   ? `Vizuri! Umechagua *${selectedItem.name}* kwa ${selectedItem.currency} ${selectedItem.amount.toLocaleString()}.\n\nTafadhali toa:\n1️⃣ Jina lako kamili\n2️⃣ Nambari ya simu (k.m. +255...)\n3️⃣ Email (hiari)`
                   : `Great! You selected *${selectedItem.name}* for ${selectedItem.currency} ${selectedItem.amount.toLocaleString()}.\n\nPlease provide:\n1️⃣ Your full name\n2️⃣ Phone number (e.g., +255...)\n3️⃣ Email (optional)`;
+                paymentHandled = true;
               } else {
                 messageToSend = lang === 'sw'
                   ? "Tafadhali jibu kwa namba sahihi ya kipengele kutoka kwenye orodha hapo juu."
                   : "Please reply with a valid item number from the list above.";
+                paymentHandled = true;
               }
             }
           } else if (paymentState && paymentState.step === 'awaiting_customer_details') {
@@ -1193,6 +1200,7 @@ app.post("/webhook", async (req, res) => {
               messageToSend = lang === 'sw'
                 ? "Tafadhali toa jina na nambari ya simu kwa mpangilio huu:\nJina, Nambari ya Simu, Email (hiari)"
                 : "Please provide name and phone number in this format:\nName, Phone Number, Email (optional)";
+              paymentHandled = true;
             } else {
               const customerName = details[0];
               const customerPhone = details[1].startsWith('+') ? details[1] : `+${details[1]}`;
@@ -1237,11 +1245,13 @@ app.post("/webhook", async (req, res) => {
                   
                   messageToSend = confirmMsg;
                   delete conversation.paymentState;
+                  paymentHandled = true;
                 } else {
                   messageToSend = lang === 'sw'
                     ? `Samahani, sikuweza kuanzisha malipo. Jaribu tena au wasiliana nasi.\n\nHitilafu: ${paymentData.error || 'Unknown error'}`
                     : `Sorry, I couldn't initiate the payment. Please try again or contact us.\n\nError: ${paymentData.error || 'Unknown error'}`;
                   delete conversation.paymentState;
+                  paymentHandled = true;
                 }
               } catch (error) {
                 console.error('[webhook] Error creating payment:', error);
@@ -1249,11 +1259,13 @@ app.post("/webhook", async (req, res) => {
                   ? "Samahani, kulikuwa na hitilafu kuchakata malipo yako. Tafadhali jaribu tena baadaye."
                   : "Sorry, there was an error processing your payment. Please try again later.";
                 delete conversation.paymentState;
+                paymentHandled = true;
               }
             }
           }
         }
-        // Check for redirection keywords BEFORE processing with AI
+        // Only check redirection/AI if payment wasn't handled
+        if (!paymentHandled) {
           const lowerMsg = incomingMsg.toLowerCase();
           const hasRedirectionKeyword = bizSettings.keywords.some(keyword => 
             lowerMsg.includes(keyword.toLowerCase())
@@ -1352,6 +1364,7 @@ CRITICAL RULES:
             }
             messageToSend = "Thanks for your message! Our team will review that and get back to you soon.";
           }
+        }
         }
       }
 
