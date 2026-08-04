@@ -3238,7 +3238,7 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
     }
 
     // Get user's Snippe API key
-    const paymentSettings = await getPaymentSettings(userId);
+    const paymentSettings = await pgGetPaymentSettings(userId);
     if (!paymentSettings?.snippeApiKey || !paymentSettings.snippeEnabled) {
       return res.status(400).json({ error: "Snippe API key not configured. Please configure payment settings or contact admin." });
     }
