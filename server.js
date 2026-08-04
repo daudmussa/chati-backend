@@ -3309,7 +3309,20 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
       body: JSON.stringify(snippePayload),
     });
 
-    const snippeData = await snippeRes.json();
+    console.log('[payment] Snippe response status:', snippeRes.status);
+    const snippeText = await snippeRes.text();
+    console.log('[payment] Snippe response body:', snippeText);
+    
+    let snippeData;
+    try {
+      snippeData = JSON.parse(snippeText);
+    } catch (e) {
+      console.error('[payment] Failed to parse Snippe response as JSON:', e);
+      return res.status(500).json({ 
+        error: 'Invalid response from payment gateway',
+        details: snippeText.substring(0, 200)
+      });
+    }
 
     if (!snippeRes.ok || snippeData.status !== 'success') {
       console.error('[payment] Snippe API error:', snippeData);
