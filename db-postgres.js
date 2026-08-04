@@ -311,6 +311,21 @@ export async function initSchema() {
     );
   `);
   
+  // Payment items table (custom payment items for chat)
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS payment_items (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT,
+      amount NUMERIC(10,2) NOT NULL,
+      currency TEXT DEFAULT 'TZS',
+      is_active BOOLEAN DEFAULT TRUE,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+  
   // Payment transactions table
   await p.query(`
     CREATE TABLE IF NOT EXISTS payment_transactions (
@@ -1321,6 +1336,118 @@ export async function getPaymentSettings(userId) {
     snippeEnabled: r.snippe_enabled,
     updatedAt: r.updated_at,
   };
+}
+
+// ========================================
+// Payment Items (Custom payment items for chat)
+// ========================================
+
+export async function createPaymentItem(item) {
+  const p = ensurePool();
+  if (!p) return null;
+  const id = item.id || crypto.randomBytes(16).toString('hex');
+  await p.query(
+    `INSERT INTO payment_items (id, user_id, name, description, amount, currency, is_active, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+    [
+      id,
+      item.userId,
+      item.name,
+      item.description || null,
+      item.amount,
+      item.currency || 'TZS',
+      item.isActive !== undefined ? item.isActive : true,
+    ]
+  );
+  return { id, ...item };
+}
+
+export async function getPaymentItemsByUserId(userId) {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(
+    'SELECT * FROM payment_items WHERE user_id=$1 ORDER BY created_at DESC',
+    [userId]
+  );
+  return rows.map(r => ({
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    description: r.description,
+    amount: parseFloat(r.amount),
+    currency: r.currency,
+    isActive: r.is_active,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function getPaymentItemById(itemId, userId) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query(
+    'SELECT * FROM payment_items WHERE id=$1 AND user_id=$2',
+    [itemId, userId]
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    userId: r.user_id,
+    name: r.name,
+    description: r.description,
+    amount: parseFloat(r.amount),
+    currency: r.currency,
+    isActive: r.is_active,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+export async function updatePaymentItem(itemId, userId, updates) {
+  const p = ensurePool();
+  if (!p) return false;
+  const fields = [];
+  const values = [];
+  let paramCount = 1;
+
+  if (updates.name !== undefined) {
+    fields.push(`name = $${paramCount++}`);
+    values.push(updates.name);
+  }
+  if (updates.description !== undefined) {
+    fields.push(`description = $${paramCount++}`);
+    values.push(updates.description);
+  }
+  if (updates.amount !== undefined) {
+    fields.push(`amount = $${paramCount++}`);
+    values.push(updates.amount);
+  }
+  if (updates.currency !== undefined) {
+    fields.push(`currency = $${paramCount++}`);
+    values.push(updates.currency);
+  }
+  if (updates.isActive !== undefined) {
+    fields.push(`is_active = $${paramCount++}`);
+    values.push(updates.isActive);
+  }
+
+  if (fields.length === 0) return false;
+  fields.push(`updated_at = NOW()`);
+  values.push(itemId, userId);
+
+  await p.query(
+    `UPDATE payment_items SET ${fields.join(', ')} WHERE id = $${paramCount++} AND user_id = $${paramCount++}`,
+    values
+  );
+  return true;
+}
+
+export async function deletePaymentItem(itemId, userId) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query('DELETE FROM payment_items WHERE id=$1 AND user_id=$2', [itemId, userId]);
+  return true;
 }
 
 // ========================================

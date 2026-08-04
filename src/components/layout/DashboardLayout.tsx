@@ -13,7 +13,8 @@ import {
   ShoppingBag,
   CalendarCheck,
   Shield,
-  Users
+  Users,
+  DollarSign
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +33,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     { name: 'Conversations', href: '/conversations', icon: MessageSquare, featureId: 'conversations' },
     { name: 'Store', href: '/store', icon: ShoppingBag, featureId: 'store' },
     { name: 'Bookings', href: '/bookings', icon: CalendarCheck, featureId: 'bookings' },
+    ...(user?.paymentsEnabled ? [
+      { name: 'Payments', href: '/payment-items', icon: DollarSign, featureId: null }
+    ] : []),
     { name: 'AI Settings', href: '/settings', icon: Settings, featureId: 'settings' },
     { name: 'Billing', href: '/billing', icon: CreditCard, featureId: 'billing' },
     ...(user?.paymentsEnabled ? [

@@ -17,6 +17,7 @@ import Conversations from "./pages/Conversations";
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import PaymentSettings from "./pages/PaymentSettings";
+import PaymentItems from "./pages/PaymentItems";
 import Store from "./pages/Store";
 import Bookings from "./pages/Bookings";
 import Staff from "./pages/Staff";
@@ -24,6 +25,7 @@ import Admin from "./pages/Admin";
 import CustomerStore from "./pages/CustomerStore";
 import ShopLanding from "./pages/ShopLanding";
 import Cart from "./pages/Cart";
+import CustomerPaymentItems from "./pages/CustomerPaymentItems";
 import Contact from "./pages/Contact";
 import Terms from "./pages/Terms";
 import Pricing from "./pages/Pricing";
@@ -89,6 +91,7 @@ function App() {
               <Route path="/conversations" element={<FeatureProtectedRoute featureId="conversations"><Conversations /></FeatureProtectedRoute>} />
               <Route path="/settings" element={<FeatureProtectedRoute featureId="settings"><Settings /></FeatureProtectedRoute>} />
               <Route path="/billing" element={<FeatureProtectedRoute featureId="billing"><Billing /></FeatureProtectedRoute>} />
+              <Route path="/payment-items" element={<ProtectedRoute><PaymentItems /></ProtectedRoute>} />
               <Route path="/payment-settings" element={<ProtectedRoute><PaymentSettings /></ProtectedRoute>} />
               <Route path="/store" element={<FeatureProtectedRoute featureId="store"><Store /></FeatureProtectedRoute>} />
               <Route path="/bookings" element={<FeatureProtectedRoute featureId="bookings"><Bookings /></FeatureProtectedRoute>} />
@@ -98,6 +101,7 @@ function App() {
               {/* Public customer-facing pages */}
               <Route path="/shop" element={<ShopLanding />} />
               <Route path="/shop/:storeName" element={<CustomerStore />} />
+              <Route path="/shop/:storeName/payments" element={<CustomerPaymentItems />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/about" element={<About />} />

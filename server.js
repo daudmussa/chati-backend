@@ -8,7 +8,7 @@ import jwt from "jsonwebtoken";
 import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -2875,6 +2875,240 @@ app.put("/api/admin/users/:userId/payments", async (req, res) => {
   }
 });
 
+// ========================================
+// PAYMENT ITEMS API (Custom payment items for chat)
+// ========================================
+
+// Get all payment items for a user
+app.get("/api/payment/items", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const items = await getPaymentItemsByUserId(userId);
+    res.json({ success: true, items });
+  } catch (error) {
+    console.error('[payment-items] Error fetching items:', error);
+    res.status(500).json({ error: "Failed to fetch payment items" });
+  }
+});
+
+// Get a single payment item by ID
+app.get("/api/payment/items/:itemId", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const { itemId } = req.params;
+    const item = await getPaymentItemById(itemId, userId);
+    
+    if (!item) {
+      return res.status(404).json({ error: "Payment item not found" });
+    }
+
+    res.json({ success: true, item });
+  } catch (error) {
+    console.error('[payment-items] Error fetching item:', error);
+    res.status(500).json({ error: "Failed to fetch payment item" });
+  }
+});
+
+// Create a new payment item
+app.post("/api/payment/items", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const { name, description, amount, currency, isActive } = req.body;
+
+    if (!name || !amount) {
+      return res.status(400).json({ error: "Name and amount are required" });
+    }
+
+    const item = await createPaymentItem({
+      userId,
+      name,
+      description,
+      amount: parseFloat(amount),
+      currency: currency || 'TZS',
+      isActive: isActive !== undefined ? isActive : true,
+    });
+
+    console.log('[payment-items] Item created:', item.id);
+    res.json({ success: true, item });
+  } catch (error) {
+    console.error('[payment-items] Error creating item:', error);
+    res.status(500).json({ error: "Failed to create payment item" });
+  }
+});
+
+// Update a payment item
+app.put("/api/payment/items/:itemId", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const { itemId } = req.params;
+    const { name, description, amount, currency, isActive } = req.body;
+
+    const existingItem = await getPaymentItemById(itemId, userId);
+    if (!existingItem) {
+      return res.status(404).json({ error: "Payment item not found" });
+    }
+
+    const updated = await updatePaymentItem(itemId, userId, {
+      name,
+      description,
+      amount: amount ? parseFloat(amount) : undefined,
+      currency,
+      isActive,
+    });
+
+    if (!updated) {
+      return res.status(400).json({ error: "Failed to update payment item" });
+    }
+
+    const item = await getPaymentItemById(itemId, userId);
+    console.log('[payment-items] Item updated:', itemId);
+    res.json({ success: true, item });
+  } catch (error) {
+    console.error('[payment-items] Error updating item:', error);
+    res.status(500).json({ error: "Failed to update payment item" });
+  }
+});
+
+// Delete a payment item
+app.delete("/api/payment/items/:itemId", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const { itemId } = req.params;
+    const deleted = await deletePaymentItem(itemId, userId);
+
+    if (!deleted) {
+      return res.status(404).json({ error: "Payment item not found" });
+    }
+
+    console.log('[payment-items] Item deleted:', itemId);
+    res.json({ success: true, message: "Payment item deleted" });
+  } catch (error) {
+    console.error('[payment-items] Error deleting item:', error);
+    res.status(500).json({ error: "Failed to delete payment item" });
+  }
+});
+
+// Create payment for a payment item (customer-facing)
+app.post("/api/payment/item/:itemId/pay", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const { itemId } = req.params;
+    const { paymentType, customerPhone, customerEmail, customerName } = req.body;
+
+    // Get payment item details
+    const item = await getPaymentItemById(itemId, userId);
+    if (!item) {
+      return res.status(404).json({ error: "Payment item not found" });
+    }
+
+    if (!item.isActive) {
+      return res.status(400).json({ error: "Payment item is not active" });
+    }
+
+    // Check if user has payments enabled
+    const user = await getUserById(userId);
+    if (!user?.paymentsEnabled) {
+      return res.status(403).json({ error: "Payments not enabled for this account" });
+    }
+
+    // Get user's Snippe API key
+    const paymentSettings = await getPaymentSettings(userId);
+    if (!paymentSettings?.snippeApiKey || !paymentSettings.snippeEnabled) {
+      return res.status(400).json({ error: "Snippe API key not configured. Please configure payment settings or contact admin." });
+    }
+
+    const snippeApiKey = paymentSettings.snippeApiKey;
+    const reference = `ITEM-${crypto.randomBytes(8).toString('hex').toUpperCase()}`;
+
+    // Create payment transaction record
+    await createPaymentTransaction({
+      userId,
+      snippeReference: reference,
+      amount: item.amount,
+      currency: item.currency || 'TZS',
+      paymentType,
+      planType: `item:${itemId}`,
+      status: 'pending',
+      customerPhone,
+      customerEmail,
+      customerName,
+      metadata: {
+        itemId: item.id,
+        itemName: item.name,
+        itemDescription: item.description,
+        type: 'payment_item',
+      },
+    });
+
+    // Create Snippe payment
+    const snippePayload = {
+      reference,
+      amount: item.amount,
+      currency: item.currency || 'TZS',
+      customer_name: customerName,
+      customer_email: customerEmail,
+      customer_phone: customerPhone,
+      payment_type: paymentType,
+      description: item.description || item.name,
+    };
+
+    const snippeRes = await fetch('https://api.snippe.sh/v1/payment/create', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${snippeApiKey}`,
+      },
+      body: JSON.stringify(snippePayload),
+    });
+
+    const snippeData = await snippeRes.json();
+
+    if (!snippeRes.ok || snippeData.status !== 'success') {
+      console.error('[payment] Snippe API error:', snippeData);
+      return res.status(400).json({ 
+        error: snippeData.message || 'Failed to create payment',
+        details: snippeData 
+      });
+    }
+
+    console.log('[payment] Item payment created:', reference);
+    res.json({
+      success: true,
+      reference,
+      paymentUrl: snippeData.payment_url,
+      ussdCode: snippeData.ussd_code,
+      message: paymentType === 'mobile' ? 'Check your phone for USSD prompt' : 'Redirect to payment page',
+    });
+  } catch (error) {
+    console.error('[payment] Error creating item payment:', error);
+    res.status(500).json({ error: "Failed to create payment" });
+  }
+});
+
 // Create payment for a booking
 app.post("/api/payment/booking/:bookingId", async (req, res) => {
   try {
@@ -3115,6 +3349,14 @@ app.post("/api/payment/webhook", async (req, res) => {
       
       await updateBookingPaymentStatus(userId, bookingId, bookingPaymentStatus, data.reference);
       console.log('[webhook] Booking payment updated:', bookingId, bookingPaymentStatus);
+    }
+
+    // Handle payment item payments
+    if (planType?.startsWith('item:')) {
+      const itemId = planType.replace('item:', '');
+      console.log('[webhook] Payment item payment:', itemId, 'status:', event);
+      // Payment item transactions are tracked but don't require additional processing
+      // The item itself remains active/inactive based on user settings
     }
 
     // If payment completed, activate user subscription
