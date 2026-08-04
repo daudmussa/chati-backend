@@ -371,14 +371,24 @@ app.post("/webhook", async (req, res) => {
       let userBookingsEnabled = false;
       let userServices = [];
       let userBookings = [];
+      let userPaymentItems = [];
+      let userPaymentsEnabled = false;
+      
       if (userCreds?.userId) {
         try {
           const bookingSettings = await getBookingSettings(userCreds.userId);
           userBookingsEnabled = bookingSettings.enabled || false;
           userServices = await listServices(userCreds.userId);
           userBookings = await listBookings(userCreds.userId);
+          
+          // Load payment items if payments are enabled
+          userPaymentsEnabled = userCreds?.paymentsEnabled || false;
+          if (userPaymentsEnabled) {
+            userPaymentItems = await getPaymentItemsByUserId(userCreds.userId);
+            userPaymentItems = userPaymentItems.filter(item => item.isActive);
+          }
         } catch (e) {
-          console.warn('[webhook] Failed to load booking settings:', e.message);
+          console.warn('[webhook] Failed to load booking/payment settings:', e.message);
         }
       }
       
@@ -1082,6 +1092,168 @@ app.post("/webhook", async (req, res) => {
           }
         }
       } else {
+        // Check for payment items keywords
+        const paymentKeywords = ['pay', 'payment', 'lipa', 'malipo', 'order', 'order item', 'nunua', 'buy'];
+        const isPaymentInquiry = paymentKeywords.some(keyword => 
+          incomingMsg.toLowerCase().includes(keyword)
+        );
+        
+        const paymentState = conversation.paymentState || null;
+        
+        // Handle cancel during payment flow
+        if (isCancelRequest && paymentState) {
+          const lang = paymentState.language || conversation.language || 'en';
+          messageToSend = lang === 'sw'
+            ? "Sawa, nimeghairi mchakato wa malipo. Je, kuna kitu kingine ninachoweza kukusaidia?"
+            : "Okay, I've cancelled the payment process. Is there anything else I can help you with?";
+          delete conversation.paymentState;
+        } else if (paymentState || isPaymentInquiry) {
+          // Use already loaded userPaymentItems and userPaymentsEnabled
+          
+          if (!paymentState && isPaymentInquiry) {
+            // Initial payment inquiry
+            if (!conversation.language) {
+              const swahiliKeywords = ['ndiyo', 'ndio', 'nafasi', 'naomba', 'nataka', 'je', 'sawa', 'ahsante', 'tafadhali', 'habari', 'lipa', 'malipo', 'nunua'];
+              const isSwahili = swahiliKeywords.some(word => incomingMsg.toLowerCase().includes(word));
+              conversation.language = isSwahili ? 'sw' : 'en';
+            }
+            const lang = conversation.language || 'en';
+            
+            if (userPaymentsEnabled && userPaymentItems.length > 0) {
+              let itemsText = lang === 'sw'
+                ? "Ndiyo, unaweza kulipa kwa huduma zetu! 💳\n\nHizi ndizo chaguzi zinazopatikana:\n\n"
+                : "Yes, you can pay for our services! 💳\n\nHere are the available payment items:\n\n";
+              
+              userPaymentItems.forEach((item, index) => {
+                itemsText += `${index + 1}. *${item.name}*\n`;
+                itemsText += `   💰 ${item.currency} ${item.amount.toLocaleString()}\n`;
+                itemsText += `   📝 ${item.description || 'No description'}\n\n`;
+              });
+              
+              itemsText += lang === 'sw'
+                ? "Tafadhali jibu kwa namba ya kipengele unachotaka kulipia.\n\nAu tuma *link* kupokea link ya malipo moja kwa moja."
+                : "Please reply with the number of the item you want to pay for.\n\nOr send *link* to receive a direct payment link.";
+              
+              conversation.paymentState = { step: 'awaiting_item', language: lang };
+              messageToSend = itemsText;
+            } else {
+              messageToSend = lang === 'sw'
+                ? "Samahani, hakuna vipengele vya malipo vinavyopatikana kwa sasa. Tafadhali wasiliana nasi moja kwa moja."
+                : "Sorry, there are no payment items available at the moment. Please contact us directly for assistance.";
+            }
+          } else if (paymentState && paymentState.step === 'awaiting_item') {
+            const lang = paymentState.language || 'en';
+            
+            if (incomingMsg.toLowerCase() === 'link') {
+              // Send direct payment page link
+              const storeSettings = await pgGetStoreSettings(userCreds.userId);
+              if (storeSettings && storeSettings.storeName) {
+                const paymentUrl = `${process.env.VITE_API_URL || 'http://localhost:5173'}/shop/${storeSettings.storeName}/payments`;
+                messageToSend = lang === 'sw'
+                  ? `Bofya link hii kuchagua na kulipa: ${paymentUrl}`
+                  : `Click this link to select and pay: ${paymentUrl}`;
+              } else {
+                messageToSend = lang === 'sw'
+                  ? "Samahani, sikuweza kupata link ya duka. Tafadhali wasiliana nasi."
+                  : "Sorry, I couldn't find the store link. Please contact us directly.";
+              }
+              delete conversation.paymentState;
+            } else {
+              const itemNum = parseInt(incomingMsg.trim());
+              
+              if (itemNum > 0 && itemNum <= userPaymentItems.length) {
+                const selectedItem = userPaymentItems[itemNum - 1];
+                
+                conversation.paymentState = {
+                  step: 'awaiting_customer_details',
+                  itemId: selectedItem.id,
+                  itemName: selectedItem.name,
+                  amount: selectedItem.amount,
+                  currency: selectedItem.currency,
+                  description: selectedItem.description,
+                  language: lang,
+                };
+                
+                messageToSend = lang === 'sw'
+                  ? `Vizuri! Umechagua *${selectedItem.name}* kwa ${selectedItem.currency} ${selectedItem.amount.toLocaleString()}.\n\nTafadhali toa:\n1️⃣ Jina lako kamili\n2️⃣ Nambari ya simu (k.m. +255...)\n3️⃣ Email (hiari)`
+                  : `Great! You selected *${selectedItem.name}* for ${selectedItem.currency} ${selectedItem.amount.toLocaleString()}.\n\nPlease provide:\n1️⃣ Your full name\n2️⃣ Phone number (e.g., +255...)\n3️⃣ Email (optional)`;
+              } else {
+                messageToSend = lang === 'sw'
+                  ? "Tafadhali jibu kwa namba sahihi ya kipengele kutoka kwenye orodha hapo juu."
+                  : "Please reply with a valid item number from the list above.";
+              }
+            }
+          } else if (paymentState && paymentState.step === 'awaiting_customer_details') {
+            const lang = paymentState.language || 'en';
+            
+            // Parse customer details (expecting: name, phone, email)
+            const details = incomingMsg.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+            
+            if (details.length < 2) {
+              messageToSend = lang === 'sw'
+                ? "Tafadhali toa jina na nambari ya simu kwa mpangilio huu:\nJina, Nambari ya Simu, Email (hiari)"
+                : "Please provide name and phone number in this format:\nName, Phone Number, Email (optional)";
+              return;
+            }
+            
+            const customerName = details[0];
+            const customerPhone = details[1].startsWith('+') ? details[1] : `+${details[1]}`;
+            const customerEmail = details[2] || '';
+            
+            try {
+              // Create payment via Snippe
+              const paymentRes = await fetch(`${process.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/item/${paymentState.itemId}/pay`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'x-user-id': userCreds.userId,
+                },
+                body: JSON.stringify({
+                  paymentType: 'mobile',
+                  customerPhone,
+                  customerEmail,
+                  customerName,
+                }),
+              });
+              
+              const paymentData = await paymentRes.json();
+              
+              if (paymentRes.ok && paymentData.success) {
+                let confirmMsg = lang === 'sw'
+                  ? `✅ *Malipo Yameanzishwa!*\n\n` +
+                    `📦 Kipengele: ${paymentState.itemName}\n` +
+                    `💰 Kiasi: ${paymentState.currency} ${paymentState.amount.toLocaleString()}\n` +
+                    `👤 Jina: ${customerName}\n` +
+                    `📱 Simu: ${customerPhone}\n\n` +
+                    `🔖 Marejeo: ${paymentData.reference}\n\n` +
+                    `${paymentData.message}\n\n` +
+                    `Utapokea ujumbe wa USSD kwenye simu yako au bofya link:\n${paymentData.paymentUrl || 'N/A'}`
+                  : `✅ *Payment Initiated!*\n\n` +
+                    `📦 Item: ${paymentState.itemName}\n` +
+                    `💰 Amount: ${paymentState.currency} ${paymentState.amount.toLocaleString()}\n` +
+                    `👤 Name: ${customerName}\n` +
+                    `📱 Phone: ${customerPhone}\n\n` +
+                    `🔖 Reference: ${paymentData.reference}\n\n` +
+                    `${paymentData.message}\n\n` +
+                    `Click to pay: ${paymentData.paymentUrl || 'N/A'}`;
+                
+                messageToSend = confirmMsg;
+                delete conversation.paymentState;
+              } else {
+                messageToSend = lang === 'sw'
+                  ? `Samahani, sikuweza kuanzisha malipo. Jaribu tena au wasiliana nasi.\n\nHitilafu: ${paymentData.error || 'Unknown error'}`
+                  : `Sorry, I couldn't initiate the payment. Please try again or contact us.\n\nError: ${paymentData.error || 'Unknown error'}`;
+                delete conversation.paymentState;
+              }
+            } catch (error) {
+              console.error('[webhook] Error creating payment:', error);
+              messageToSend = lang === 'sw'
+                ? "Samahani, kulikuwa na hitilafu kuchakata malipo yako. Tafadhali jaribu tena baadaye."
+                : "Sorry, there was an error processing your payment. Please try again later.";
+              delete conversation.paymentState;
+            }
+          }
+        } else {
         // Check for redirection keywords BEFORE processing with AI
         const lowerMsg = incomingMsg.toLowerCase();
         const hasRedirectionKeyword = bizSettings.keywords.some(keyword => 
@@ -1143,6 +1315,11 @@ CRITICAL RULES:
           // Add booking information if enabled
           if (userBookingsEnabled && userServices.length > 0) {
             systemPrompt += `\n\nIMPORTANT: This business has a booking system enabled. If a customer asks about bookings, appointments, reservations, or scheduling, inform them they can book by saying "I want to book" or "I'd like to make a reservation".`;
+          }
+          
+          // Add payment items information if enabled
+          if (userPaymentsEnabled && userPaymentItems.length > 0) {
+            systemPrompt += `\n\nIMPORTANT: This business has a payment system enabled. If a customer asks about payments, paying, ordering, or buying, inform them they can pay by saying "I want to pay" or "I want to order".`;
           }
 
           console.log(`Sending ${conversation.messages.length} messages to Claude for ${from}`);
