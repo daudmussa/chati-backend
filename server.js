@@ -1100,6 +1100,10 @@ app.post("/webhook", async (req, res) => {
                     const paymentData = await paymentRes.json();
                     
                     if (paymentRes.ok && paymentData.success) {
+                      const reference = paymentData.reference || 'N/A';
+                      const paymentUrl = paymentData.paymentUrl || paymentData.payment_url || 'N/A';
+                      const message = paymentData.message || 'Check your phone for USSD prompt';
+                      
                       if (lang === 'sw') {
                         messageToSend = `✅ *Nafasi Imehifadhiwa! Malipo Yanahitajika.*\n\n` +
                           `👤 Jina: ${customerName}\n` +
@@ -1108,9 +1112,9 @@ app.post("/webhook", async (req, res) => {
                           `📅 Tarehe: ${dateFormatted}\n` +
                           `⏰ Saa: ${booking.timeSlot}\n` +
                           `💰 Bei: TZS ${booking.price.toLocaleString()}\n\n` +
-                          `🔖 Marejeo ya Malipo: ${paymentData.reference}\n\n` +
-                          `${paymentData.message}\n\n` +
-                          `Tafadhali malipa ili kuthibitisha nafasi yako. Utapokea ujumbe wa USSD kwenye simu yako au bofya link:\n${paymentData.paymentUrl || 'N/A'}\n\n` +
+                          `🔖 Marejeo ya Malipo: ${reference}\n\n` +
+                          `${message}\n\n` +
+                          `Tafadhali malipa ili kuthibitisha nafasi yako. Utapokea ujumbe wa USSD kwenye simu yako au bofya link:\n${paymentUrl}\n\n` +
                           `Nafasi yako itathibitishwa baada ya malipo kukamilika.`;
                       } else {
                         messageToSend = `✅ *Booking Saved! Payment Required.*\n\n` +
@@ -1120,9 +1124,9 @@ app.post("/webhook", async (req, res) => {
                           `📅 Date: ${dateFormatted}\n` +
                           `⏰ Time: ${booking.timeSlot}\n` +
                           `💰 Price: TZS ${booking.price.toLocaleString()}\n\n` +
-                          `🔖 Payment Reference: ${paymentData.reference}\n\n` +
-                          `${paymentData.message}\n\n` +
-                          `Please pay to confirm your booking. You will receive a USSD prompt on your phone or click:\n${paymentData.paymentUrl || 'N/A'}\n\n` +
+                          `🔖 Payment Reference: ${reference}\n\n` +
+                          `${message}\n\n` +
+                          `Please pay to confirm your booking. You will receive a USSD prompt on your phone or click:\n${paymentUrl}\n\n` +
                           `Your booking will be confirmed after payment is completed.`;
                       }
                     } else {
@@ -3647,36 +3651,44 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
     }
 
     // Update booking with payment info
+    const reference = snippeData.data?.reference || snippeData.reference;
+    const paymentUrl = snippeData.data?.payment_url || snippeData.payment_url;
+    const status = snippeData.data?.status || snippeData.status || 'pending';
+    
     await updateBookingPaymentStatus(
       userId,
       bookingId,
       'pending',
-      snippeData.reference,
-      snippeData.payment_url
+      reference,
+      paymentUrl
     );
 
     // Save transaction
     await createPaymentTransaction({
       userId,
-      snippeReference: snippeData.reference,
+      snippeReference: reference,
       amount: booking.price,
       currency: "TZS",
       paymentType: paymentType || 'mobile',
       planType: 'booking',
-      status: snippeData.status || 'pending',
+      status: status,
       customerPhone: customerPhone || booking.customerPhone,
       customerEmail,
       customerName: customerName || booking.customerName,
-      metadata: { bookingId, snippeData },
+      metadata: { 
+        booking_id: bookingId, 
+        service_name: booking.serviceName,
+      },
     });
 
-    console.log('[snippe] Booking payment created:', snippeData.reference);
+    console.log('[snippe] Booking payment created:', reference);
     res.json({
       success: true,
-      reference: snippeData.reference,
-      status: snippeData.status,
-      paymentUrl: snippeData.payment_url,
-      qrCode: snippeData.qr_code,
+      reference: reference,
+      status: status,
+      paymentUrl: paymentUrl,
+      qrCode: snippeData.data?.qr_code || snippeData.qr_code,
+      message: normalizedPaymentType === 'mobile' ? 'Check your phone for USSD prompt' : 'Redirect to payment page',
     });
   } catch (error) {
     console.error('[snippe] Error creating booking payment:', error);

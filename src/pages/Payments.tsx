@@ -88,6 +88,9 @@ export default function Payments() {
 
   const getTransactionName = (t: any) => {
     const meta = typeof t.metadata === 'string' ? JSON.parse(t.metadata) : t.metadata;
+    if (t.planType === 'booking') {
+      return `Booking - ${meta?.service_name || 'Service'}`;
+    }
     return meta?.itemName || t.planType?.replace(/_/g, ' ') || 'Payment';
   };
 
@@ -304,7 +307,7 @@ export default function Payments() {
                         <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                           <span>{new Date(transaction.createdAt).toLocaleDateString()}</span>
                           <span className="font-mono text-xs">
-                            Ref: {transaction.snippeReference || 'N/A'}
+                            Ref: {t.snippe_reference || t.snippeReference || 'N/A'}
                           </span>
                         </div>
                         {transaction.customerName && (
