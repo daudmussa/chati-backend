@@ -524,7 +524,7 @@ export default function Cart() {
                 onClick={sendToWhatsApp}
               >
                 <Send className="w-5 h-5 mr-2" />
-                Send Order via WhatsApp
+                {paymentRequired ? 'Pay & Send Order' : 'Send Order via WhatsApp'}
               </Button>
             </div>
 
