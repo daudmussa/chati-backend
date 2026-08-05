@@ -9,7 +9,7 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
 import crypto from "crypto";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -3777,23 +3777,39 @@ app.post("/api/payment/webhook", async (req, res) => {
   }
 });
 
-// Get user's payment transactions
-app.get("/api/payment/transactions", async (req, res) => {
-  try {
-    const userId = req.headers['x-user-id'];
-    if (!userId) {
-      return res.status(401).json({ error: "User ID required" });
+  // Get user's payment transactions
+  app.get("/api/payment/transactions", async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'];
+      if (!userId) {
+        return res.status(401).json({ error: "User ID required" });
+      }
+  
+      const transactions = await getPaymentTransactionsByUserId(userId);
+      res.json({ success: true, transactions });
+    } catch (error) {
+      console.error('[payment] Error fetching transactions:', error);
+      res.status(500).json({ error: "Failed to fetch transactions" });
     }
-
-    const transactions = await getPaymentTransactionsByUserId(userId);
-    res.json({ success: true, transactions });
-  } catch (error) {
-    console.error('[payment] Error fetching transactions:', error);
-    res.status(500).json({ error: "Failed to fetch transactions" });
-  }
-});
-
-// Helper function to get plan configuration
+  });
+  
+  // Get user's payment statistics
+  app.get("/api/payment/stats", async (req, res) => {
+    try {
+      const userId = req.headers['x-user-id'];
+      if (!userId) {
+        return res.status(401).json({ error: "User ID required" });
+      }
+  
+      const stats = await getPaymentStatsByUserId(userId);
+      res.json({ success: true, stats });
+    } catch (error) {
+      console.error('[payment] Error fetching stats:', error);
+      res.status(500).json({ error: "Failed to fetch payment statistics" });
+    }
+  });
+  
+  // Helper function to get plan configuration
 function getPlanConfig(planType) {
   const plans = {
     starter: {

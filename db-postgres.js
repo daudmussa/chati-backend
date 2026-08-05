@@ -1566,3 +1566,34 @@ export async function getPaymentTransactionByReference(snippeReference) {
     updatedAt: r.updated_at,
   };
 }
+
+export async function getPaymentStatsByUserId(userId) {
+  const p = ensurePool();
+  if (!p) return null;
+  
+  const { rows } = await p.query(`
+    SELECT 
+      COUNT(*) as total_transactions,
+      COALESCE(SUM(CASE WHEN status = 'completed' THEN amount ELSE 0 END), 0) as total_paid,
+      COALESCE(SUM(CASE WHEN status = 'pending' THEN amount ELSE 0 END), 0) as total_pending,
+      COALESCE(SUM(CASE WHEN status = 'failed' THEN amount ELSE 0 END), 0) as total_failed,
+      COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_count,
+      COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+      COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed_count
+    FROM payment_transactions
+    WHERE user_id = $1
+  `, [userId]);
+  
+  const r = rows[0];
+  if (!r) return null;
+  
+  return {
+    totalTransactions: parseInt(r.total_transactions),
+    totalPaid: parseFloat(r.total_paid),
+    totalPending: parseFloat(r.total_pending),
+    totalFailed: parseFloat(r.total_failed),
+    completedCount: parseInt(r.completed_count),
+    pendingCount: parseInt(r.pending_count),
+    failedCount: parseInt(r.failed_count),
+  };
+}

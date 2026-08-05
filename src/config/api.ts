@@ -63,6 +63,7 @@ export const API_ENDPOINTS = {
   PAYMENT_CREATE: `${API_BASE_URL}/api/payment/create`,
   PAYMENT_BOOKING: (bookingId: string) => `${API_BASE_URL}/api/payment/booking/${bookingId}`,
   PAYMENT_TRANSACTIONS: `${API_BASE_URL}/api/payment/transactions`,
+  PAYMENT_STATS: `${API_BASE_URL}/api/payment/stats`,
   PAYMENT_WEBHOOK: `${API_BASE_URL}/api/payment/webhook`,
   PAYMENT_ITEMS: `${API_BASE_URL}/api/payment/items`,
   PAYMENT_ITEMS_BY_STORE: (storeName: string) => `${API_BASE_URL}/api/payment/items/by-store/${encodeURIComponent(storeName)}`,
