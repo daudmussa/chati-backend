@@ -3653,7 +3653,9 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
     // Update booking with payment info
     const reference = snippeData.data?.reference || snippeData.reference;
     const paymentUrl = snippeData.data?.payment_url || snippeData.payment_url;
-    const status = snippeData.data?.status || snippeData.status || 'pending';
+    
+    // Always set to 'pending' initially - webhook will update to 'completed' when payment succeeds
+    const status = 'pending';
     
     await updateBookingPaymentStatus(
       userId,
@@ -3681,7 +3683,7 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
       },
     });
 
-    console.log('[snippe] Booking payment created:', reference);
+    console.log('[snippe] Booking payment created:', reference, 'status:', status);
     res.json({
       success: true,
       reference: reference,
