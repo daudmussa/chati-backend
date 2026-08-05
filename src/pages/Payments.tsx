@@ -252,37 +252,6 @@ export default function Payments() {
           </CardContent>
         </Card>
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex gap-4 items-center">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by reference, plan type, or customer name..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-muted-foreground" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="border rounded-md px-3 py-2 text-sm"
-                >
-                  <option value="all">All Status</option>
-                  <option value="completed">Completed</option>
-                  <option value="pending">Pending</option>
-                  <option value="failed">Failed</option>
-                  <option value="refunded">Refunded</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Transactions List */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
