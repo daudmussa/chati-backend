@@ -38,11 +38,13 @@ export default function Payments() {
 
       if (statsRes.ok) {
         const statsData = await statsRes.json();
+        console.log('[Payments] Stats loaded:', statsData);
         setPaymentStats(statsData.stats);
       }
 
       if (transactionsRes.ok) {
         const transactionsData = await transactionsRes.json();
+        console.log('[Payments] Transactions loaded:', transactionsData);
         setTransactions(transactionsData.transactions || []);
       }
     } catch (error) {
@@ -257,20 +259,12 @@ export default function Payments() {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-[#25D366]" />
           </div>
-        ) : filteredTransactions.length === 0 ? (
+        ) : transactions.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
-              <p className="text-muted-foreground">
-                {searchTerm || statusFilter !== 'all' 
-                  ? 'No transactions match your search' 
-                  : 'No payment history yet'}
-              </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {searchTerm || statusFilter !== 'all' 
-                  ? 'Try adjusting your filters' 
-                  : 'Subscribe to a plan to get started'}
-              </p>
+              <p className="text-muted-foreground">No payment history yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Subscribe to a plan to get started</p>
             </CardContent>
           </Card>
         ) : (
