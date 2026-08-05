@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { API_ENDPOINTS } from '@/config/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Check, Zap, TrendingUp, ShoppingBag, Loader2, CreditCard, Smartphone, QrCode, AlertCircle, ExternalLink, DollarSign, Wallet, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Check, Zap, TrendingUp, ShoppingBag, Loader2, CreditCard, Smartphone, QrCode, AlertCircle, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -108,7 +108,6 @@ export default function Billing() {
   const [loading, setLoading] = useState(false);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [fetchingTransactions, setFetchingTransactions] = useState(false);
-  const [paymentStats, setPaymentStats] = useState<any>(null);
   const [paymentDialog, setPaymentDialog] = useState<{ open: boolean; plan: any }>({ open: false, plan: null });
   const [paymentType, setPaymentType] = useState('mobile');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -119,22 +118,7 @@ export default function Billing() {
 
   useEffect(() => {
     fetchTransactions();
-    fetchStats();
   }, []);
-
-  const fetchStats = async () => {
-    try {
-      const res = await fetch(API_ENDPOINTS.PAYMENT_STATS, {
-        headers: { 'x-user-id': user?.id || '' }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setPaymentStats(data.stats);
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    }
-  };
 
   const fetchTransactions = async () => {
     setFetchingTransactions(true);
@@ -188,7 +172,6 @@ export default function Billing() {
         
         setPaymentDialog({ open: false, plan: null });
         fetchTransactions();
-        fetchStats();
       } else {
         toast({ title: 'Payment Failed', description: data.error || 'Failed to create payment', variant: 'destructive' });
       }
@@ -231,73 +214,6 @@ export default function Billing() {
             <ExternalLink className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800">
               Complete your card payment: <a href={paymentUrl} target="_blank" rel="noopener noreferrer" className="font-medium underline">{paymentUrl}</a>
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Payment Statistics */}
-        {user?.paymentsEnabled ? (
-          paymentStats ? (
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">TSh {paymentStats.totalPaid.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {paymentStats.completedCount} completed transactions
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pending</CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">TSh {paymentStats.totalPending.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {paymentStats.pendingCount} awaiting payment
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Failed</CardTitle>
-                  <XCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">TSh {paymentStats.totalFailed.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {paymentStats.failedCount} failed transactions
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-                  <Wallet className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{paymentStats.totalTransactions}</div>
-                  <p className="text-xs text-muted-foreground">
-                    All payment activity
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-[#25D366]" />
-            </div>
-          )
-        ) : (
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              Payments are not enabled for your account. Contact admin to enable payments feature.
             </AlertDescription>
           </Alert>
         )}
