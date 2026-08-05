@@ -34,7 +34,7 @@ export default function Contact() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
       <SEO 
         title="Contact Us - Get in Touch with Chati Solutions | WhatsApp: +255719958997"
-        description="Contact Chati Solutions for AI-powered WhatsApp business automation. Phone: +255719958997, Email: chatisolutions@gmail.com. Get support for your business automation needs."
+        description="Contact Chati Solutions for AI-powered WhatsApp business automation. Phone: +255719958997, Email: info@chatisolutions.com. Get support for your business automation needs."
         keywords="contact Chati Solutions, WhatsApp automation support Tanzania, business automation contact, customer service Tanzania"
         canonical="https://chati.solutions/contact"
       />
@@ -204,7 +204,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900">Email</h3>
-                    <p className="text-gray-600">chatisolutions@gmail.com</p>
+                    <p className="text-gray-600">info@chatisolutions.com</p>
                     {/* <p className="text-gray-600">support@chatisolutions.com</p> */}
                   </div>
                 </div>

@@ -9,7 +9,7 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
 import crypto from "crypto";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listStores as pgListStores, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -2152,6 +2152,20 @@ app.get("/api/store/by-name/:storeName", async (req, res) => {
   } catch (error) {
     console.error('[store] Error fetching by name:', error);
     res.status(500).json({ error: 'Failed to fetch store' });
+  }
+});
+
+// List stores (public, latest first)
+app.get("/api/stores", async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+    console.log('[store] Listing stores, limit:', limit);
+    const stores = await pgListStores(limit);
+    console.log('[store] Found stores:', stores.length);
+    res.json(stores);
+  } catch (error) {
+    console.error('[store] Error listing stores:', error);
+    res.status(500).json({ error: 'Failed to list stores' });
   }
 });
 

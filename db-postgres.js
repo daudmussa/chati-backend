@@ -842,6 +842,22 @@ export async function getStoreByName(storeName) {
   return null;
 }
 
+export async function listStores(limit = 10) {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(
+    'SELECT * FROM store_settings WHERE store_name IS NOT NULL AND store_name != \'\' ORDER BY COALESCE(updated_at, created_at, NOW()) DESC LIMIT $1',
+    [limit]
+  );
+  return rows.map(r => ({
+    userId: r.user_id,
+    storeId: r.store_id,
+    storeName: r.store_name,
+    storePhone: r.store_phone || '',
+    paymentRequired: r.payment_required || false,
+  }));
+}
+
 // Product Functions
 export async function listProducts(userId) {
   const p = ensurePool();

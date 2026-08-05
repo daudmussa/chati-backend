@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,16 +18,46 @@ import {
   Zap,
   Menu,
   X,
-  ShoppingBag
+  ShoppingBag,
+  ChevronRight
 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { API_ENDPOINTS } from '@/config/api';
+
+interface StoreItem {
+  storeName: string;
+  storeId: string;
+  storePhone: string;
+}
 
 export default function ShopLanding() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [latestStores, setLatestStores] = useState<StoreItem[]>([]);
+
+  useEffect(() => {
+    fetchLatestStores();
+  }, []);
+
+  const fetchLatestStores = async () => {
+    try {
+      console.log('[ShopLanding] Fetching latest stores...');
+      const response = await fetch(API_ENDPOINTS.STORES_LIST(3));
+      console.log('[ShopLanding] Response status:', response.status);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('[ShopLanding] Stores data:', data);
+        setLatestStores(data);
+      } else {
+        const err = await response.text();
+        console.error('[ShopLanding] Failed to fetch stores:', err);
+      }
+    } catch (error) {
+      console.error('[ShopLanding] Failed to fetch stores:', error);
+    }
+  };
 
   const handleStoreSearch = async () => {
     if (!searchQuery.trim()) {
@@ -321,6 +351,38 @@ export default function ShopLanding() {
               </div>
             </Card>
           </div>
+
+          {/* Latest Stores */}
+          {latestStores.length > 0 && (
+            <div className="max-w-2xl mx-auto mt-8">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Available Stores</h2>
+                <span className="text-xs text-gray-400">Latest</span>
+              </div>
+              <div className="space-y-3">
+                {latestStores.map((store) => (
+                  <Card
+                    key={store.storeName}
+                    className="cursor-pointer hover:shadow-md hover:border-[#25D366] transition-all duration-200 border-gray-200"
+                    onClick={() => navigate(`/shop/${store.storeName}`)}
+                  >
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#25D366] flex items-center justify-center">
+                          <Store className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold text-gray-900">{store.storeName}</p>
+                          <p className="text-xs text-gray-500">Visit store →</p>
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 

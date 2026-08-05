@@ -735,175 +735,183 @@ export default function Store() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Store Settings Card */}
-        <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-blue-900">
+        <Card className="border-0 shadow-md">
+          <CardHeader className="bg-gradient-to-r from-[#25D366] to-[#1DA851] text-white rounded-t-lg">
+            <CardTitle className="flex items-center gap-2">
               <StoreIcon className="w-5 h-5" />
               Store Settings
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Store ID - Read Only */}
-              <div className="space-y-2">
-                <Label className="text-blue-900">Store ID</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={loadingStore ? 'Loading...' : storeSettings.storeId}
-                    disabled
-                    className="bg-gray-100 text-gray-600 cursor-not-allowed"
-                  />
-                  <Badge variant="secondary" className="whitespace-nowrap">
-                    Read Only
-                  </Badge>
-                </div>
-                <p className="text-xs text-blue-700">
-                  This ID is unique and cannot be changed
-                </p>
+          <CardContent className="p-6 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Store ID - Read Only */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">Store ID</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={loadingStore ? 'Loading...' : storeSettings.storeId}
+                  disabled
+                  className="bg-gray-50 text-gray-500 cursor-not-allowed border-gray-200"
+                />
+                <Badge variant="secondary" className="whitespace-nowrap bg-gray-100 text-gray-500 border-0">
+                  Read Only
+                </Badge>
               </div>
+              <p className="text-xs text-gray-400">
+                This ID is unique and cannot be changed
+              </p>
+            </div>
 
-              {/* Store Name - Editable */}
-              <div className="space-y-2">
-                <Label className="text-blue-900">Store Name (URL)</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={tempStoreName}
-                    onChange={(e) => {
-                      // Only allow lowercase letters, numbers, and hyphens
-                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                      setTempStoreName(value);
-                    }}
-                    disabled={!editingStoreName || loadingStore}
-                    className={editingStoreName ? '' : 'bg-gray-50'}
-                    placeholder="my-store-name"
-                  />
-                  {!editingStoreName ? (
+            {/* Store Name - Editable */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">Store Name (URL)</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={tempStoreName}
+                  onChange={(e) => {
+                    const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
+                    setTempStoreName(value);
+                  }}
+                  disabled={!editingStoreName || loadingStore}
+                  className={editingStoreName ? 'border-[#25D366] ring-2 ring-green-100' : 'bg-gray-50 border-gray-200'}
+                  placeholder="my-store-name"
+                />
+                {!editingStoreName ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditingStoreName(true)}
+                    disabled={loadingStore}
+                    className="shrink-0"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveStoreName}
+                      className="bg-[#25D366] hover:bg-[#20BD5A] text-white shrink-0"
+                    >
+                      <Save className="w-4 h-4" />
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setEditingStoreName(true)}
-                      disabled={loadingStore}
+                      onClick={handleCancelEdit}
+                      className="shrink-0"
                     >
-                      <Pencil className="w-4 h-4" />
+                      Cancel
                     </Button>
-                  ) : (
-                    <>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveStoreName}
-                        className="bg-[#25D366] hover:bg-[#20BD5A]"
-                      >
-                        <Save className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCancelEdit}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  )}
-                </div>
-                <p className="text-xs text-blue-700">
-                  Only lowercase letters, numbers, and hyphens allowed. Your store will be at: /shop/{tempStoreName || 'store-name'}
-                </p>
+                  </>
+                )}
               </div>
+              <p className="text-xs text-gray-400">
+                Your store will be at: <span className="font-mono text-[#25D366]">/shop/{tempStoreName || 'store-name'}</span>
+              </p>
+            </div>
 
-              {/* Store Phone - Editable */}
-              <div className="space-y-2 md:col-span-2">
-                <Label className="text-blue-900">Store WhatsApp Number</Label>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={tempStorePhone}
-                    onChange={(e) => setTempStorePhone(e.target.value)}
-                    disabled={!editingStorePhone || loadingStore}
-                    className={editingStorePhone ? '' : 'bg-gray-50'}
-                    placeholder="+255712345678"
-                  />
-                  {!editingStorePhone ? (
+            {/* Store Phone - Editable */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">WhatsApp Number</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={tempStorePhone}
+                  onChange={(e) => setTempStorePhone(e.target.value)}
+                  disabled={!editingStorePhone || loadingStore}
+                  className={editingStorePhone ? 'border-blue-400 ring-2 ring-blue-100' : 'bg-gray-50 border-gray-200'}
+                  placeholder="+255712345678"
+                />
+                {!editingStorePhone ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setEditingStorePhone(true)}
+                    disabled={loadingStore}
+                    className="shrink-0"
+                  >
+                    <Pencil className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveStorePhone}
+                      className="bg-[#25D366] hover:bg-[#20BD5A] text-white shrink-0"
+                    >
+                      <Save className="w-4 h-4" />
+                    </Button>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => setEditingStorePhone(true)}
-                      disabled={loadingStore}
+                      onClick={handleCancelPhoneEdit}
+                      className="shrink-0"
                     >
-                      <Pencil className="w-4 h-4" />
+                      Cancel
                     </Button>
-                  ) : (
-                    <>
-                      <Button
-                        size="sm"
-                        onClick={handleSaveStorePhone}
-                        className="bg-[#25D366] hover:bg-[#20BD5A]"
-                      >
-                        <Save className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCancelPhoneEdit}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  )}
-                </div>
-                <p className="text-xs text-blue-700">
-                  This number will receive customer orders from the cart. Include country code (e.g., +255 for Tanzania)
-                </p>
+                  </>
+                )}
               </div>
+              <p className="text-xs text-gray-400">
+                Receives customer orders from the cart. Include country code (e.g., +255)
+              </p>
+            </div>
+            </div>
 
-              {/* Payment Required Toggle */}
-              <div className="space-y-2 md:col-span-2">
-                <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
-                  <div className="flex items-center gap-3">
-                    <ShoppingCart className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <Label className="text-blue-900 font-medium">Online Payment Required</Label>
-                      <p className="text-xs text-blue-700">
-                        {storeSettings.paymentRequired 
-                          ? 'Customers must pay online to complete orders' 
-                          : 'Orders can be placed without online payment'}
-                      </p>
-                    </div>
+            <hr className="border-gray-100" />
+
+            {/* Payment Section */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Payment</h3>
+              <div className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all duration-200 ${storeSettings.paymentRequired ? 'bg-green-600 text-white border-green-700 shadow-lg shadow-green-200' : 'bg-white text-gray-900 border-gray-200 hover:border-gray-300'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${storeSettings.paymentRequired ? 'bg-white/20' : 'bg-green-50'}`}>
+                    <ShoppingCart className={`w-5 h-5 ${storeSettings.paymentRequired ? 'text-white' : 'text-[#25D366]'}`} />
                   </div>
-                  <Switch
-                    checked={storeSettings.paymentRequired}
-                    onCheckedChange={togglePaymentRequired}
-                  />
+                  <div>
+                    <Label className={`font-medium ${storeSettings.paymentRequired ? 'text-white' : 'text-gray-900'}`}>Online Payment Required</Label>
+                    <p className={`text-xs mt-0.5 ${storeSettings.paymentRequired ? 'text-green-100' : 'text-gray-500'}`}>
+                      {storeSettings.paymentRequired 
+                        ? 'Customers must pay online to complete orders' 
+                        : 'Orders can be placed without online payment'}
+                    </p>
+                  </div>
                 </div>
+                <Switch
+                  checked={storeSettings.paymentRequired}
+                  onCheckedChange={togglePaymentRequired}
+                />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full max-w-3xl grid-cols-3">
-            <TabsTrigger value="products" className="flex items-center gap-2">
+          <TabsList className="grid w-full max-w-3xl grid-cols-3 bg-gray-100 p-1 rounded-xl">
+            <TabsTrigger value="products" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#25D366]">
               <Package className="w-4 h-4" />
               Products
               {user?.limits && (
-                <Badge variant={products.length >= user.limits.maxProducts ? "destructive" : "secondary"} className="ml-2">
+                <Badge variant={products.length >= user.limits.maxProducts ? "destructive" : "secondary"} className="ml-1">
                   {products.length}/{user.limits.maxProducts}
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="categories" className="flex items-center gap-2">
+            <TabsTrigger value="categories" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#25D366]">
               <StoreIcon className="w-4 h-4" />
               Categories ({categories.length})
             </TabsTrigger>
-            <TabsTrigger value="orders" className="flex items-center gap-2">
+            <TabsTrigger value="orders" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#25D366]">
               <ShoppingCart className="w-4 h-4" />
               Orders ({orders.length})
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="products" className="space-y-4 mt-6">
+          <TabsContent value="products" className="space-y-6 mt-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Products</h1>
-                <p className="text-muted-foreground mt-1">
+                <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+                <p className="text-sm text-gray-500 mt-1">
                   Manage your products for WhatsApp customers
                 </p>
               </div>
@@ -1038,18 +1046,20 @@ export default function Store() {
         </div>
 
         {/* Products Grid */}
-        {filteredProducts.length === 0 ? (
-          <Card className="p-12 text-center">
-            <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          {filteredProducts.length === 0 ? (
+          <Card className="p-12 text-center border-0 shadow-sm">
+            <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+              <Package className="w-8 h-8 text-gray-400" />
+            </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No products found</h3>
-            <p className="text-muted-foreground mb-4">
+            <p className="text-sm text-gray-500 mb-6">
               {searchQuery || categoryFilter !== 'all'
                 ? 'Try adjusting your filters'
                 : 'Add your first product to get started'}
             </p>
             {!searchQuery && categoryFilter === 'all' && (
               <Button
-                className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                className="bg-[#25D366] hover:bg-[#20BD5A] text-white shadow-lg shadow-green-200"
                 onClick={() => handleOpenDialog()}
               >
                 <Plus className="w-4 h-4 mr-2" />
@@ -1061,56 +1071,65 @@ export default function Store() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {paginatedProducts.map((product) => (
-              <Card key={product.id} className="overflow-hidden">
-                <div className="aspect-square relative">
+              <Card key={product.id} className="group overflow-hidden border-0 shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                <div className="aspect-square relative overflow-hidden">
                   <img
                     src={product.image || 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image'}
                     alt={product.title}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.src = 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
                     }}
                   />
                   {!product.inStock && (
-                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                      <Badge variant="secondary" className="bg-white text-gray-900">
+                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
+                      <Badge variant="secondary" className="bg-white/90 text-gray-800 font-medium px-3 py-1">
                         Out of Stock
                       </Badge>
+                    </div>
+                  )}
+                  {product.inStock && (
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex gap-1">
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        onClick={() => handleOpenDialog(product)}
+                        className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="h-8 w-8 bg-white/90 hover:bg-white shadow-sm text-red-500 hover:text-red-600"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </Button>
                     </div>
                   )}
                 </div>
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-2">
-                    <h3 className="font-semibold text-gray-900 line-clamp-1">{product.title}</h3>
-                    <Badge variant="outline" className="text-xs flex-shrink-0">
+                    <h3 className="font-semibold text-gray-900 line-clamp-1 group-hover:text-[#25D366] transition-colors">{product.title}</h3>
+                    <Badge variant="secondary" className="text-xs flex-shrink-0 bg-gray-100 text-gray-600 font-normal border-0">
                       {product.category}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
+                  <p className="text-sm text-gray-500 line-clamp-2 mb-3">
                     {product.description}
                   </p>
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-bold text-[#25D366]">
-                      TZS {product.price.toLocaleString()}
-                    </p>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenDialog(product)}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <div>
+                      <p className="text-xs text-gray-400">Price</p>
+                      <p className="text-lg font-bold text-[#25D366]">
+                        TZS {product.price.toLocaleString()}
+                      </p>
                     </div>
+                    <Badge className={`${product.inStock ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'} border-0 font-normal`}>
+                      {product.inStock ? 'In Stock' : 'Out of Stock'}
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -1153,14 +1172,29 @@ export default function Store() {
           <TabsContent value="orders" className="space-y-4 mt-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Orders</h1>
-                <p className="text-muted-foreground mt-1">
+                <h1 className="text-2xl font-bold text-gray-900">Orders</h1>
+                <p className="text-sm text-gray-500 mt-1">
                   Track customer orders from your store
                 </p>
               </div>
-              <Badge variant="outline" className="text-lg px-4 py-2">
+              <Badge className="bg-green-50 text-green-700 border-0 font-medium px-4 py-2">
                 {orders.length} Total Orders
               </Badge>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { label: 'Total', value: orders.length, color: 'bg-gray-50 text-gray-700', border: 'border-gray-200' },
+                { label: 'Pending', value: orders.filter(o => o.status === 'pending').length, color: 'bg-yellow-50 text-yellow-700', border: 'border-yellow-200' },
+                { label: 'Completed', value: orders.filter(o => o.status === 'completed').length, color: 'bg-green-50 text-green-700', border: 'border-green-200' },
+                { label: 'Cancelled', value: orders.filter(o => o.status === 'cancelled').length, color: 'bg-red-50 text-red-700', border: 'border-red-200' },
+              ].map(stat => (
+                <div key={stat.label} className={`${stat.color} ${stat.border} rounded-xl border p-4 text-center`}>
+                  <p className="text-2xl font-bold">{stat.value}</p>
+                  <p className="text-xs font-medium mt-1">{stat.label}</p>
+                </div>
+              ))}
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
@@ -1195,33 +1229,46 @@ export default function Store() {
             </div>
 
             {orders.length === 0 ? (
-              <Card className="p-12 text-center">
-                <ShoppingCart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <Card className="p-12 text-center border-0 shadow-sm">
+                <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                  <ShoppingCart className="w-8 h-8 text-gray-400" />
+                </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No orders yet</h3>
-                <p className="text-muted-foreground">
+                <p className="text-sm text-gray-500">
                   Orders will appear here when customers checkout from your store
                 </p>
               </Card>
             ) : filteredOrders.length === 0 ? (
-              <Card className="p-12 text-center">
-                <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <Card className="p-12 text-center border-0 shadow-sm">
+                <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                  <Search className="w-8 h-8 text-gray-400" />
+                </div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No orders found</h3>
-                <p className="text-muted-foreground">
+                <p className="text-sm text-gray-500">
                   Try adjusting your search or filter criteria
                 </p>
               </Card>
             ) : (
               <div className="space-y-4">
                 {paginatedOrders.map((order) => (
-                  <Card key={order.id}>
+                  <Card key={order.id} className="border-0 shadow-sm hover:shadow-md transition-shadow duration-200">
                     <CardContent className="p-6">
                       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                         <div className="space-y-3 flex-1">
                           <div className="flex items-start justify-between">
                             <div>
-                              <h3 className="font-semibold text-lg">{order.customerName}</h3>
-                              <p className="text-sm text-muted-foreground">{order.customerPhone}</p>
-                              <p className="text-xs text-muted-foreground mt-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                                  <span className="text-sm font-semibold text-green-600">
+                                    {order.customerName.charAt(0).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <h3 className="font-semibold text-gray-900">{order.customerName}</h3>
+                                  <p className="text-sm text-gray-500">{order.customerPhone}</p>
+                                </div>
+                              </div>
+                              <p className="text-xs text-gray-400 mt-2">
                                 {new Date(order.createdAt).toLocaleString('en-US', {
                                   dateStyle: 'medium',
                                   timeStyle: 'short'
@@ -1235,8 +1282,9 @@ export default function Store() {
                                 'secondary'
                               }
                               className={
-                                order.status === 'completed' ? 'bg-green-600' :
-                                order.status === 'pending' ? 'bg-yellow-600' : ''
+                                order.status === 'completed' ? 'bg-green-100 text-green-700 border-0 font-normal' :
+                                order.status === 'pending' ? 'bg-yellow-100 text-yellow-700 border-0 font-normal' :
+                                'bg-red-100 text-red-700 border-0 font-normal'
                               }
                             >
                               {order.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
@@ -1246,66 +1294,68 @@ export default function Store() {
                             </Badge>
                           </div>
 
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium">Order Items:</p>
+                          <div className="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Order Items</p>
                             {order.items.map((item, idx) => (
-                              <p key={idx} className="text-sm text-muted-foreground">
-                                • {item.title} × {item.quantity} - TZS {(item.price * item.quantity).toLocaleString()}
-                              </p>
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <span className="text-gray-700">{item.title} × {item.quantity}</span>
+                                <span className="font-medium text-gray-900">TZS {(item.price * item.quantity).toLocaleString()}</span>
+                              </div>
                             ))}
                           </div>
 
-                          <div className="flex items-center gap-4 pt-2 border-t">
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                            <div className="flex items-center gap-4">
+                              <p className="text-sm text-gray-500">
+                                Items: <span className="font-semibold text-gray-900">{order.totalItems}</span>
+                              </p>
+                            </div>
                             <p className="text-sm">
-                              <span className="text-muted-foreground">Total Items:</span>{' '}
-                              <span className="font-semibold">{order.totalItems}</span>
-                            </p>
-                            <p className="text-sm">
-                              <span className="text-muted-foreground">Total Amount:</span>{' '}
-                              <span className="font-bold text-[#25D366]">TZS {order.totalAmount.toLocaleString()}</span>
+                              <span className="text-gray-500">Total: </span>
+                              <span className="text-lg font-bold text-[#25D366]">TZS {order.totalAmount.toLocaleString()}</span>
                             </p>
                           </div>
                         </div>
 
                         {order.status === 'pending' && (
-                          <div className="flex flex-col gap-2">
+                          <div className="flex flex-row md:flex-col gap-2">
                             <Button
                               size="sm"
                               onClick={() => updateOrderStatus(order.id, 'completed')}
-                              className="bg-green-600 hover:bg-green-700 text-white"
+                              className="bg-green-600 hover:bg-green-700 text-white flex-1 md:flex-none"
                             >
-                              <CheckCircle2 className="w-4 h-4 mr-1" />
+                              <CheckCircle2 className="w-4 h-4 mr-1.5" />
                               Complete
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
                               onClick={() => updateOrderStatus(order.id, 'cancelled')}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              className="border-red-200 text-red-600 hover:bg-red-50 flex-1 md:flex-none"
                             >
-                              <XCircle className="w-4 h-4 mr-1" />
+                              <XCircle className="w-4 h-4 mr-1.5" />
                               Cancel
                             </Button>
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => handleDeleteOrder(order.id)}
-                              className="text-gray-600 hover:text-red-700 hover:bg-red-50"
+                              className="text-gray-400 hover:text-red-600 hover:bg-red-50 flex-1 md:flex-none"
                             >
-                              <Trash2 className="w-4 h-4 mr-1" />
+                              <Trash2 className="w-4 h-4 mr-1.5" />
                               Delete
                             </Button>
                           </div>
                         )}
                         {order.status !== 'pending' && (
-                          <div className="flex flex-col gap-2">
+                          <div className="flex flex-row md:flex-col gap-2">
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => handleDeleteOrder(order.id)}
-                              className="text-gray-600 hover:text-red-700 hover:bg-red-50"
+                              className="text-gray-400 hover:text-red-600 hover:bg-red-50 flex-1 md:flex-none"
                             >
-                              <Trash2 className="w-4 h-4 mr-1" />
+                              <Trash2 className="w-4 h-4 mr-1.5" />
                               Delete
                             </Button>
                           </div>
@@ -1351,8 +1401,8 @@ export default function Store() {
           <TabsContent value="categories" className="space-y-4 mt-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Categories</h1>
-                <p className="text-muted-foreground mt-1">
+                <h1 className="text-2xl font-bold text-gray-900">Categories</h1>
+                <p className="text-sm text-gray-500 mt-1">
                   Manage product categories for your store
                 </p>
               </div>
@@ -1410,16 +1460,18 @@ export default function Store() {
             </div>
 
             {categories.length === 0 ? (
-              <Card className="p-12">
+              <Card className="p-12 border-0 shadow-sm">
                 <div className="text-center">
-                  <StoreIcon className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No categories yet</h3>
-                  <p className="text-muted-foreground mb-4">
+                  <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center mx-auto mb-4">
+                    <StoreIcon className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">No categories yet</h3>
+                  <p className="text-sm text-gray-500 mb-6">
                     Create categories to organize your products
                   </p>
                   <Button
                     onClick={() => handleOpenCategoryDialog()}
-                    className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                    className="bg-[#25D366] hover:bg-[#20BD5A] text-white shadow-lg shadow-green-200"
                   >
                     <Plus className="w-4 h-4 mr-2" />
                     Add Your First Category
@@ -1431,20 +1483,26 @@ export default function Store() {
                 {categories.map((category) => {
                   const productCount = products.filter(p => p.category === category.name).length;
                   return (
-                    <Card key={category.id}>
+                    <Card key={category.id} className="border-0 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5">
                       <CardHeader className="pb-3">
                         <div className="flex items-start justify-between">
                           <div>
-                            <CardTitle className="text-lg">{category.name}</CardTitle>
-                            <Badge variant="secondary" className="mt-2">
+                            <div className="flex items-center gap-2 mb-1">
+                              <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#25D366] to-[#1DA851] flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                                {category.name.charAt(0).toUpperCase()}
+                              </div>
+                              <CardTitle className="text-lg text-gray-900">{category.name}</CardTitle>
+                            </div>
+                            <Badge variant="secondary" className="mt-2 bg-gray-100 text-gray-600 border-0 font-normal">
                               {productCount} {productCount === 1 ? 'product' : 'products'}
                             </Badge>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex gap-1">
                             <Button
                               size="sm"
                               variant="ghost"
                               onClick={() => handleOpenCategoryDialog(category)}
+                              className="text-gray-400 hover:text-[#25D366]"
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
@@ -1452,16 +1510,20 @@ export default function Store() {
                               size="sm"
                               variant="ghost"
                               onClick={() => handleDeleteCategory(category.id)}
-                              className="text-red-600 hover:text-red-700"
+                              className="text-gray-400 hover:text-red-600"
                             >
                               <Trash2 className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
                       </CardHeader>
-                      {category.description && (
-                        <CardContent>
-                          <p className="text-sm text-muted-foreground">{category.description}</p>
+                      {category.description ? (
+                        <CardContent className="pt-0">
+                          <p className="text-sm text-gray-500">{category.description}</p>
+                        </CardContent>
+                      ) : (
+                        <CardContent className="pt-0">
+                          <p className="text-sm text-gray-400 italic">No description</p>
                         </CardContent>
                       )}
                     </Card>

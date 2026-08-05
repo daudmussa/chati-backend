@@ -11,6 +11,7 @@ export const API_ENDPOINTS = {
   STORE_SETTINGS: `${API_BASE_URL}/api/store/settings`,
   STORE_PAYMENT_REQUIRED: `${API_BASE_URL}/api/store/payment-required`,
   STORE_BY_NAME: (name: string) => `${API_BASE_URL}/api/store/by-name/${encodeURIComponent(name)}`,
+  STORES_LIST: (limit: number = 10) => `${API_BASE_URL}/api/stores?limit=${limit}`,
   PRODUCTS: `${API_BASE_URL}/api/products`,
   PRODUCTS_BY_STORE: (storeName: string) => `${API_BASE_URL}/api/products/by-store/${encodeURIComponent(storeName)}`,
   PRODUCT_BY_ID: (id: string) => `${API_BASE_URL}/api/products/${id}`,
