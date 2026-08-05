@@ -3266,7 +3266,7 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
     const { paymentType, customerPhone, customerEmail, customerName } = req.body;
 
     // Normalize payment type to Snippe format
-    const normalizedPaymentType = paymentType === 'card' ? 'card' : 'mobile_money';
+    const normalizedPaymentType = paymentType === 'card' ? 'card' : 'mobile';
 
     // Get payment item details
     const item = await getPaymentItemById(itemId, userId);
@@ -3405,7 +3405,7 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
       reference: snippeData.data?.reference || reference,
       paymentUrl: snippeData.data?.payment_url,
       ussdCode: snippeData.data?.ussd_code,
-      message: normalizedPaymentType === 'mobile_money' ? 'Check your phone for USSD prompt' : 'Redirect to payment page',
+      message: normalizedPaymentType === 'mobile' ? 'Check your phone for USSD prompt' : 'Redirect to payment page',
     });
   } catch (error) {
     console.error('[payment] Error creating item payment:', error);
@@ -3540,7 +3540,7 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
       snippeReference: snippeData.reference,
       amount: booking.price,
       currency: "TZS",
-      paymentType: paymentType || 'mobile_money',
+      paymentType: paymentType || 'mobile',
       planType: 'booking',
       status: snippeData.status || 'pending',
       customerPhone: customerPhone || booking.customerPhone,
@@ -3868,4 +3868,5 @@ server.on("error", (err) => {
   console.error("[startup] Server error:", err);
   process.exit(1);
 });
+
 
