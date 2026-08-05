@@ -115,7 +115,7 @@ export default function Dashboard() {
                   </Button>
                   <Button
                     variant="outline"
-                    onClick={() => navigate('/payment-settings')}
+                    onClick={() => navigate('/payments/settings')}
                   >
                     Configure Payment
                   </Button>

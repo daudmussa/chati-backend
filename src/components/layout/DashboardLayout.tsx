@@ -14,7 +14,9 @@ import {
   CalendarCheck,
   Shield,
   Users,
-  DollarSign
+  DollarSign,
+  ChevronDown,
+  History
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -28,15 +30,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  const isPaymentsActive = location.pathname.startsWith('/payments');
+  const [paymentsOpen, setPaymentsOpen] = useState(isPaymentsActive);
+
+  const paymentsChildren = [
+    { name: 'Payment History', href: '/payments', icon: History },
+    { name: 'Payment Items', href: '/payments/items', icon: CreditCard },
+    { name: 'Payment Settings', href: '/payments/settings', icon: Settings },
+  ];
+
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, featureId: null },
     { name: 'Conversations', href: '/conversations', icon: MessageSquare, featureId: 'conversations' },
     { name: 'Store', href: '/store', icon: ShoppingBag, featureId: 'store' },
     { name: 'Bookings', href: '/bookings', icon: CalendarCheck, featureId: 'bookings' },
     ...(user?.paymentsEnabled ? [
-      { name: 'Payments', href: '/payments', icon: DollarSign, featureId: null },
-      { name: 'Payment Items', href: '/payment-items', icon: DollarSign, featureId: null },
-      { name: 'Payment Settings', href: '/payment-settings', icon: CreditCard, featureId: null }
+      { name: 'Payments', href: '/payments', icon: DollarSign, featureId: null, children: paymentsChildren }
     ] : []),
     { name: 'AI Settings', href: '/settings', icon: Settings, featureId: 'settings' },
     { name: 'Billing', href: '/billing', icon: CreditCard, featureId: 'billing' },
@@ -48,9 +57,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
   // Filter navigation based on user's enabled features
   const filteredNavigation = navigation.filter(item => {
-    // Always show items without featureId (Dashboard, Admin)
     if (!item.featureId) return true;
-    // Check if user has this feature enabled
     return user?.enabledFeatures?.includes(item.featureId) ?? true;
   });
 
@@ -93,6 +100,53 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1">
             {filteredNavigation.map((item) => {
+              if (item.children) {
+                const isParentActive = location.pathname.startsWith(item.href);
+                return (
+                  <div key={item.name}>
+                    <button
+                      onClick={() => setPaymentsOpen(!paymentsOpen)}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                        isParentActive
+                          ? "bg-[#25D366] text-white"
+                          : "text-gray-700 hover:bg-gray-100"
+                      )}
+                    >
+                      <item.icon className="w-5 h-5" />
+                      <span className="flex-1 text-left">{item.name}</span>
+                      <ChevronDown className={cn(
+                        "w-4 h-4 transition-transform",
+                        paymentsOpen && "rotate-180"
+                      )} />
+                    </button>
+                    {paymentsOpen && (
+                      <div className="ml-4 mt-1 space-y-1">
+                        {item.children.map((child: any) => {
+                          const isChildActive = location.pathname === child.href;
+                          return (
+                            <Link
+                              key={child.name}
+                              to={child.href}
+                              onClick={() => setSidebarOpen(false)}
+                              className={cn(
+                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                                isChildActive
+                                  ? "bg-[#25D366] text-white"
+                                  : "text-gray-700 hover:bg-gray-100"
+                              )}
+                            >
+                              <child.icon className="w-4 h-4" />
+                              {child.name}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               const isActive = location.pathname === item.href;
               return (
                 <Link

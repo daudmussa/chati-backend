@@ -121,6 +121,7 @@ export default function Bookings() {
   const [isServiceDialogOpen, setIsServiceDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<BookingService | null>(null);
   const [bookingsEnabled, setBookingsEnabled] = useState(false);
+  const [paymentRequired, setPaymentRequired] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newDate, setNewDate] = useState('');
   const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
@@ -249,6 +250,7 @@ export default function Bookings() {
       if (response.ok) {
         const data = await response.json();
         setBookingsEnabled(data.enabled);
+        setPaymentRequired(data.paymentRequired || false);
       }
     } catch (error) {
       console.error('Failed to fetch bookings status:', error);
@@ -264,7 +266,7 @@ export default function Bookings() {
           'Content-Type': 'application/json',
           'x-user-id': user.id,
         },
-        body: JSON.stringify({ enabled }),
+        body: JSON.stringify({ enabled, paymentRequired }),
       });
 
       if (response.ok) {
@@ -276,6 +278,30 @@ export default function Bookings() {
       }
     } catch (error) {
       toast({ title: "Error", description: "Failed to toggle bookings", variant: "destructive" });
+    }
+  };
+
+  const togglePaymentRequired = async (required: boolean) => {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(API_ENDPOINTS.BOOKINGS_PAYMENT_REQUIRED, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({ paymentRequired: required }),
+      });
+
+      if (response.ok) {
+        setPaymentRequired(required);
+        toast({
+          title: required ? "Payment Required Enabled" : "Payment Required Disabled",
+          description: required ? "Customers must pay to confirm bookings" : "Bookings no longer require payment",
+        });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to toggle payment required", variant: "destructive" });
     }
   };
 
@@ -552,21 +578,39 @@ export default function Bookings() {
               Manage customer bookings from WhatsApp
             </p>
           </div>
-          <Card className="p-4">
-            <div className="flex items-center gap-3">
-              <Power className={`w-5 h-5 ${bookingsEnabled ? 'text-green-600' : 'text-gray-400'}`} />
-              <div className="flex flex-col">
-                <span className="text-sm font-medium">Bookings System</span>
-                <span className="text-xs text-muted-foreground">
-                  {bookingsEnabled ? 'Active' : 'Disabled'}
-                </span>
+          <div className="flex gap-3">
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <Power className={`w-5 h-5 ${bookingsEnabled ? 'text-green-600' : 'text-gray-400'}`} />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Bookings System</span>
+                  <span className="text-xs text-muted-foreground">
+                    {bookingsEnabled ? 'Active' : 'Disabled'}
+                  </span>
+                </div>
+                <Switch
+                  checked={bookingsEnabled}
+                  onCheckedChange={toggleBookings}
+                />
               </div>
-              <Switch
-                checked={bookingsEnabled}
-                onCheckedChange={toggleBookings}
-              />
-            </div>
-          </Card>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <CreditCard className={`w-5 h-5 ${paymentRequired && bookingsEnabled ? 'text-green-600' : 'text-gray-400'}`} />
+                <div className="flex flex-col">
+                  <span className="text-sm font-medium">Payment Required</span>
+                  <span className="text-xs text-muted-foreground">
+                    {paymentRequired && bookingsEnabled ? 'Enabled' : 'Disabled'}
+                  </span>
+                </div>
+                <Switch
+                  checked={paymentRequired}
+                  onCheckedChange={togglePaymentRequired}
+                  disabled={!bookingsEnabled}
+                />
+              </div>
+            </Card>
+          </div>
         </div>
 
         {/* Stats */}

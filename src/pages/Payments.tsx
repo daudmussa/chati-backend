@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { API_ENDPOINTS } from '@/config/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Wallet, Search, Filter, CreditCard, Smartphone, QrCode, Loader2, AlertCircle, Download, DollarSign, CheckCircle2, XCircle, Clock, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 

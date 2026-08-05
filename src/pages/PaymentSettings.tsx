@@ -52,7 +52,7 @@ export default function PaymentSettings() {
 
   const handleSave = async () => {
     if (!settings.snippeApiKey) {
-      toast({ title: 'API Key Required', description: 'Please enter your Snippe API key.', variant: 'destructive' });
+      toast({ title: 'API Key Required', description: 'Please enter your API key.', variant: 'destructive' });
       return;
     }
 
@@ -96,14 +96,14 @@ export default function PaymentSettings() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Payment Settings</h1>
           <p className="text-muted-foreground mt-1">
-            Configure your Snippe payment gateway integration
+            Configure your payment gateway integration
           </p>
         </div>
 
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            Get your API credentials from your <a href="https://snippe.sh/dashboard" target="_blank" rel="noopener noreferrer" className="font-medium text-[#25D366] hover:underline">Snippe Dashboard</a>. You need a Snippe merchant account to accept payments.
+            Get your API credentials from your payment gateway dashboard.
           </AlertDescription>
         </Alert>
 
@@ -111,10 +111,10 @@ export default function PaymentSettings() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Key className="w-5 h-5" />
-              Snippe API Configuration
+              API Configuration
             </CardTitle>
             <CardDescription>
-              Enter your Snippe API credentials to enable payment processing
+              Enter your API credentials to enable payment processing
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -138,7 +138,7 @@ export default function PaymentSettings() {
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Your Snippe API key (starts with sn_live_ or sn_test_)
+                Your API key (starts with sn_live_ or sn_test_)
               </p>
             </div>
 
@@ -168,9 +168,9 @@ export default function PaymentSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label>Enable Snippe Payments</Label>
+                <Label>Enable Payments</Label>
                 <p className="text-sm text-muted-foreground">
-                  Allow customers to pay via Snippe (M-Pesa, Airtel Money, Tigo Pesa, Cards)
+                  Allow customers to pay via mobile money and cards
                 </p>
               </div>
               <Switch
@@ -199,14 +199,14 @@ export default function PaymentSettings() {
           </CardContent>
         </Card>
 
-        <Card>
+        {/* <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Webhook className="w-5 h-5" />
               Webhook Configuration
             </CardTitle>
             <CardDescription>
-              Register this webhook URL in your Snippe Dashboard
+              Register this webhook URL in your payment gateway dashboard
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -214,16 +214,16 @@ export default function PaymentSettings() {
               {window.location.origin}/api/payment/webhook
             </div>
             <p className="text-xs text-muted-foreground mt-2">
-              Snippe will send payment status updates to this URL. Make sure your server is publicly accessible.
+              Payment status updates will be sent to this URL. Make sure your server is publicly accessible.
             </p>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {settings.snippeEnabled && (
           <Alert className="border-green-500 bg-green-50">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertDescription className="text-green-800">
-              Snippe payments are enabled. Customers can now pay via mobile money and cards.
+              Payments are enabled. Customers can now pay via mobile money and cards.
             </AlertDescription>
           </Alert>
         )}

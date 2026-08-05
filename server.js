@@ -9,7 +9,7 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
 import crypto from "crypto";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -374,11 +374,13 @@ app.post("/webhook", async (req, res) => {
       let userBookings = [];
       let userPaymentItems = [];
       let userPaymentsEnabled = false;
+      let bookingPaymentRequired = false;
       
       if (userCreds?.userId) {
         try {
           const bookingSettings = await getBookingSettings(userCreds.userId);
           userBookingsEnabled = bookingSettings.enabled || false;
+          bookingPaymentRequired = bookingSettings.paymentRequired || false;
           userServices = await listServices(userCreds.userId);
           userBookings = await listBookings(userCreds.userId);
           
@@ -388,8 +390,10 @@ app.post("/webhook", async (req, res) => {
           const paymentSettings = await pgGetPaymentSettings(userCreds.userId);
           userPaymentsEnabled = (user?.paymentsEnabled || false) && (paymentSettings?.snippeEnabled || false);
           
-          console.log('[webhook] Payment check:', {
+          console.log('[webhook] Booking settings:', {
             userId: userCreds.userId,
+            userBookingsEnabled,
+            bookingPaymentRequired,
             userPaymentsEnabled: user?.paymentsEnabled,
             snippeEnabled: paymentSettings?.snippeEnabled,
             combined: userPaymentsEnabled,
@@ -1076,28 +1080,123 @@ app.post("/webhook", async (req, res) => {
                 
                 const lang = userState.language || 'en';
                 
-                if (lang === 'sw') {
-                  messageToSend = `✅ *Uhakikisho wa Nafasi!*\n\n` +
-                    `👤 Jina: ${customerName}\n` +
-                    `🆔 Nambari ya Uhakikisho: ${booking.id}\n` +
-                    `📋 Huduma: ${booking.serviceName}\n` +
-                    `📅 Tarehe: ${dateFormatted}\n` +
-                    `⏰ Saa: ${booking.timeSlot}\n` +
-                    `💰 Bei: TZS ${booking.price.toLocaleString()}\n` +
-                    `⏱️ Muda: Dakika ${userState.duration}\n\n` +
-                    `Tunatarajia kukuona! Utapokea ujumbe wa uthibitisho hivi karibuni.\n\n` +
-                    `Kubadilisha nafasi yako, tuma "badilisha nafasi" au "ahirisha".`;
+                // Check if payment is required for bookings
+                if (bookingPaymentRequired && userPaymentsEnabled) {
+                  // Create payment for the booking
+                  try {
+                    const paymentRes = await fetch(`${process.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/booking/${booking.id}`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': userCreds.userId,
+                      },
+                      body: JSON.stringify({
+                        paymentType: 'mobile',
+                        customerPhone: from.replace('whatsapp:', ''),
+                        customerName: customerName,
+                      }),
+                    });
+                    
+                    const paymentData = await paymentRes.json();
+                    
+                    if (paymentRes.ok && paymentData.success) {
+                      if (lang === 'sw') {
+                        messageToSend = `✅ *Nafasi Imehifadhiwa! Malipo Yanahitajika.*\n\n` +
+                          `👤 Jina: ${customerName}\n` +
+                          `🆔 Nambari ya Uhakikisho: ${booking.id}\n` +
+                          `📋 Huduma: ${booking.serviceName}\n` +
+                          `📅 Tarehe: ${dateFormatted}\n` +
+                          `⏰ Saa: ${booking.timeSlot}\n` +
+                          `💰 Bei: TZS ${booking.price.toLocaleString()}\n\n` +
+                          `🔖 Marejeo ya Malipo: ${paymentData.reference}\n\n` +
+                          `${paymentData.message}\n\n` +
+                          `Tafadhali malipa ili kuthibitisha nafasi yako. Utapokea ujumbe wa USSD kwenye simu yako au bofya link:\n${paymentData.paymentUrl || 'N/A'}\n\n` +
+                          `Nafasi yako itathibitishwa baada ya malipo kukamilika.`;
+                      } else {
+                        messageToSend = `✅ *Booking Saved! Payment Required.*\n\n` +
+                          `👤 Name: ${customerName}\n` +
+                          `🆔 Booking ID: ${booking.id}\n` +
+                          `📋 Service: ${booking.serviceName}\n` +
+                          `📅 Date: ${dateFormatted}\n` +
+                          `⏰ Time: ${booking.timeSlot}\n` +
+                          `💰 Price: TZS ${booking.price.toLocaleString()}\n\n` +
+                          `🔖 Payment Reference: ${paymentData.reference}\n\n` +
+                          `${paymentData.message}\n\n` +
+                          `Please pay to confirm your booking. You will receive a USSD prompt on your phone or click:\n${paymentData.paymentUrl || 'N/A'}\n\n` +
+                          `Your booking will be confirmed after payment is completed.`;
+                      }
+                    } else {
+                      if (lang === 'sw') {
+                        messageToSend = `✅ *Nafasi Imehifadhiwa!*  \n\n` +
+                          `👤 Jina: ${customerName}\n` +
+                          `🆔 Nambari ya Uhakikisho: ${booking.id}\n` +
+                          `📋 Huduma: ${booking.serviceName}\n` +
+                          `📅 Tarehe: ${dateFormatted}\n` +
+                          `⏰ Saa: ${booking.timeSlot}\n` +
+                          `💰 Bei: TZS ${booking.price.toLocaleString()}\n\n` +
+                          `Tafadhali wasiliana nasi kwa maelekezo ya malipo.\n\n` +
+                          `Kubadilisha nafasi yako, tuma "badilisha nafasi" au "ahirisha".`;
+                      } else {
+                        messageToSend = `✅ *Booking Saved!*\n\n` +
+                          `👤 Name: ${customerName}\n` +
+                          `🆔 Booking ID: ${booking.id}\n` +
+                          `📋 Service: ${booking.serviceName}\n` +
+                          `📅 Date: ${dateFormatted}\n` +
+                          `⏰ Time: ${booking.timeSlot}\n` +
+                          `💰 Price: TZS ${booking.price.toLocaleString()}\n\n` +
+                          `Please contact us for payment instructions.\n\n` +
+                          `To change your booking, reply with "change booking" or "reschedule".`;
+                      }
+                    }
+                  } catch (error) {
+                    console.error('[webhook] Error creating booking payment:', error);
+                    if (lang === 'sw') {
+                      messageToSend = `✅ *Nafasi Imehifadhiwa!*  \n\n` +
+                        `👤 Jina: ${customerName}\n` +
+                        `🆔 Nambari ya Uhakikisho: ${booking.id}\n` +
+                        `📋 Huduma: ${booking.serviceName}\n` +
+                        `📅 Tarehe: ${dateFormatted}\n` +
+                        `⏰ Saa: ${booking.timeSlot}\n` +
+                        `💰 Bei: TZS ${booking.price.toLocaleString()}\n\n` +
+                        `Tafadhali wasiliana nasi kwa maelekezo ya malipo.\n\n` +
+                        `Kubadilisha nafasi yako, tuma "badilisha nafasi" au "ahirisha".`;
+                    } else {
+                      messageToSend = `✅ *Booking Saved!*\n\n` +
+                        `👤 Name: ${customerName}\n` +
+                        `🆔 Booking ID: ${booking.id}\n` +
+                        `📋 Service: ${booking.serviceName}\n` +
+                        `📅 Date: ${dateFormatted}\n` +
+                        `⏰ Time: ${booking.timeSlot}\n` +
+                        `💰 Price: TZS ${booking.price.toLocaleString()}\n\n` +
+                        `Please contact us for payment instructions.\n\n` +
+                        `To change your booking, reply with "change booking" or "reschedule".`;
+                    }
+                  }
                 } else {
-                  messageToSend = `✅ *Booking Confirmed!*\n\n` +
-                    `👤 Name: ${customerName}\n` +
-                    `🆔 Booking ID: ${booking.id}\n` +
-                    `📋 Service: ${booking.serviceName}\n` +
-                    `📅 Date: ${dateFormatted}\n` +
-                    `⏰ Time: ${booking.timeSlot}\n` +
-                    `💰 Price: TZS ${booking.price.toLocaleString()}\n` +
-                    `⏱️ Duration: ${userState.duration} minutes\n\n` +
-                    `We look forward to seeing you! You will receive a confirmation shortly.\n\n` +
-                    `To change your booking, reply with "change booking" or "reschedule".`;
+                  // No payment required - confirm booking as before
+                  if (lang === 'sw') {
+                    messageToSend = `✅ *Uhakikisho wa Nafasi!*\n\n` +
+                      `👤 Jina: ${customerName}\n` +
+                      `🆔 Nambari ya Uhakikisho: ${booking.id}\n` +
+                      `📋 Huduma: ${booking.serviceName}\n` +
+                      `📅 Tarehe: ${dateFormatted}\n` +
+                      `⏰ Saa: ${booking.timeSlot}\n` +
+                      `💰 Bei: TZS ${booking.price.toLocaleString()}\n` +
+                      `⏱️ Muda: Dakika ${userState.duration}\n\n` +
+                      `Tunatarajia kukuona! Utapokea ujumbe wa uthibitisho hivi karibuni.\n\n` +
+                      `Kubadilisha nafasi yako, tuma "badilisha nafasi" au "ahirisha".`;
+                  } else {
+                    messageToSend = `✅ *Booking Confirmed!*\n\n` +
+                      `👤 Name: ${customerName}\n` +
+                      `🆔 Booking ID: ${booking.id}\n` +
+                      `📋 Service: ${booking.serviceName}\n` +
+                      `📅 Date: ${dateFormatted}\n` +
+                      `⏰ Time: ${booking.timeSlot}\n` +
+                      `💰 Price: TZS ${booking.price.toLocaleString()}\n` +
+                      `⏱️ Duration: ${userState.duration} minutes\n\n` +
+                      `We look forward to seeing you! You will receive a confirmation shortly.\n\n` +
+                      `To change your booking, reply with "change booking" or "reschedule".`;
+                  }
                 }
                 
                 delete conversation.bookingState;
@@ -1483,13 +1582,33 @@ app.post("/api/bookings/toggle", async (req, res) => {
     return res.status(401).json({ error: 'User ID required' });
   }
   try {
-    const { enabled } = req.body;
-    await setBookingStatus(userId, enabled);
+    const { enabled, paymentRequired } = req.body;
+    if (paymentRequired !== undefined) {
+      await setBookingStatus(userId, enabled, paymentRequired);
+    } else {
+      await setBookingStatus(userId, enabled);
+    }
     console.log(`[bookings] Bookings ${enabled ? 'enabled' : 'disabled'} for user ${userId}`);
-    res.json({ enabled });
+    res.json({ enabled, paymentRequired });
   } catch (error) {
     console.error('[bookings] Error toggling:', error);
     res.status(500).json({ error: 'Failed to toggle bookings' });
+  }
+});
+
+app.post("/api/bookings/payment-required", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const { paymentRequired } = req.body;
+    await setBookingPaymentRequired(userId, paymentRequired);
+    console.log(`[bookings] Payment required set to ${paymentRequired} for user ${userId}`);
+    res.json({ paymentRequired });
+  } catch (error) {
+    console.error('[bookings] Error setting payment required:', error);
+    res.status(500).json({ error: 'Failed to set payment required' });
   }
 });
 

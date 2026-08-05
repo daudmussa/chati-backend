@@ -35,6 +35,7 @@ export const API_ENDPOINTS = {
   BOOKINGS: `${API_BASE_URL}/api/bookings`,
   BOOKINGS_STATUS: `${API_BASE_URL}/api/bookings/status`,
   BOOKINGS_TOGGLE: `${API_BASE_URL}/api/bookings/toggle`,
+  BOOKINGS_PAYMENT_REQUIRED: `${API_BASE_URL}/api/bookings/payment-required`,
   SERVICES: `${API_BASE_URL}/api/services`,
   SERVICE_BY_ID: (id: string) => `${API_BASE_URL}/api/services/${id}`,
   BOOKING_STATUS: (id: string) => `${API_BASE_URL}/api/bookings/${id}/status`,

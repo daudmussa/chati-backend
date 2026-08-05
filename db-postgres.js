@@ -270,8 +270,15 @@ export async function initSchema() {
     CREATE TABLE IF NOT EXISTS booking_settings (
       user_id TEXT PRIMARY KEY,
       enabled BOOLEAN DEFAULT FALSE,
+      payment_required BOOLEAN DEFAULT FALSE,
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+  `);
+  
+  // Migration: Add payment_required column if it doesn't exist
+  await p.query(`
+    ALTER TABLE booking_settings 
+    ADD COLUMN IF NOT EXISTS payment_required BOOLEAN DEFAULT FALSE;
   `);
   
   // Staff table
@@ -918,19 +925,38 @@ export async function deleteOrder(userId, orderId) {
 
 export async function getBookingSettings(userId) {
   const p = ensurePool();
-  if (!p) return { enabled: false };
+  if (!p) return { enabled: false, paymentRequired: false };
   const { rows } = await p.query('SELECT * FROM booking_settings WHERE user_id=$1', [userId]);
-  return rows[0] ? { enabled: rows[0].enabled } : { enabled: false };
+  return rows[0] ? { enabled: rows[0].enabled, paymentRequired: rows[0].payment_required || false } : { enabled: false, paymentRequired: false };
 }
 
-export async function setBookingStatus(userId, enabled) {
+export async function setBookingStatus(userId, enabled, paymentRequired = null) {
+  const p = ensurePool();
+  if (!p) return false;
+  if (paymentRequired !== null) {
+    await p.query(`
+      INSERT INTO booking_settings (user_id, enabled, payment_required, updated_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET enabled = EXCLUDED.enabled, payment_required = EXCLUDED.payment_required, updated_at = NOW();
+    `, [userId, enabled, paymentRequired]);
+  } else {
+    await p.query(`
+      INSERT INTO booking_settings (user_id, enabled, updated_at)
+      VALUES ($1, $2, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = NOW();
+    `, [userId, enabled]);
+  }
+  return true;
+}
+
+export async function setBookingPaymentRequired(userId, paymentRequired) {
   const p = ensurePool();
   if (!p) return false;
   await p.query(`
-    INSERT INTO booking_settings (user_id, enabled, updated_at)
+    INSERT INTO booking_settings (user_id, payment_required, updated_at)
     VALUES ($1, $2, NOW())
-    ON CONFLICT (user_id) DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = NOW();
-  `, [userId, enabled]);
+    ON CONFLICT (user_id) DO UPDATE SET payment_required = EXCLUDED.payment_required, updated_at = NOW();
+  `, [userId, paymentRequired]);
   return true;
 }
 
