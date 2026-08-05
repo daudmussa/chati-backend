@@ -1254,7 +1254,7 @@ app.post("/webhook", async (req, res) => {
                     'x-user-id': userCreds.userId,
                   },
                   body: JSON.stringify({
-                    paymentType: 'mobile_money',
+                    paymentType: 'mobile',
                     customerPhone,
                     customerEmail: customerEmail || null,
                     customerName,
@@ -3334,12 +3334,10 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
       });
     }
 
-    // Validate email (optional, but if provided must be valid)
-    if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
-      return res.status(400).json({ 
-        error: 'Invalid email format'
-      });
-    }
+    // Validate email (required by Snippe)
+    const validEmail = customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail) 
+      ? customerEmail 
+      : 'customer@example.com';
 
     const snippePayload = {
       payment_type: normalizedPaymentType,
@@ -3351,7 +3349,7 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
       customer: {
         firstname: firstName,
         lastname: lastName,
-        email: customerEmail,
+        email: validEmail,
         address: 'Tanzania',
         city: 'Dar es Salaam',
         state: 'DSM',
@@ -3364,7 +3362,9 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
         itemName: item.name,
         type: 'payment_item',
       },
-      webhook_url: `${process.env.SERVER_URL || 'http://localhost:3000'}/api/payment/webhook`,
+      webhook_url: process.env.SERVER_URL?.startsWith('https') 
+        ? `${process.env.SERVER_URL}/api/payment/webhook`
+        : 'https://chatisolutions.com/api/payment/webhook',
     };
 
     const snippeRes = await fetch('https://api.snippe.sh/v1/payments', {
@@ -3449,7 +3449,7 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
     }
 
     // Normalize payment type to Snippe format
-    const normalizedPaymentType = (paymentType || 'mobile_money') === 'card' ? 'card' : 'mobile_money';
+    const normalizedPaymentType = (paymentType || 'mobile') === 'card' ? 'card' : 'mobile';
 
     // Format and validate phone number for Tanzania
     let formattedPhone = (customerPhone || booking.customerPhone).replace('+', '').trim();
@@ -3466,13 +3466,10 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
       });
     }
 
-    // Validate email (optional, but if provided must be valid)
-    const email = customerEmail || booking.customerEmail;
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ 
-        error: 'Invalid email format'
-      });
-    }
+    // Validate email (required by Snippe)
+    const email = (customerEmail || booking.customerEmail) && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail || booking.customerEmail)
+      ? (customerEmail || booking.customerEmail)
+      : 'customer@example.com';
 
     // Create payment via Snippe API
     const snippeResponse = await fetch("https://api.snippe.sh/v1/payments", {
@@ -3499,7 +3496,9 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
           booking_id: bookingId,
           service_name: booking.serviceName,
         },
-        webhook_url: `${process.env.SERVER_URL || "http://localhost:3000"}/api/payment/webhook`,
+        webhook_url: process.env.SERVER_URL?.startsWith('https') 
+          ? `${process.env.SERVER_URL}/api/payment/webhook`
+          : 'https://chatisolutions.com/api/payment/webhook',
       }),
     });
 
@@ -3583,7 +3582,7 @@ app.post("/api/payment/create", async (req, res) => {
     }
 
     // Normalize payment type to Snippe format
-    const normalizedPaymentType = paymentType === 'card' ? 'card' : 'mobile_money';
+    const normalizedPaymentType = paymentType === 'card' ? 'card' : 'mobile';
 
     // Get user's Snippe API key
     const settings = await pgGetPaymentSettings(userId);
@@ -3608,12 +3607,10 @@ app.post("/api/payment/create", async (req, res) => {
       });
     }
 
-    // Validate email (optional, but if provided must be valid)
-    if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
-      return res.status(400).json({ 
-        error: 'Invalid email format'
-      });
-    }
+    // Validate email (required by Snippe, use placeholder if not provided)
+    const validCustomerEmail = customerEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)
+      ? customerEmail
+      : 'customer@example.com';
 
     // Create payment via Snippe API
     const snippeResponse = await fetch("https://api.snippe.sh/v1/payments", {
@@ -3633,13 +3630,15 @@ app.post("/api/payment/create", async (req, res) => {
         customer: {
           firstname: customerName?.split(' ')[0] || 'Customer',
           lastname: customerName?.split(' ').slice(1).join(' ') || 'Unknown',
-          email: customerEmail,
+          email: validCustomerEmail,
         },
         metadata: {
           user_id: userId,
           plan_type: planType,
         },
-        webhook_url: `${process.env.SERVER_URL || "http://localhost:3000"}/api/payment/webhook`,
+        webhook_url: process.env.SERVER_URL?.startsWith('https') 
+          ? `${process.env.SERVER_URL}/api/payment/webhook`
+          : 'https://chatisolutions.com/api/payment/webhook',
       }),
     });
 
