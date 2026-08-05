@@ -120,6 +120,7 @@ export default function Store() {
     storeId: '',
     storeName: '',
     storePhone: '',
+    paymentRequired: false,
   });
   const [editingStoreName, setEditingStoreName] = useState(false);
   const [tempStoreName, setTempStoreName] = useState('');
@@ -275,6 +276,30 @@ export default function Store() {
   const handleCancelEdit = () => {
     setTempStoreName(storeSettings.storeName);
     setEditingStoreName(false);
+  };
+
+  const togglePaymentRequired = async (required: boolean) => {
+    if (!user?.id) return;
+    try {
+      const response = await fetch(API_ENDPOINTS.STORE_PAYMENT_REQUIRED, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-user-id': user.id,
+        },
+        body: JSON.stringify({ paymentRequired: required }),
+      });
+
+      if (response.ok) {
+        setStoreSettings(prev => ({ ...prev, paymentRequired: required }));
+        toast({
+          title: required ? "Payment Required Enabled" : "Payment Required Disabled",
+          description: required ? "Customers must pay online to complete orders" : "Orders no longer require online payment",
+        });
+      }
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to toggle payment required", variant: "destructive" });
+    }
   };
 
   const handleSaveStorePhone = async () => {
@@ -826,6 +851,29 @@ export default function Store() {
                 <p className="text-xs text-blue-700">
                   This number will receive customer orders from the cart. Include country code (e.g., +255 for Tanzania)
                 </p>
+              </div>
+
+              {/* Payment Required Toggle */}
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-center justify-between p-3 bg-white rounded-lg border">
+                  <div className="flex items-center gap-3">
+                    <ShoppingCart className="w-5 h-5 text-blue-600" />
+                    <div>
+                      <Label className="text-blue-900 font-medium">Online Payment Required</Label>
+                      <p className="text-xs text-blue-700">
+                        {storeSettings.paymentRequired 
+                          ? 'Customers must pay online to complete orders' 
+                          : 'Orders can be placed without online payment'}
+                      </p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={storeSettings.paymentRequired}
+                    onChange={(e) => togglePaymentRequired(e.target.checked)}
+                    className="w-5 h-5 accent-[#25D366]"
+                  />
+                </div>
               </div>
             </div>
           </CardContent>

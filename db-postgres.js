@@ -176,9 +176,16 @@ export async function initSchema() {
       store_id TEXT UNIQUE NOT NULL,
       store_name TEXT NOT NULL,
       store_phone TEXT,
+      payment_required BOOLEAN DEFAULT FALSE,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+  `);
+  
+  // Migration: Add payment_required column if it doesn't exist
+  await p.query(`
+    ALTER TABLE store_settings 
+    ADD COLUMN IF NOT EXISTS payment_required BOOLEAN DEFAULT FALSE;
   `);
   
   // Products table
@@ -208,9 +215,26 @@ export async function initSchema() {
       total_amount NUMERIC(10,2) NOT NULL,
       total_items INT NOT NULL,
       status TEXT DEFAULT 'pending',
+      payment_status TEXT DEFAULT 'unpaid',
+      payment_reference TEXT,
+      payment_url TEXT,
       created_at TIMESTAMPTZ DEFAULT NOW(),
       updated_at TIMESTAMPTZ DEFAULT NOW()
     );
+  `);
+  
+  // Migration: Add payment columns to orders if they don't exist
+  await p.query(`
+    ALTER TABLE orders 
+    ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'unpaid';
+  `);
+  await p.query(`
+    ALTER TABLE orders 
+    ADD COLUMN IF NOT EXISTS payment_reference TEXT;
+  `);
+  await p.query(`
+    ALTER TABLE orders 
+    ADD COLUMN IF NOT EXISTS payment_url TEXT;
   `);
   
   // Booking services table
@@ -745,17 +769,18 @@ export async function getStoreSettings(userId) {
       storeId: rows[0].store_id,
       storeName: rows[0].store_name,
       storePhone: rows[0].store_phone || '',
+      paymentRequired: rows[0].payment_required || false,
     };
   }
   
   // Create initial store settings with generated ID if doesn't exist
   const storeId = crypto.randomBytes(8).toString('hex');
   await p.query(`
-    INSERT INTO store_settings (user_id, store_id, store_name, store_phone, created_at, updated_at)
-    VALUES ($1, $2, '', '', NOW(), NOW())
+    INSERT INTO store_settings (user_id, store_id, store_name, store_phone, payment_required, created_at, updated_at)
+    VALUES ($1, $2, '', '', FALSE, NOW(), NOW())
   `, [userId, storeId]);
   
-  return { storeId, storeName: '', storePhone: '' };
+  return { storeId, storeName: '', storePhone: '', paymentRequired: false };
 }
 
 export async function saveStoreSettings(userId, settings) {
@@ -775,15 +800,30 @@ export async function saveStoreSettings(userId, settings) {
   const storeId = settings.storeId || crypto.randomBytes(8).toString('hex');
   
   await p.query(`
-    INSERT INTO store_settings (user_id, store_id, store_name, store_phone, updated_at)
-    VALUES ($1, $2, $3, $4, NOW())
+    INSERT INTO store_settings (user_id, store_id, store_name, store_phone, payment_required, updated_at)
+    VALUES ($1, $2, $3, $4, $5, NOW())
     ON CONFLICT (user_id) DO UPDATE SET
       store_name = EXCLUDED.store_name,
       store_phone = EXCLUDED.store_phone,
+      payment_required = EXCLUDED.payment_required,
       updated_at = NOW();
-  `, [userId, storeId, settings.storeName, settings.storePhone || '']);
+  `, [userId, storeId, settings.storeName, settings.storePhone || '', settings.paymentRequired || false]);
   
-  return { storeId, storeName: settings.storeName, storePhone: settings.storePhone || '' };
+  return { 
+    storeId, 
+    storeName: settings.storeName, 
+    storePhone: settings.storePhone || '',
+    paymentRequired: settings.paymentRequired || false,
+  };
+}
+
+export async function updateStorePaymentRequired(userId, paymentRequired) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query(`
+    UPDATE store_settings SET payment_required = $1, updated_at = NOW() WHERE user_id = $2
+  `, [paymentRequired, userId]);
+  return true;
 }
 
 export async function getStoreByName(storeName) {
@@ -875,6 +915,9 @@ export async function listOrders(userId) {
     totalAmount: parseFloat(r.total_amount),
     totalItems: r.total_items,
     status: r.status,
+    paymentStatus: r.payment_status || 'unpaid',
+    paymentReference: r.payment_reference,
+    paymentUrl: r.payment_url,
     createdAt: r.created_at,
   }));
 }
@@ -886,8 +929,8 @@ export async function createOrder(userId, order) {
   const id = crypto.randomBytes(12).toString('hex');
   
   await p.query(`
-    INSERT INTO orders (id, user_id, customer_name, customer_phone, items, total_amount, total_items, status, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+    INSERT INTO orders (id, user_id, customer_name, customer_phone, items, total_amount, total_items, status, payment_status, payment_reference, payment_url, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
   `, [
     id,
     userId,
@@ -896,7 +939,10 @@ export async function createOrder(userId, order) {
     JSON.stringify(order.items),
     order.totalAmount,
     order.totalItems,
-    order.status || 'pending'
+    order.status || 'pending',
+    order.paymentStatus || 'unpaid',
+    order.paymentReference || null,
+    order.paymentUrl || null,
   ]);
   
   return { ...order, id, createdAt: new Date().toISOString() };
@@ -910,6 +956,40 @@ export async function updateOrderStatus(userId, orderId, status) {
     [status, orderId, userId]
   );
   return true;
+}
+
+export async function updateOrderPaymentStatus(userId, orderId, paymentStatus, paymentReference = null, paymentUrl = null) {
+  const p = ensurePool();
+  if (!p) return false;
+  await p.query(
+    'UPDATE orders SET payment_status=$1, payment_reference=$2, payment_url=$3, updated_at=NOW() WHERE id=$4 AND user_id=$5',
+    [paymentStatus, paymentReference, paymentUrl, orderId, userId]
+  );
+  return true;
+}
+
+export async function getOrderById(orderId, userId) {
+  const p = ensurePool();
+  if (!p) return null;
+  const { rows } = await p.query(
+    'SELECT * FROM orders WHERE id=$1 AND user_id=$2',
+    [orderId, userId]
+  );
+  const r = rows[0];
+  if (!r) return null;
+  return {
+    id: r.id,
+    customerName: r.customer_name,
+    customerPhone: r.customer_phone,
+    items: r.items,
+    totalAmount: parseFloat(r.total_amount),
+    totalItems: r.total_items,
+    status: r.status,
+    paymentStatus: r.payment_status || 'unpaid',
+    paymentReference: r.payment_reference,
+    paymentUrl: r.payment_url,
+    createdAt: r.created_at,
+  };
 }
 
 export async function deleteOrder(userId, orderId) {

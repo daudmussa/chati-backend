@@ -9,6 +9,7 @@ export const API_ENDPOINTS = {
   
   // Store
   STORE_SETTINGS: `${API_BASE_URL}/api/store/settings`,
+  STORE_PAYMENT_REQUIRED: `${API_BASE_URL}/api/store/payment-required`,
   STORE_BY_NAME: (name: string) => `${API_BASE_URL}/api/store/by-name/${encodeURIComponent(name)}`,
   PRODUCTS: `${API_BASE_URL}/api/products`,
   PRODUCTS_BY_STORE: (storeName: string) => `${API_BASE_URL}/api/products/by-store/${encodeURIComponent(storeName)}`,
@@ -70,6 +71,7 @@ export const API_ENDPOINTS = {
   PAYMENT_ITEMS_BY_STORE: (storeName: string) => `${API_BASE_URL}/api/payment/items/by-store/${encodeURIComponent(storeName)}`,
   PAYMENT_ITEM_BY_ID: (itemId: string) => `${API_BASE_URL}/api/payment/items/${itemId}`,
   PAYMENT_ITEM_PAY: (itemId: string) => `${API_BASE_URL}/api/payment/item/${itemId}/pay`,
+  PAYMENT_ORDER: (orderId: string) => `${API_BASE_URL}/api/payment/order/${orderId}`,
   
   // Health
   HEALTH: `${API_BASE_URL}/health`,

@@ -91,6 +91,9 @@ export default function Payments() {
     if (t.planType === 'booking') {
       return `Booking - ${meta?.service_name || 'Service'}`;
     }
+    if (t.planType === 'order') {
+      return `Order - ${meta?.order_id ? 'Order #' + meta.order_id.substring(0, 6) : 'Store Order'}`;
+    }
     return meta?.itemName || t.planType?.replace(/_/g, ' ') || 'Payment';
   };
 

@@ -9,7 +9,7 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
 import crypto from "crypto";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -2083,13 +2083,14 @@ app.put("/api/store/settings", async (req, res) => {
   }
   
   try {
-    const { storeName, storePhone } = req.body;
+    const { storeName, storePhone, paymentRequired } = req.body;
     const currentSettings = await pgGetStoreSettings(userId);
     
     const updatedSettings = {
       storeId: currentSettings.storeId,
       storeName: storeName !== undefined ? storeName.trim() : currentSettings.storeName,
       storePhone: storePhone !== undefined ? storePhone.trim() : currentSettings.storePhone,
+      paymentRequired: paymentRequired !== undefined ? paymentRequired : currentSettings.paymentRequired,
     };
     
     if (!updatedSettings.storeName || updatedSettings.storeName.length === 0) {
@@ -2106,6 +2107,22 @@ app.put("/api/store/settings", async (req, res) => {
     } else {
       res.status(500).json({ error: 'Failed to update store settings' });
     }
+  }
+});
+
+app.post("/api/store/payment-required", async (req, res) => {
+  const userId = req.headers['x-user-id'];
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+  try {
+    const { paymentRequired } = req.body;
+    await updateStorePaymentRequired(userId, paymentRequired);
+    console.log(`[store] Payment required set to ${paymentRequired} for user ${userId}`);
+    res.json({ paymentRequired });
+  } catch (error) {
+    console.error('[store] Error setting payment required:', error);
+    res.status(500).json({ error: 'Failed to set payment required' });
   }
 });
 
@@ -3698,6 +3715,163 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
   }
 });
 
+// Create payment for an order
+app.post("/api/payment/order/:orderId", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      return res.status(401).json({ error: "User ID required" });
+    }
+
+    const { orderId } = req.params;
+    const { paymentType, customerPhone, customerEmail, customerName } = req.body;
+
+    // Get order details
+    const order = await getOrderById(orderId, userId);
+    if (!order) {
+      return res.status(404).json({ error: "Order not found" });
+    }
+
+    if (order.paymentStatus === 'paid') {
+      return res.status(400).json({ error: "Order already paid" });
+    }
+
+    // Check if user has payments enabled
+    const user = await getUserById(userId);
+    if (!user?.payments_enabled) {
+      return res.status(403).json({ error: "Payments not enabled for your account. Contact admin." });
+    }
+
+    // Get user's Snippe API key
+    const settings = await pgGetPaymentSettings(userId);
+    const apiKey = settings?.snippeApiKey || process.env.SNIPPE_API_KEY;
+
+    if (!apiKey) {
+      return res.status(400).json({ error: "Snippe API key not configured. Please configure payment settings or contact admin." });
+    }
+
+    // Normalize payment type to Snippe format
+    const normalizedPaymentType = (paymentType || 'mobile') === 'card' ? 'card' : 'mobile';
+
+    // Format and validate phone number for Tanzania
+    let formattedPhone = (customerPhone || order.customerPhone).replace('+', '').trim();
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '255' + formattedPhone.slice(1);
+    } else if (!formattedPhone.startsWith('255')) {
+      formattedPhone = '255' + formattedPhone;
+    }
+
+    const phoneRegex = /^255[67]\d{8}$/;
+    if (!phoneRegex.test(formattedPhone)) {
+      return res.status(400).json({ 
+        error: 'Invalid phone number format for Tanzania. Please use format: 255XXXXXXXXX (e.g., 255712345678)'
+      });
+    }
+
+    // Validate email (required by Snippe)
+    const email = (customerEmail || 'customer@example.com') && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail || 'customer@example.com')
+      ? (customerEmail || 'customer@example.com')
+      : 'customer@example.com';
+
+    // Create payment via Snippe API
+    const snippeResponse = await fetch("https://api.snippe.sh/v1/payments", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": `chati-order-${orderId}-${Date.now()}`,
+      },
+      body: JSON.stringify({
+        payment_type: normalizedPaymentType,
+        details: {
+          amount: Math.round(order.totalAmount),
+          currency: "TZS",
+        },
+        phone_number: formattedPhone,
+        customer: {
+          firstname: (customerName || order.customerName || '').split(' ')[0] || 'Customer',
+          lastname: (customerName || order.customerName || '').split(' ').slice(1).join(' ') || 'Unknown',
+          email: email,
+        },
+        metadata: {
+          user_id: userId,
+          order_id: orderId,
+          items: order.items,
+        },
+        webhook_url: process.env.SERVER_URL?.startsWith('https') 
+          ? `${process.env.SERVER_URL}/api/payment/webhook`
+          : 'https://chatisolutions.com/api/payment/webhook',
+      }),
+    });
+
+    const snippeText = await snippeResponse.text();
+    console.log('[snippe] Raw response:', snippeResponse.status, snippeText);
+    
+    let snippeData;
+    try {
+      snippeData = JSON.parse(snippeText);
+    } catch (e) {
+      console.error('[snippe] Failed to parse response:', e);
+      return res.status(500).json({ 
+        error: 'Invalid response from payment gateway',
+        details: snippeText.substring(0, 500)
+      });
+    }
+
+    if (!snippeResponse.ok) {
+      console.error('[snippe] Order payment failed:', snippeData);
+      return res.status(snippeResponse.status).json({
+        error: snippeData.message || "Failed to create payment",
+        details: snippeData,
+        errors: snippeData.errors,
+      });
+    }
+
+    // Update order with payment info
+    const reference = snippeData.data?.reference || snippeData.reference;
+    const paymentUrl = snippeData.data?.payment_url || snippeData.payment_url;
+    const status = 'pending';
+    
+    await updateOrderPaymentStatus(
+      userId,
+      orderId,
+      'pending',
+      reference,
+      paymentUrl
+    );
+
+    // Save transaction
+    await createPaymentTransaction({
+      userId,
+      snippeReference: reference,
+      amount: order.totalAmount,
+      currency: "TZS",
+      paymentType: paymentType || 'mobile',
+      planType: 'order',
+      status: status,
+      customerPhone: customerPhone || order.customerPhone,
+      customerEmail,
+      customerName: customerName || order.customerName,
+      metadata: { 
+        order_id: orderId,
+      },
+    });
+
+    console.log('[snippe] Order payment created:', reference, 'status:', status);
+    res.json({
+      success: true,
+      reference: reference,
+      status: status,
+      paymentUrl: paymentUrl,
+      qrCode: snippeData.data?.qr_code || snippeData.qr_code,
+      message: normalizedPaymentType === 'mobile' ? 'Check your phone for USSD prompt' : 'Redirect to payment page',
+    });
+  } catch (error) {
+    console.error('[snippe] Error creating order payment:', error);
+    res.status(500).json({ error: "Failed to create order payment" });
+  }
+});
+
 // ========================================
 // SNIPPE PAYMENT API
 // ========================================
@@ -3868,6 +4042,15 @@ app.post("/api/payment/webhook", async (req, res) => {
       
       await updateBookingPaymentStatus(userId, bookingId, bookingPaymentStatus, data.reference);
       console.log('[webhook] Booking payment updated:', bookingId, bookingPaymentStatus);
+    }
+
+    // Handle order payments
+    if (planType === 'order' && metadata?.order_id) {
+      const orderId = metadata.order_id;
+      const orderPaymentStatus = event === "payment.completed" ? 'paid' : event === "payment.failed" ? 'failed' : 'pending';
+      
+      await updateOrderPaymentStatus(userId, orderId, orderPaymentStatus, data.reference);
+      console.log('[webhook] Order payment updated:', orderId, orderPaymentStatus);
     }
 
     // Handle payment item payments
