@@ -1211,7 +1211,23 @@ app.post("/webhook", async (req, res) => {
             const lang = paymentState.language || 'en';
             
             // Parse customer details (expecting: name, phone, email)
-            const details = incomingMsg.split(/[\n,]+/).map(s => s.trim()).filter(s => s);
+            // Handle both comma-separated and numbered list formats
+            const lines = incomingMsg.split('\n').map(s => s.trim()).filter(s => s);
+            const details = [];
+            
+            for (const line of lines) {
+              // Remove numbered list prefixes (e.g., "1.", "2.", "3.")
+              const cleaned = line.replace(/^\d+\.\s*/, '').trim();
+              if (cleaned) {
+                details.push(cleaned);
+              }
+            }
+            
+            // Also try comma-separated format if no numbered list found
+            if (details.length === 0) {
+              const commaDetails = incomingMsg.split(',').map(s => s.trim()).filter(s => s);
+              details.push(...commaDetails);
+            }
             
             if (details.length < 2) {
               messageToSend = lang === 'sw'
@@ -1220,7 +1236,13 @@ app.post("/webhook", async (req, res) => {
               paymentHandled = true;
             } else {
               const customerName = details[0];
-              const customerPhone = details[1].startsWith('+') ? details[1] : `+${details[1]}`;
+              let customerPhone = details[1].replace('+', '').trim();
+              // Ensure phone starts with 255 for Tanzania
+              if (customerPhone.startsWith('0')) {
+                customerPhone = '255' + customerPhone.slice(1);
+              } else if (!customerPhone.startsWith('255')) {
+                customerPhone = '255' + customerPhone;
+              }
               const customerEmail = details[2] || '';
               
               try {
@@ -1232,9 +1254,9 @@ app.post("/webhook", async (req, res) => {
                     'x-user-id': userCreds.userId,
                   },
                   body: JSON.stringify({
-                    paymentType: 'mobile',
+                    paymentType: 'mobile_money',
                     customerPhone,
-                    customerEmail,
+                    customerEmail: customerEmail || null,
                     customerName,
                   }),
                 });
@@ -3312,10 +3334,10 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
       });
     }
 
-    // Validate email
-    if (!customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+    // Validate email (optional, but if provided must be valid)
+    if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
       return res.status(400).json({ 
-        error: 'Valid customer email is required'
+        error: 'Invalid email format'
       });
     }
 
@@ -3444,11 +3466,11 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
       });
     }
 
-    // Validate email
+    // Validate email (optional, but if provided must be valid)
     const email = customerEmail || booking.customerEmail;
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return res.status(400).json({ 
-        error: 'Valid customer email is required'
+        error: 'Invalid email format'
       });
     }
 
@@ -3586,10 +3608,10 @@ app.post("/api/payment/create", async (req, res) => {
       });
     }
 
-    // Validate email
-    if (!customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+    // Validate email (optional, but if provided must be valid)
+    if (customerEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
       return res.status(400).json({ 
-        error: 'Valid customer email is required'
+        error: 'Invalid email format'
       });
     }
 
