@@ -86,7 +86,7 @@ export default function Payments() {
   };
 
   const filteredTransactions = transactions.filter((t) => {
-    const matchesSearch = 
+    const matchesSearch = !searchTerm || 
       t.snippe_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.plan_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
