@@ -307,7 +307,7 @@ export default function Payments() {
                         <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                           <span>{new Date(transaction.createdAt).toLocaleDateString()}</span>
                           <span className="font-mono text-xs">
-                            Ref: {t.snippe_reference || t.snippeReference || 'N/A'}
+                            Ref: {transaction.snippe_reference || transaction.snippeReference || 'N/A'}
                           </span>
                         </div>
                         {transaction.customerName && (
