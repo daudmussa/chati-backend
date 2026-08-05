@@ -393,7 +393,9 @@ export default function CustomerStore() {
     localStorage.setItem('storeInfo', JSON.stringify({
       storeName: storeSettings.storeName,
       storeId: storeSettings.storeId,
-      storePhone: storeSettings.storePhone || ''
+      storePhone: storeSettings.storePhone || '',
+      userId: storeSettings.userId || '',
+      paymentRequired: storeSettings.paymentRequired || false,
     }));
     
     const existingItem = cart.find(item => item.id === product.id);

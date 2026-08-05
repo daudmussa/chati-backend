@@ -69,21 +69,20 @@ export default function Cart() {
         setBusinessPhone(storeInfo.storePhone || '+255719958997');
         setStoreName(storeInfo.storeName || '');
         setStoreUserId(storeInfo.userId || '');
-        
-        // Fetch store settings to check if payment is required
-        if (storeInfo.userId) {
-          fetchStoreSettings(storeInfo.userId);
-        }
+        setPaymentRequired(storeInfo.paymentRequired || false);
+        console.log('[Cart] Store info loaded:', storeInfo);
       } catch (e) {
         console.error('Failed to parse store info:', e);
         setBusinessPhone('+255719958997');
         setStoreName('');
         setStoreUserId('');
+        setPaymentRequired(false);
       }
     } else {
       setBusinessPhone('+255719958997');
       setStoreName('');
       setStoreUserId('');
+      setPaymentRequired(false);
     }
     setLoadingPhone(false);
   }, []);

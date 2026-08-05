@@ -836,6 +836,7 @@ export async function getStoreByName(storeName) {
       storeId: rows[0].store_id,
       storeName: rows[0].store_name,
       storePhone: rows[0].store_phone || '',
+      paymentRequired: rows[0].payment_required || false,
     };
   }
   return null;
