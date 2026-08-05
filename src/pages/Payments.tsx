@@ -87,9 +87,9 @@ export default function Payments() {
 
   const filteredTransactions = transactions.filter((t) => {
     const matchesSearch = !searchTerm || 
-      t.snippe_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.plan_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      t.snippeReference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.planType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.customerName?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
     
@@ -99,13 +99,13 @@ export default function Payments() {
   const exportToCSV = () => {
     const headers = ['Date', 'Reference', 'Type', 'Amount', 'Status', 'Customer Name', 'Customer Email'];
     const rows = filteredTransactions.map(t => [
-      new Date(t.created_at).toLocaleDateString(),
-      t.snippe_reference,
-      t.plan_type,
+      new Date(t.createdAt).toLocaleDateString(),
+      t.snippeReference,
+      t.planType,
       t.amount,
       t.status,
-      t.customer_name,
-      t.customer_email
+      t.customerName,
+      t.customerEmail
     ]);
     
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
@@ -291,19 +291,19 @@ export default function Payments() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-gray-900 capitalize">
-                            {transaction.plan_type?.replace(/_/g, ' ') || 'Payment'}
+                            {transaction.planType?.replace(/_/g, ' ') || 'Payment'}
                           </p>
                           {getStatusBadge(transaction.status)}
                         </div>
                         <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                          <span>{new Date(transaction.created_at).toLocaleDateString()}</span>
+                          <span>{new Date(transaction.createdAt).toLocaleDateString()}</span>
                           <span className="font-mono text-xs">
-                            Ref: {transaction.snippe_reference || 'N/A'}
+                            Ref: {transaction.snippeReference || 'N/A'}
                           </span>
                         </div>
-                        {transaction.customer_name && (
+                        {transaction.customerName && (
                           <p className="text-sm text-gray-600 mt-1">
-                            Customer: {transaction.customer_name}
+                            Customer: {transaction.customerName}
                           </p>
                         )}
                       </div>
