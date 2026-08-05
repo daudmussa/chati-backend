@@ -3289,17 +3289,34 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
     });
 
     // Create Snippe payment
+    // Format phone number for Tanzania (remove +, ensure 255 prefix)
+    let formattedPhone = customerPhone.replace('+', '').trim();
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '255' + formattedPhone.slice(1);
+    } else if (!formattedPhone.startsWith('255')) {
+      formattedPhone = '255' + formattedPhone;
+    }
+    
+    const nameParts = customerName?.trim().split(' ') || ['Customer', ''];
+    const firstName = nameParts[0] || 'Customer';
+    const lastName = nameParts.slice(1).join(' ') || 'Unknown';
+    
     const snippePayload = {
       payment_type: paymentType,
       details: {
         amount: item.amount,
         currency: item.currency || 'TZS',
       },
-      phone_number: customerPhone,
+      phone_number: formattedPhone,
       customer: {
-        firstname: customerName?.split(' ')[0] || 'Customer',
-        lastname: customerName?.split(' ').slice(1).join(' ') || '',
-        email: customerEmail,
+        firstname: firstName,
+        lastname: lastName,
+        email: customerEmail || 'customer@example.com',
+        address: 'Tanzania',
+        city: 'Dar es Salaam',
+        state: 'DSM',
+        postcode: '00000',
+        country: 'TZ',
       },
       description: item.description || item.name,
       metadata: {
