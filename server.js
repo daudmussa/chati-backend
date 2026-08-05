@@ -2653,8 +2653,9 @@ app.post("/api/auth/signup", async (req, res) => {
         limits: user.limits || { maxConversations: 100, maxProducts: 50 },
         payDate: user.pay_date || null,
         package: user.package || 'starter',
-        status: user.status || 'active'
-      }
+        status: user.status || 'active',
+        paymentsEnabled: user.payments_enabled || false,
+      },
     });
   } catch (error) {
     console.error('[auth] Signup error:', error);
@@ -2711,8 +2712,9 @@ app.post("/api/auth/login", async (req, res) => {
         limits: user.limits || { maxConversations: 100, maxProducts: 50 },
         payDate: user.pay_date || null,
         package: user.package || 'starter',
-        status: user.status || 'active'
-      }
+        status: user.status || 'active',
+        paymentsEnabled: user.payments_enabled || false,
+      },
     });
   } catch (error) {
     console.error('[auth] Login error:', error);

@@ -54,6 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const userData = data.user;
           
           console.log('[AuthContext] Loaded user data:', userData);
+          console.log('[AuthContext] User paymentsEnabled:', userData.paymentsEnabled);
           console.log('[AuthContext] User limits:', userData.limits);
           
           // Fetch business name
