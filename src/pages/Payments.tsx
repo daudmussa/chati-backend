@@ -85,10 +85,15 @@ export default function Payments() {
     }
   };
 
+  const getTransactionName = (t: any) => {
+    const meta = typeof t.metadata === 'string' ? JSON.parse(t.metadata) : t.metadata;
+    return meta?.itemName || t.planType?.replace(/_/g, ' ') || 'Payment';
+  };
+
   const filteredTransactions = transactions.filter((t) => {
     const matchesSearch = !searchTerm || 
       t.snippeReference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      t.planType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      getTransactionName(t).toLowerCase().includes(searchTerm.toLowerCase()) ||
       t.customerName?.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
@@ -101,7 +106,7 @@ export default function Payments() {
     const rows = filteredTransactions.map(t => [
       new Date(t.createdAt).toLocaleDateString(),
       t.snippeReference,
-      t.planType,
+      getTransactionName(t),
       t.amount,
       t.status,
       t.customerName,
@@ -291,7 +296,7 @@ export default function Payments() {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <p className="font-semibold text-gray-900 capitalize">
-                            {transaction.planType?.replace(/_/g, ' ') || 'Payment'}
+                            {getTransactionName(transaction)}
                           </p>
                           {getStatusBadge(transaction.status)}
                         </div>
