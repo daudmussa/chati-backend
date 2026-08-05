@@ -15,6 +15,7 @@ import { Pagination, PaginationContent, PaginationItem, PaginationLink, Paginati
 import { Plus, Pencil, Trash2, Package, Search, Store as StoreIcon, Save, ShoppingCart, Clock, CheckCircle2, XCircle, ArrowUpDown } from 'lucide-react';
 import { API_ENDPOINTS } from '@/config/api';
 import { ImageUpload } from '@/components/ui/image-upload';
+import { Switch } from '@/components/ui/switch';
 
 interface Product {
   id: string;
@@ -867,11 +868,9 @@ export default function Store() {
                       </p>
                     </div>
                   </div>
-                  <input
-                    type="checkbox"
+                  <Switch
                     checked={storeSettings.paymentRequired}
-                    onChange={(e) => togglePaymentRequired(e.target.checked)}
-                    className="w-5 h-5 accent-[#25D366]"
+                    onCheckedChange={togglePaymentRequired}
                   />
                 </div>
               </div>
