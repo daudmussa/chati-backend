@@ -3243,6 +3243,9 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
     const { itemId } = req.params;
     const { paymentType, customerPhone, customerEmail, customerName } = req.body;
 
+    // Normalize payment type to Snippe format
+    const normalizedPaymentType = paymentType === 'card' ? 'card' : 'mobile_money';
+
     // Get payment item details
     const item = await getPaymentItemById(itemId, userId);
     if (!item) {
@@ -3301,8 +3304,23 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
     const firstName = nameParts[0] || 'Customer';
     const lastName = nameParts.slice(1).join(' ') || 'Unknown';
     
+    // Validate Tanzania phone number (255 followed by 9 digits)
+    const phoneRegex = /^255[67]\d{8}$/;
+    if (!phoneRegex.test(formattedPhone)) {
+      return res.status(400).json({ 
+        error: 'Invalid phone number format for Tanzania. Please use format: 255XXXXXXXXX (e.g., 255712345678)'
+      });
+    }
+
+    // Validate email
+    if (!customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+      return res.status(400).json({ 
+        error: 'Valid customer email is required'
+      });
+    }
+
     const snippePayload = {
-      payment_type: paymentType,
+      payment_type: normalizedPaymentType,
       details: {
         amount: item.amount,
         currency: item.currency || 'TZS',
@@ -3311,7 +3329,7 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
       customer: {
         firstname: firstName,
         lastname: lastName,
-        email: customerEmail || 'customer@example.com',
+        email: customerEmail,
         address: 'Tanzania',
         city: 'Dar es Salaam',
         state: 'DSM',
@@ -3324,6 +3342,7 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
         itemName: item.name,
         type: 'payment_item',
       },
+      webhook_url: `${process.env.SERVER_URL || 'http://localhost:3000'}/api/payment/webhook`,
     };
 
     const snippeRes = await fetch('https://api.snippe.sh/v1/payments', {
@@ -3364,7 +3383,7 @@ app.post("/api/payment/item/:itemId/pay", async (req, res) => {
       reference: snippeData.data?.reference || reference,
       paymentUrl: snippeData.data?.payment_url,
       ussdCode: snippeData.data?.ussd_code,
-      message: paymentType === 'mobile' ? 'Check your phone for USSD prompt' : 'Redirect to payment page',
+      message: normalizedPaymentType === 'mobile_money' ? 'Check your phone for USSD prompt' : 'Redirect to payment page',
     });
   } catch (error) {
     console.error('[payment] Error creating item payment:', error);
@@ -3407,6 +3426,32 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
       return res.status(400).json({ error: "Snippe API key not configured. Please configure payment settings or contact admin." });
     }
 
+    // Normalize payment type to Snippe format
+    const normalizedPaymentType = (paymentType || 'mobile_money') === 'card' ? 'card' : 'mobile_money';
+
+    // Format and validate phone number for Tanzania
+    let formattedPhone = (customerPhone || booking.customerPhone).replace('+', '').trim();
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '255' + formattedPhone.slice(1);
+    } else if (!formattedPhone.startsWith('255')) {
+      formattedPhone = '255' + formattedPhone;
+    }
+
+    const phoneRegex = /^255[67]\d{8}$/;
+    if (!phoneRegex.test(formattedPhone)) {
+      return res.status(400).json({ 
+        error: 'Invalid phone number format for Tanzania. Please use format: 255XXXXXXXXX (e.g., 255712345678)'
+      });
+    }
+
+    // Validate email
+    const email = customerEmail || booking.customerEmail;
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ 
+        error: 'Valid customer email is required'
+      });
+    }
+
     // Create payment via Snippe API
     const snippeResponse = await fetch("https://api.snippe.sh/v1/payments", {
       method: "POST",
@@ -3416,31 +3461,46 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
         "Idempotency-Key": `chati-booking-${bookingId}-${Date.now()}`,
       },
       body: JSON.stringify({
-        amount: Math.round(booking.price),
-        currency: "TZS",
-        payment_type: paymentType || 'mobile',
+        payment_type: normalizedPaymentType,
+        details: {
+          amount: Math.round(booking.price),
+          currency: "TZS",
+        },
+        phone_number: formattedPhone,
         customer: {
-          phone_number: customerPhone || booking.customerPhone,
-          email: customerEmail,
-          name: customerName || booking.customerName,
+          firstname: (customerName || booking.customerName || '').split(' ')[0] || 'Customer',
+          lastname: (customerName || booking.customerName || '').split(' ').slice(1).join(' ') || 'Unknown',
+          email: email,
         },
         metadata: {
           user_id: userId,
           booking_id: bookingId,
           service_name: booking.serviceName,
         },
-        callback_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/bookings?payment=pending`,
         webhook_url: `${process.env.SERVER_URL || "http://localhost:3000"}/api/payment/webhook`,
       }),
     });
 
-    const snippeData = await snippeResponse.json();
+    const snippeText = await snippeResponse.text();
+    console.log('[snippe] Raw response:', snippeResponse.status, snippeText);
+    
+    let snippeData;
+    try {
+      snippeData = JSON.parse(snippeText);
+    } catch (e) {
+      console.error('[snippe] Failed to parse response:', e);
+      return res.status(500).json({ 
+        error: 'Invalid response from payment gateway',
+        details: snippeText.substring(0, 500)
+      });
+    }
 
     if (!snippeResponse.ok) {
       console.error('[snippe] Booking payment failed:', snippeData);
       return res.status(snippeResponse.status).json({
         error: snippeData.message || "Failed to create payment",
         details: snippeData,
+        errors: snippeData.errors,
       });
     }
 
@@ -3459,7 +3519,7 @@ app.post("/api/payment/booking/:bookingId", async (req, res) => {
       snippeReference: snippeData.reference,
       amount: booking.price,
       currency: "TZS",
-      paymentType: paymentType || 'mobile',
+      paymentType: paymentType || 'mobile_money',
       planType: 'booking',
       status: snippeData.status || 'pending',
       customerPhone: customerPhone || booking.customerPhone,
@@ -3500,12 +3560,37 @@ app.post("/api/payment/create", async (req, res) => {
       return res.status(400).json({ error: "Amount and payment type are required" });
     }
 
+    // Normalize payment type to Snippe format
+    const normalizedPaymentType = paymentType === 'card' ? 'card' : 'mobile_money';
+
     // Get user's Snippe API key
     const settings = await pgGetPaymentSettings(userId);
     const apiKey = settings?.snippeApiKey || process.env.SNIPPE_API_KEY;
 
     if (!apiKey) {
       return res.status(400).json({ error: "Snippe API key not configured. Please configure payment settings or contact admin." });
+    }
+
+    // Format and validate phone number for Tanzania
+    let formattedPhone = customerPhone.replace('+', '').trim();
+    if (formattedPhone.startsWith('0')) {
+      formattedPhone = '255' + formattedPhone.slice(1);
+    } else if (!formattedPhone.startsWith('255')) {
+      formattedPhone = '255' + formattedPhone;
+    }
+
+    const phoneRegex = /^255[67]\d{8}$/;
+    if (!phoneRegex.test(formattedPhone)) {
+      return res.status(400).json({ 
+        error: 'Invalid phone number format for Tanzania. Please use format: 255XXXXXXXXX (e.g., 255712345678)'
+      });
+    }
+
+    // Validate email
+    if (!customerEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(customerEmail)) {
+      return res.status(400).json({ 
+        error: 'Valid customer email is required'
+      });
     }
 
     // Create payment via Snippe API
@@ -3517,30 +3602,45 @@ app.post("/api/payment/create", async (req, res) => {
         "Idempotency-Key": `chati-${userId}-${Date.now()}`,
       },
       body: JSON.stringify({
-        amount: Math.round(amount),
-        currency: "TZS",
-        payment_type: paymentType,
+        payment_type: normalizedPaymentType,
+        details: {
+          amount: Math.round(amount),
+          currency: "TZS",
+        },
+        phone_number: formattedPhone,
         customer: {
-          phone_number: customerPhone,
+          firstname: customerName?.split(' ')[0] || 'Customer',
+          lastname: customerName?.split(' ').slice(1).join(' ') || 'Unknown',
           email: customerEmail,
-          name: customerName,
         },
         metadata: {
           user_id: userId,
           plan_type: planType,
         },
-        callback_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/billing?payment=pending`,
         webhook_url: `${process.env.SERVER_URL || "http://localhost:3000"}/api/payment/webhook`,
       }),
     });
 
-    const snippeData = await snippeResponse.json();
+    const snippeText = await snippeResponse.text();
+    console.log('[snippe] Raw response:', snippeResponse.status, snippeText);
+    
+    let snippeData;
+    try {
+      snippeData = JSON.parse(snippeText);
+    } catch (e) {
+      console.error('[snippe] Failed to parse response:', e);
+      return res.status(500).json({ 
+        error: 'Invalid response from payment gateway',
+        details: snippeText.substring(0, 500)
+      });
+    }
 
     if (!snippeResponse.ok) {
       console.error('[snippe] Payment creation failed:', snippeData);
       return res.status(snippeResponse.status).json({
         error: snippeData.message || "Failed to create payment",
         details: snippeData,
+        errors: snippeData.errors,
       });
     }
 
@@ -3747,3 +3847,4 @@ server.on("error", (err) => {
   console.error("[startup] Server error:", err);
   process.exit(1);
 });
+
