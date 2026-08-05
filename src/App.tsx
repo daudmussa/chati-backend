@@ -19,7 +19,6 @@ import Billing from "./pages/Billing";
 import PaymentSettings from "./pages/PaymentSettings";
 import PaymentItems from "./pages/PaymentItems";
 import Payments from "./pages/Payments";
-import PaymentHistory from "./pages/PaymentHistory";
 import Store from "./pages/Store";
 import Bookings from "./pages/Bookings";
 import Staff from "./pages/Staff";
@@ -96,7 +95,6 @@ function App() {
               <Route path="/payment-items" element={<ProtectedRoute><PaymentItems /></ProtectedRoute>} />
               <Route path="/payment-settings" element={<ProtectedRoute><PaymentSettings /></ProtectedRoute>} />
               <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
-              <Route path="/payment-history" element={<ProtectedRoute><PaymentHistory /></ProtectedRoute>} />
               <Route path="/store" element={<FeatureProtectedRoute featureId="store"><Store /></FeatureProtectedRoute>} />
               <Route path="/bookings" element={<FeatureProtectedRoute featureId="bookings"><Bookings /></FeatureProtectedRoute>} />
               <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />

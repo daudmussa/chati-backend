@@ -2,20 +2,23 @@ import { useEffect, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
 import { API_ENDPOINTS } from '@/config/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { DollarSign, Wallet, CheckCircle2, XCircle, Clock, TrendingUp, Loader2, AlertCircle, CreditCard, Smartphone, QrCode } from 'lucide-react';
+import { Wallet, Search, Filter, CreditCard, Smartphone, QrCode, Loader2, AlertCircle, Download, DollarSign, CheckCircle2, XCircle, Clock, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Payments() {
   const { user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [paymentStats, setPaymentStats] = useState<any>(null);
-  const [recentTransactions, setRecentTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
     fetchPaymentData();
@@ -40,7 +43,7 @@ export default function Payments() {
 
       if (transactionsRes.ok) {
         const transactionsData = await transactionsRes.json();
-        setRecentTransactions(transactionsData.transactions?.slice(0, 5) || []);
+        setTransactions(transactionsData.transactions || []);
       }
     } catch (error) {
       console.error('Error fetching payment data:', error);
@@ -57,16 +60,59 @@ export default function Payments() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'completed':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Completed</span>;
+        return <Badge className="bg-green-500 text-white">Completed</Badge>;
       case 'pending':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending</span>;
+        return <Badge className="bg-yellow-500 text-white">Pending</Badge>;
       case 'failed':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Failed</span>;
+        return <Badge variant="destructive">Failed</Badge>;
       case 'refunded':
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Refunded</span>;
+        return <Badge variant="outline">Refunded</Badge>;
       default:
-        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">{status}</span>;
+        return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const getPaymentTypeIcon = (type: string) => {
+    switch (type) {
+      case 'card':
+        return <CreditCard className="w-5 h-5 text-blue-600" />;
+      case 'dynamic-qr':
+        return <QrCode className="w-5 h-5 text-purple-600" />;
+      default:
+        return <Smartphone className="w-5 h-5 text-green-600" />;
+    }
+  };
+
+  const filteredTransactions = transactions.filter((t) => {
+    const matchesSearch = 
+      t.snippe_reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.plan_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      t.customer_name?.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const exportToCSV = () => {
+    const headers = ['Date', 'Reference', 'Type', 'Amount', 'Status', 'Customer Name', 'Customer Email'];
+    const rows = filteredTransactions.map(t => [
+      new Date(t.created_at).toLocaleDateString(),
+      t.snippe_reference,
+      t.plan_type,
+      t.amount,
+      t.status,
+      t.customer_name,
+      t.customer_email
+    ]);
+    
+    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `payment-history-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
   };
 
   if (!user?.paymentsEnabled) {
@@ -75,7 +121,7 @@ export default function Payments() {
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Payments</h1>
-            <p className="text-muted-foreground mt-1">Manage your payment settings and view transaction history</p>
+            <p className="text-muted-foreground mt-1">Manage payments and view transaction history</p>
           </div>
 
           <Alert>
@@ -95,152 +141,77 @@ export default function Payments() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Payments</h1>
-            <p className="text-muted-foreground mt-1">Manage payments and view transaction history</p>
+            <p className="text-muted-foreground mt-1">Payment statistics and transaction history</p>
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/payment-settings')}>
-              <CreditCard className="w-4 h-4 mr-2" />
-              Payment Settings
-            </Button>
-            <Button onClick={() => navigate('/payment-history')}>
-              <Wallet className="w-4 h-4 mr-2" />
-              View All History
-            </Button>
-          </div>
+          <Button variant="outline" onClick={exportToCSV} disabled={transactions.length === 0}>
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
+          </Button>
         </div>
 
+        {/* Statistics Cards */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-[#25D366]" />
           </div>
         ) : paymentStats ? (
-          <>
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
-                  <DollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">TSh {paymentStats.totalPaid.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <CheckCircle2 className="w-3 h-3 text-green-600" />
-                    {paymentStats.completedCount} completed
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Pending</CardTitle>
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">TSh {paymentStats.totalPending.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <Clock className="w-3 h-3 text-yellow-600" />
-                    {paymentStats.pendingCount} awaiting
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Failed</CardTitle>
-                  <XCircle className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">TSh {paymentStats.totalFailed.toLocaleString()}</div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <XCircle className="w-3 h-3 text-red-600" />
-                    {paymentStats.failedCount} failed
-                  </p>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
-                  <Wallet className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{paymentStats.totalTransactions}</div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <TrendingUp className="w-3 h-3 text-blue-600" />
-                    All time
-                  </p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recent Transactions */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Card>
-              <CardHeader>
-                <CardTitle>Recent Transactions</CardTitle>
-                <CardDescription>Your last 5 payment transactions</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Paid</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                {recentTransactions.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <AlertCircle className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <p>No transactions yet</p>
-                    <p className="text-sm">Start by creating a payment to see it here</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {recentTransactions.map((transaction) => (
-                      <div
-                        key={transaction.id}
-                        className="flex items-center justify-between py-3 border-b last:border-0"
-                      >
-                        <div className="flex items-center gap-3">
-                          {transaction.payment_type === 'card' ? (
-                            <CreditCard className="w-8 h-8 text-blue-600" />
-                          ) : transaction.payment_type === 'dynamic-qr' ? (
-                            <QrCode className="w-8 h-8 text-purple-600" />
-                          ) : (
-                            <Smartphone className="w-8 h-8 text-green-600" />
-                          )}
-                          <div>
-                            <p className="font-medium text-gray-900 capitalize">
-                              {transaction.plan_type?.replace(/_/g, ' ') || 'Payment'}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              {new Date(transaction.created_at).toLocaleDateString()}
-                              {transaction.snippe_reference && (
-                                <span className="ml-2 font-mono text-xs text-gray-500">
-                                  {transaction.snippe_reference.substring(0, 12)}...
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-900">
-                            TSh {Number(transaction.amount).toLocaleString()}
-                          </p>
-                          <div className="mt-1">
-                            {getStatusBadge(transaction.status)}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                <div className="text-2xl font-bold">TSh {paymentStats.totalPaid.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <CheckCircle2 className="w-3 h-3 text-green-600" />
+                  {paymentStats.completedCount} completed
+                </p>
               </CardContent>
             </Card>
 
-            {/* Payment Methods Info */}
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <p className="font-medium mb-1">Accepted Payment Methods</p>
-                <p className="text-sm">M-Pesa, Airtel Money, Tigo Pesa, Halotel, Visa, Mastercard</p>
-                <p className="text-sm mt-1">Need help? Contact us at <a href="tel:+255719958997" className="text-[#25D366] hover:underline">+255 719 958 997</a></p>
-              </AlertDescription>
-            </Alert>
-          </>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">TSh {paymentStats.totalPending.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <Clock className="w-3 h-3 text-yellow-600" />
+                  {paymentStats.pendingCount} awaiting
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Failed</CardTitle>
+                <XCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">TSh {paymentStats.totalFailed.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <XCircle className="w-3 h-3 text-red-600" />
+                  {paymentStats.failedCount} failed
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Transactions</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{paymentStats.totalTransactions}</div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
+                  <TrendingUp className="w-3 h-3 text-blue-600" />
+                  All time
+                </p>
+              </CardContent>
+            </Card>
+          </div>
         ) : (
           <Alert>
             <AlertCircle className="h-4 w-4" />
@@ -248,6 +219,145 @@ export default function Payments() {
               No payment statistics available.
             </AlertDescription>
           </Alert>
+        )}
+
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex gap-4 items-center">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by reference, plan type, or customer name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="border rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="completed">Completed</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Filters */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex gap-4 items-center">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by reference, plan type, or customer name..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="border rounded-md px-3 py-2 text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="completed">Completed</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Transactions List */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-[#25D366]" />
+          </div>
+        ) : filteredTransactions.length === 0 ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <AlertCircle className="w-12 h-12 text-gray-400 mb-4" />
+              <p className="text-muted-foreground">
+                {searchTerm || statusFilter !== 'all' 
+                  ? 'No transactions match your search' 
+                  : 'No payment history yet'}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                {searchTerm || statusFilter !== 'all' 
+                  ? 'Try adjusting your filters' 
+                  : 'Subscribe to a plan to get started'}
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle>
+                Transactions ({filteredTransactions.length})
+              </CardTitle>
+              <CardDescription>
+                Showing {filteredTransactions.length} of {transactions.length} transactions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {filteredTransactions.map((transaction) => (
+                  <div
+                    key={transaction.id}
+                    className="flex items-center justify-between py-4 border-b last:border-0 hover:bg-gray-50 p-4 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                        {getPaymentTypeIcon(transaction.payment_type)}
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900 capitalize">
+                            {transaction.plan_type?.replace(/_/g, ' ') || 'Payment'}
+                          </p>
+                          {getStatusBadge(transaction.status)}
+                        </div>
+                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+                          <span>{new Date(transaction.created_at).toLocaleDateString()}</span>
+                          <span className="font-mono text-xs">
+                            Ref: {transaction.snippe_reference || 'N/A'}
+                          </span>
+                        </div>
+                        {transaction.customer_name && (
+                          <p className="text-sm text-gray-600 mt-1">
+                            Customer: {transaction.customer_name}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-gray-900">
+                        TSh {Number(transaction.amount).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {transaction.currency || 'TZS'}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </DashboardLayout>
