@@ -1250,8 +1250,8 @@ app.post("/webhook", async (req, res) => {
               });
               
               itemsText += lang === 'sw'
-                ? "Tafadhali jibu kwa namba ya kipengele unachotaka kulipia.\n\nAu tuma *link* kupokea link ya malipo moja kwa moja."
-                : "Please reply with the number of the item you want to pay for.\n\nOr send *link* to receive a direct payment link.";
+                ? "Tafadhali jibu kwa namba ya kipengele unachotaka kulipia."
+                : "Please reply with the number of the item you want to pay for.";
               
               conversation.paymentState = { step: 'awaiting_item', language: lang };
               messageToSend = itemsText;
@@ -1265,50 +1265,30 @@ app.post("/webhook", async (req, res) => {
           } else if (paymentState && paymentState.step === 'awaiting_item') {
             const lang = paymentState.language || 'en';
             
-            if (incomingMsg.toLowerCase() === 'link') {
-              // Send direct payment page link
-              const storeSettings = await pgGetStoreSettings(userCreds.userId);
-              if (storeSettings && storeSettings.storeName) {
-                const baseUrl = process.env.VITE_API_URL?.includes('localhost') 
-                  ? 'https://chatisolutions.com' 
-                  : (process.env.VITE_API_URL || 'https://chatisolutions.com');
-                const paymentUrl = `${baseUrl}/shop/${storeSettings.storeName}/payments`;
-                messageToSend = lang === 'sw'
-                  ? `Bofya link hii kuchagua na kulipa: ${paymentUrl}`
-                  : `Click this link to select and pay: ${paymentUrl}`;
-              } else {
-                messageToSend = lang === 'sw'
-                  ? "Samahani, sikuweza kupata link ya duka. Tafadhali wasiliana nasi."
-                  : "Sorry, I couldn't find the store link. Please contact us directly.";
-              }
-              delete conversation.paymentState;
+            const itemNum = parseInt(incomingMsg.trim());
+            
+            if (itemNum > 0 && itemNum <= userPaymentItems.length) {
+              const selectedItem = userPaymentItems[itemNum - 1];
+              
+              conversation.paymentState = {
+                step: 'awaiting_customer_details',
+                itemId: selectedItem.id,
+                itemName: selectedItem.name,
+                amount: selectedItem.amount,
+                currency: selectedItem.currency,
+                description: selectedItem.description,
+                language: lang,
+              };
+              
+              messageToSend = lang === 'sw'
+                ? `Vizuri! Umechagua *${selectedItem.name}* kwa ${selectedItem.currency} ${selectedItem.amount.toLocaleString()}.\n\nTafadhali toa:\n1️⃣ Jina lako kamili\n2️⃣ Nambari ya simu (k.m. +255...)\n3️⃣ Email (hiari)`
+                : `Great! You selected *${selectedItem.name}* for ${selectedItem.currency} ${selectedItem.amount.toLocaleString()}.\n\nPlease provide:\n1️⃣ Your full name\n2️⃣ Phone number (e.g., +255...)\n3️⃣ Email (optional)`;
               paymentHandled = true;
             } else {
-              const itemNum = parseInt(incomingMsg.trim());
-              
-              if (itemNum > 0 && itemNum <= userPaymentItems.length) {
-                const selectedItem = userPaymentItems[itemNum - 1];
-                
-                conversation.paymentState = {
-                  step: 'awaiting_customer_details',
-                  itemId: selectedItem.id,
-                  itemName: selectedItem.name,
-                  amount: selectedItem.amount,
-                  currency: selectedItem.currency,
-                  description: selectedItem.description,
-                  language: lang,
-                };
-                
-                messageToSend = lang === 'sw'
-                  ? `Vizuri! Umechagua *${selectedItem.name}* kwa ${selectedItem.currency} ${selectedItem.amount.toLocaleString()}.\n\nTafadhali toa:\n1️⃣ Jina lako kamili\n2️⃣ Nambari ya simu (k.m. +255...)\n3️⃣ Email (hiari)`
-                  : `Great! You selected *${selectedItem.name}* for ${selectedItem.currency} ${selectedItem.amount.toLocaleString()}.\n\nPlease provide:\n1️⃣ Your full name\n2️⃣ Phone number (e.g., +255...)\n3️⃣ Email (optional)`;
-                paymentHandled = true;
-              } else {
-                messageToSend = lang === 'sw'
-                  ? "Tafadhali jibu kwa namba sahihi ya kipengele kutoka kwenye orodha hapo juu."
-                  : "Please reply with a valid item number from the list above.";
-                paymentHandled = true;
-              }
+              messageToSend = lang === 'sw'
+                ? "Tafadhali jibu kwa namba sahihi ya kipengele kutoka kwenye orodha hapo juu."
+                : "Please reply with a valid item number from the list above.";
+              paymentHandled = true;
             }
           } else if (paymentState && paymentState.step === 'awaiting_customer_details') {
             const lang = paymentState.language || 'en';
