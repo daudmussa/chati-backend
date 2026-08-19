@@ -1451,9 +1451,9 @@ app.post("/webhook", async (req, res) => {
           }
         }
         
-        // Check for payment items keywords
-        const paymentKeywords = ['pay', 'payment', 'lipa', 'malipo', 'order', 'order item', 'nunua', 'buy'];
-        const isPaymentInquiry = paymentKeywords.some(keyword => 
+        // Check for payment items keywords (only if product flow didn't handle it)
+        const paymentKeywords = ['pay', 'payment', 'lipa', 'malipo', 'order item', 'nunua', 'buy'];
+        const isPaymentInquiry = !productHandled && paymentKeywords.some(keyword => 
           incomingMsg.toLowerCase().includes(keyword)
         );
         
@@ -1468,7 +1468,7 @@ app.post("/webhook", async (req, res) => {
             : "Okay, I've cancelled the payment process. Is there anything else I can help you with?";
           delete conversation.paymentState;
           paymentHandled = true;
-        } else if (paymentState || isPaymentInquiry) {
+        } else if ((paymentState || isPaymentInquiry) && !productHandled) {
           // Use already loaded userPaymentItems and userPaymentsEnabled
           
           if (!paymentState && isPaymentInquiry) {
