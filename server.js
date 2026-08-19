@@ -1261,7 +1261,7 @@ app.post("/webhook", async (req, res) => {
                   await userTwilioClient.messages.create({
                     from: fromNumber,
                     to: toNumber,
-                    mediaUrl: [product.image],
+                    mediaUrl: product.image,
                   });
                   
                   console.log('[webhook] Image sent successfully');
@@ -1537,7 +1537,7 @@ app.post("/webhook", async (req, res) => {
                     await userTwilioClient.messages.create({
                       from: fromNumber,
                       to: toNumber,
-                      mediaUrl: [product.image],
+                      mediaUrl: product.image,
                     });
                     
                     messageToSend = lang === 'sw'
