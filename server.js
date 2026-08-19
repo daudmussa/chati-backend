@@ -1401,7 +1401,7 @@ app.post("/webhook", async (req, res) => {
                 const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
                 
                 const orderId = crypto.randomBytes(8).toString('hex');
-                await createOrder(userCreds.userId, {
+                const order = await createOrder(userCreds.userId, {
                   id: orderId,
                   customerName: customerName,
                   customerPhone: customerPhone,
@@ -1419,26 +1419,134 @@ app.post("/webhook", async (req, res) => {
                 
                 const orderSummary = cart.map(item => `   - ${item.title} x${item.quantity} = TSh ${item.itemTotal.toLocaleString()}`).join('\n');
                 
-                if (lang === 'sw') {
-                  messageToSend = `✅ *Oda Imepokelewa!*\n\n` +
-                    `👤 Jina: ${customerName}\n` +
-                    `📱 Simu: ${customerPhone}\n` +
-                    `🆔 Nambari ya Oda: ${orderId}\n\n` +
-                    `🛒 *Vilivyochaguliwa:*\n${orderSummary}\n\n` +
-                    `💰 *Jumla: TSh ${totalAmount.toLocaleString()}*\n\n` +
-                    `Tutawasiliana nawe hivi karibuni kwa ajili ya uthibitisho na malipo.`;
+                // If payments are enabled, create payment transaction
+                if (userPaymentsEnabled) {
+                  try {
+                    // Format phone for Tanzania
+                    let paymentPhone = customerPhone.replace('+', '').trim();
+                    if (paymentPhone.startsWith('0')) {
+                      paymentPhone = '255' + paymentPhone.slice(1);
+                    } else if (!paymentPhone.startsWith('255')) {
+                      paymentPhone = '255' + paymentPhone;
+                    }
+                    
+                    // Create temporary payment item for the order
+                    const tempPaymentItem = await createPaymentItem(userCreds.userId, {
+                      name: `Order ${orderId}`,
+                      description: `Products: ${cart.map(i => i.title).join(', ')}`,
+                      amount: totalAmount,
+                      currency: 'TZS',
+                      isActive: true
+                    });
+                    
+                    const paymentRes = await fetch(`${process.env.VITE_API_URL || 'http://localhost:3000'}/api/payment/item/${tempPaymentItem.id}/pay`, {
+                      method: 'POST',
+                      headers: {
+                        'Content-Type': 'application/json',
+                        'x-user-id': userCreds.userId,
+                      },
+                      body: JSON.stringify({
+                        paymentType: 'mobile',
+                        customerPhone: paymentPhone,
+                        customerEmail: '',
+                        customerName: customerName,
+                      }),
+                    });
+                    
+                    const paymentData = await paymentRes.json();
+                    
+                    if (paymentRes.ok && paymentData.success) {
+                      if (lang === 'sw') {
+                        messageToSend = `✅ *Oda Imepokelewa - Malipo Yanahitajika!*\n\n` +
+                          `👤 Jina: ${customerName}\n` +
+                          `📱 Simu: ${customerPhone}\n` +
+                          `🆔 Nambari ya Oda: ${orderId}\n\n` +
+                          `🛒 *Vilivyochaguliwa:*\n${orderSummary}\n\n` +
+                          `💰 *Jumla: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                          `🔖 Marejeo ya Malipo: ${paymentData.reference}\n\n` +
+                          `${paymentData.message}\n\n` +
+                          `Tafadhali malipa ili kuthibitisha oda yako. Utapokea ujumbe wa USSD kwenye simu yako au bofya link:\n${paymentData.paymentUrl || 'N/A'}`;
+                      } else {
+                        messageToSend = `✅ *Order Received - Payment Required!*\n\n` +
+                          `👤 Name: ${customerName}\n` +
+                          `📱 Phone: ${customerPhone}\n` +
+                          `🆔 Order ID: ${orderId}\n\n` +
+                          `🛒 *Items:*\n${orderSummary}\n\n` +
+                          `💰 *Total: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                          `🔖 Payment Reference: ${paymentData.reference}\n\n` +
+                          `${paymentData.message}\n\n` +
+                          `Please pay to confirm your order. You will receive a USSD prompt on your phone or click:\n${paymentData.paymentUrl || 'N/A'}`;
+                      }
+                      delete conversation.productState;
+                      productHandled = true;
+                    } else {
+                      // Payment failed, send order without payment
+                      if (lang === 'sw') {
+                        messageToSend = `✅ *Oda Imepokelewa!*\n\n` +
+                          `👤 Jina: ${customerName}\n` +
+                          `📱 Simu: ${customerPhone}\n` +
+                          `🆔 Nambari ya Oda: ${orderId}\n\n` +
+                          `🛒 *Vilivyochaguliwa:*\n${orderSummary}\n\n` +
+                          `💰 *Jumla: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                          `Tutawasiliana nawe hivi karibuni kwa ajili ya uthibitisho na malipo.`;
+                      } else {
+                        messageToSend = `✅ *Order Received!*\n\n` +
+                          `👤 Name: ${customerName}\n` +
+                          `📱 Phone: ${customerPhone}\n` +
+                          `🆔 Order ID: ${orderId}\n\n` +
+                          `🛒 *Items:*\n${orderSummary}\n\n` +
+                          `💰 *Total: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                          `We'll contact you soon for confirmation and payment.`;
+                      }
+                      delete conversation.productState;
+                      productHandled = true;
+                    }
+                  } catch (paymentError) {
+                    console.error('[webhook] Error creating payment for order:', paymentError);
+                    // Send order without payment link
+                    if (lang === 'sw') {
+                      messageToSend = `✅ *Oda Imepokelewa!*\n\n` +
+                        `👤 Jina: ${customerName}\n` +
+                        `📱 Simu: ${customerPhone}\n` +
+                        `🆔 Nambari ya Oda: ${orderId}\n\n` +
+                        `🛒 *Vilivyochaguliwa:*\n${orderSummary}\n\n` +
+                        `💰 *Jumla: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                        `Tutawasiliana nawe hivi karibuni kwa ajili ya uthibitisho na malipo.`;
+                    } else {
+                      messageToSend = `✅ *Order Received!*\n\n` +
+                        `👤 Name: ${customerName}\n` +
+                        `📱 Phone: ${customerPhone}\n` +
+                        `🆔 Order ID: ${orderId}\n\n` +
+                        `🛒 *Items:*\n${orderSummary}\n\n` +
+                        `💰 *Total: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                        `We'll contact you soon for confirmation and payment.`;
+                    }
+                    delete conversation.productState;
+                    productHandled = true;
+                  }
                 } else {
-                  messageToSend = `✅ *Order Received!*\n\n` +
-                    `👤 Name: ${customerName}\n` +
-                    `📱 Phone: ${customerPhone}\n` +
-                    `🆔 Order ID: ${orderId}\n\n` +
-                    `🛒 *Items:*\n${orderSummary}\n\n` +
-                    `💰 *Total: TSh ${totalAmount.toLocaleString()}*\n\n` +
-                    `We'll contact you soon for confirmation and payment.`;
+                  // Payments not enabled
+                  if (lang === 'sw') {
+                    messageToSend = `✅ *Oda Imepokelewa!*\n\n` +
+                      `👤 Jina: ${customerName}\n` +
+                      `📱 Simu: ${customerPhone}\n` +
+                      `🆔 Nambari ya Oda: ${orderId}\n\n` +
+                      `🛒 *Vilivyochaguliwa:*\n${orderSummary}\n\n` +
+                      `💰 *Jumla: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                      `Tutawasiliana nawe hivi karibuni kwa ajili ya uthibitisho na malipo.`;
+                  } else {
+                    messageToSend = `✅ *Order Received!*\n\n` +
+                      `👤 Name: ${customerName}\n` +
+                      `📱 Phone: ${customerPhone}\n` +
+                      `🆔 Order ID: ${orderId}\n\n` +
+                      `🛒 *Items:*\n${orderSummary}\n\n` +
+                      `💰 *Total: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                      `We'll contact you soon for confirmation and payment.`;
+                  }
+                  
+                  delete conversation.productState;
+                  productHandled = true;
                 }
-                
-                delete conversation.productState;
-                productHandled = true;
               } catch (error) {
                 console.error('[webhook] Error creating order:', error);
                 messageToSend = lang === 'sw'
