@@ -1628,8 +1628,8 @@ app.post("/webhook", async (req, res) => {
             }
           }
         }
-        // Only check redirection/AI if payment wasn't handled
-        if (!paymentHandled) {
+        // Only check redirection/AI if payment and product flows didn't handle it
+        if (!paymentHandled && !productHandled) {
           const lowerMsg = incomingMsg.toLowerCase();
           const hasRedirectionKeyword = bizSettings.keywords.some(keyword => 
             lowerMsg.includes(keyword.toLowerCase())
