@@ -1,9 +1,20 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import SEO from '@/components/SEO';
-import { Check, Zap, TrendingUp, Crown, MessageSquare, ShoppingBag, Menu, X } from 'lucide-react';
+import {
+  Check,
+  X,
+  MessageSquare,
+  TrendingUp,
+  ShoppingBag,
+  Menu,
+  X as XIcon,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Wallet,
+} from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -14,224 +25,150 @@ export default function Pricing() {
 
   const plans = [
     {
-      name: 'Starter',
-      icon: MessageSquare,
-      price: '45,000',
-      period: 'month',
-      description: 'AI Conversations - Perfect for customer support automation',
+      name: 'Store Lite',
+      icon: ShoppingBag,
+      price: '25,000',
+      description: 'Showcase products and receive orders through WhatsApp',
       features: [
-        'WhatsApp AI auto-replies',
-        'FAQ & customer support AI',
-        'Shared inbox',
-        'Basic analytics',
-        '4,000 AI replies / month',
-        '100 active conversations / month',
+        'Product catalog',
+        'Product images',
+        'Product descriptions',
+        'Customers browse products',
+        'Orders/inquiries sent to WhatsApp',
+        'Basic order management',
       ],
-      excludes: [
-        'Booking system',
-        'Store features',
+      notIncluded: [
+        'No payment features',
+        'No AI assistant',
       ],
-      cta: 'Start Now',
+      cta: 'Start now',
       popular: false,
     },
     {
       name: 'Business',
-      icon: TrendingUp,
-      price: '95,000',
-      period: 'month',
-      description: 'AI + Booking - Complete solution for service businesses',
+      icon: Wallet,
+      price: '30,000',
+      description: 'Sell and track payments',
       features: [
-        'Everything in Starter',
-        'Booking / appointment system',
-        'Manual booking management',
-        'Customer history',
-        '8,000 AI replies / month',
-        '1000 active conversations / month',
+        'Everything in Store Lite',
+        'Payment tracking',
+        'Paid/unpaid order status',
+        'Payment records',
+        'Sales tracking',
+        'Customer order history',
+        '2,000 AI customer chats / month',
       ],
-      excludes: [
-      
-      ],
-      cta: 'Get Started',
-      popular: true,
-    },
-    {
-      name: 'Store Package',
-      icon: ShoppingBag,
-      price: '25,000',
-      period: 'month',
-      description: 'Standalone store solution - Can be combined with other plans',
-      features: [
-        'Product / service listing',
-        'Unlimited order receiving',
-        'Order status & management',
-        'Manual order handling',
-        '100 product images FREE',
-        'Can be used alone or combined',
-      ],
-      excludes: [
-        'WhatsApp catalog browsing',
-      ],
-      cta: 'Get Started',
+      notIncluded: [],
+      cta: 'Get started',
       popular: false,
     },
+    {
+      name: 'Starter',
+      icon: MessageSquare,
+      price: '25,000',
+      description: 'AI-powered customer support',
+      features: [
+        'AI WhatsApp assistant',
+        'Personal inbox',
+        'Customer management',
+        'Basic analytics',
+        '500 AI customer chats / month',
+        'Basic automation',
+      ],
+      notIncluded: [],
+      cta: 'Get started',
+      popular: true,
+    },
+  ];
+
+  const aiAddOns = [
+    { label: '1,000 extra AI customer chats', price: '30,000' },
+    { label: '5,000 extra AI customer chats', price: '100,000' },
   ];
 
   const faqs = [
-    {
-      question: 'What happens when I exceed my AI message limit?',
-      answer: 'You can purchase AI Message Token Bundles that never expire. They work across all features - conversations, bookings, and store inquiries.',
-    },
-    {
-      question: 'Can I combine plans?',
-      answer: 'Yes! The Store Package can be used standalone or combined with Starter or Business plans. Mix and match based on your needs.',
-    },
-    {
-      question: 'What payment methods do you accept?',
-      answer: 'We accept M-Pesa, Airtel Money, Tigo Pesa, credit/debit cards, and bank transfers for Tanzanian businesses.',
-    },
-    {
-      question: 'Can I cancel anytime?',
-      answer: 'Yes, you can cancel your subscription at any time. You\'ll continue to have access until the end of your billing period.',
-    },
-    {
-      question: 'Do AI tokens expire?',
-      answer: 'No! AI Message Token Bundles never expire and can be used across all your conversations, bookings, and store interactions.',
-    },
+    { question: 'Can I switch plans later?', answer: 'Yes. You can upgrade or downgrade your plan at any time. Changes take effect at the start of your next billing cycle.' },
+    { question: 'What payment methods do you accept?', answer: 'We accept M-Pesa, Airtel Money, Tigo Pesa, Halotel, for Tanzanian businesses.' },
+    { question: 'Can I cancel anytime?', answer: "Yes, you can cancel your subscription at any time. You'll keep access until the end of your billing period." },
+    { question: 'How do AI customer chats work?', answer: 'Each AI customer chat counts as one conversation session with a customer. When you exceed your monthly limit, you can purchase additional AI chat bundles.' },
+    { question: 'Do unused AI chats roll over?', answer: 'No, unused AI customer chats do not roll over to the next month. You can purchase extra AI chat bundles that add to your monthly limit.' },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-[#F5F7F2] font-['Inter'] text-[#0B1F17]">
+      <SEO
+        title="Pricing - WhatsApp Business Automation Plans | Chati Solutions Tanzania"
+        description="Affordable WhatsApp business pricing. Store Lite TSh 25K/mo, Business TSh 30K/mo, AI Chat TSh 25K/mo. AI, store, payments."
+        keywords="WhatsApp automation pricing Tanzania, business automation cost, WhatsApp chatbot price Tanzania, affordable business automation, online store pricing Tanzania"
+        canonical="https://chati.solutions/pricing"
+      />
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+      `}</style>
+
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-black/5 bg-[#F5F7F2]/90 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
             <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain" />
           </div>
-          
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-3">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/features')}
-            >
-              Features
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/pricing')}
-            >
-              Pricing
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/about')}
-            >
-              About
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/shop')}
-            >
-              <ShoppingBag className="w-4 h-4 mr-2" />
-              Shop
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/contact')}
-            >
-              Contact
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/signin')}
-            >
+
+          <div className="hidden md:flex items-center gap-1">
+            {[
+              ['Features', '/features'],
+              ['Pricing', '/pricing'],
+              ['About', '/about'],
+              ['Shop', '/shop'],
+              ['Contact', '/contact'],
+            ].map(([label, path]) => (
+              <Button
+                key={path}
+                variant="ghost"
+                className="font-['Inter'] font-medium text-[#0B1F17]/80 hover:text-[#0B1F17] hover:bg-black/5"
+                onClick={() => navigate(path)}
+              >
+                {label}
+              </Button>
+            ))}
+            <Button variant="outline" className="ml-2 border-[#0B1F17]/15" onClick={() => navigate('/signin')}>
               Sign In
             </Button>
             <Button
-              className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+              className="bg-[#0B1F17] hover:bg-[#0E7A43] text-white font-medium transition-colors"
               onClick={() => navigate('/onboarding/account')}
             >
               Get Started
             </Button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
+          <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Toggle menu">
+            {isMenuOpen ? <XIcon className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
-        {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden border-t bg-white">
-            <div className="container mx-auto px-4 py-4 space-y-2">
-              <button
-                onClick={() => {
-                  navigate('/features');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Features
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/pricing');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Pricing
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/about');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                About
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/shop');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Shop
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/contact');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Contact
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/signin');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Sign In
-              </button>
+          <div className="md:hidden border-t border-black/5 bg-[#F5F7F2]">
+            <div className="container mx-auto px-4 py-4 space-y-1">
+              {[
+                ['Features', '/features'],
+                ['Pricing', '/pricing'],
+                ['About', '/about'],
+                ['Shop', '/shop'],
+                ['Contact', '/contact'],
+                ['Sign In', '/signin'],
+              ].map(([label, path]) => (
+                <button
+                  key={path}
+                  onClick={() => { navigate(path); setIsMenuOpen(false); }}
+                  className="block w-full text-left px-4 py-2.5 hover:bg-black/5 rounded-lg font-medium"
+                >
+                  {label}
+                </button>
+              ))}
               <Button
-                className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mt-2"
-                onClick={() => {
-                  navigate('/onboarding/account');
-                  setIsMenuOpen(false);
-                }}
+                className="w-full bg-[#0B1F17] hover:bg-[#0E7A43] text-white mt-2"
+                onClick={() => { navigate('/onboarding/account'); setIsMenuOpen(false); }}
               >
                 Get Started
               </Button>
@@ -240,328 +177,195 @@ export default function Pricing() {
         )}
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <SEO 
-          title="Pricing - WhatsApp Business Automation Plans | Chati Solutions Tanzania"
-          description="Affordable WhatsApp business automation pricing. Plans from TZS 45,000/month. AI conversations, online store, booking system. No hidden fees. Perfect for Tanzanian businesses."
-          keywords="WhatsApp automation pricing Tanzania, business automation cost, WhatsApp chatbot price Tanzania, affordable business automation, online store pricing Tanzania"
-          canonical="https://chati.solutions/pricing"
-        />
-        
-        {/* Hero Section */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Simple, Transparent Pricing
-          </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            Choose the perfect plan for your business. Mix and match to fit your needs.
-          </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
+        {/* Hero */}
+        <div className="relative overflow-hidden">
+          <div className="absolute top-0 -left-24 w-72 h-72 bg-[#25D366]/15 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-72 h-72 bg-[#FFA630]/10 rounded-full blur-3xl" />
+
+          <div className="text-center mb-16 max-w-2xl mx-auto relative">
+            <div className="inline-flex items-center gap-2 bg-white border border-[#25D366]/30 text-[#0E7A43] px-3.5 py-1.5 rounded-full text-xs font-semibold font-['JetBrains_Mono'] tracking-wide uppercase mb-5">
+              <Sparkles className="w-3.5 h-3.5" />
+              No hidden fees
+            </div>
+            <h1 className="font-['Bricolage_Grotesque'] font-extrabold text-4xl md:text-5xl leading-tight text-[#0B1F17]">
+              Simple, transparent pricing
+            </h1>
+            <p className="text-lg text-[#4A5850] max-w-xl mx-auto mt-5">
+              Choose the plan that fits your business. Upgrade anytime.
+            </p>
+          </div>
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20 max-w-5xl mx-auto">
           {plans.map((plan) => {
             const Icon = plan.icon;
             return (
               <Card
                 key={plan.name}
-                className={`relative ${
-                  plan.popular ? 'border-[#25D366] border-2 shadow-xl' : ''
+                className={`relative shadow-sm transition-all duration-300 flex flex-col ${
+                  plan.popular ? 'border-2 border-[#25D366] shadow-xl lg:-translate-y-2' : 'border border-black/5 hover:border-[#25D366]/40'
                 }`}
               >
                 {plan.popular && (
-                  <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#25D366] hover:bg-[#20BD5A]">
-                    Most Popular
-                  </Badge>
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#25D366] text-white text-xs font-semibold font-['JetBrains_Mono'] uppercase tracking-wide px-3 py-1 rounded-full">
+                    Most popular
+                  </span>
                 )}
-                <CardHeader>
-                  <div className="w-12 h-12 bg-[#25D366]/10 rounded-full flex items-center justify-center mb-4">
+                <CardContent className="p-6 flex flex-col flex-1">
+                  <div className="w-12 h-12 bg-[#0B1F17] rounded-2xl flex items-center justify-center mb-4">
                     <Icon className="w-6 h-6 text-[#25D366]" />
                   </div>
-                  <CardTitle className="text-2xl">{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
-                  <div className="mt-4">
-                    <span className="text-4xl font-bold text-gray-900">
-                      TSh {plan.price}
-                    </span>
-                    <span className="text-gray-600">/{plan.period}</span>
+                  <h3 className="text-xl font-bold font-['Bricolage_Grotesque'] text-[#0B1F17]">{plan.name}</h3>
+                  <p className="text-sm text-[#4A5850] mt-1 mb-4">{plan.description}</p>
+                  <div className="mb-5">
+                    <span className="text-3xl font-bold font-['Bricolage_Grotesque'] text-[#0B1F17]">TSh {plan.price}</span>
+                    <span className="text-[#4A5850] text-sm">/month</span>
                   </div>
-                </CardHeader>
-                <CardContent>
                   <Button
-                    className={`w-full mb-6 ${
+                    className={`w-full mb-5 font-semibold ${
                       plan.popular
-                        ? 'bg-[#25D366] hover:bg-[#20BD5A] text-white'
-                        : ''
+                        ? 'bg-[#25D366] hover:bg-[#0E7A43] text-white'
+                        : 'bg-white border border-[#0B1F17]/15 text-[#0B1F17] hover:bg-black/5'
                     }`}
-                    variant={plan.popular ? 'default' : 'outline'}
-                    onClick={() => isAuthenticated ? navigate('/billing') : navigate('/onboarding/account')}
+                    onClick={() => (isAuthenticated ? navigate('/billing') : navigate('/onboarding/account'))}
                   >
                     {plan.cta}
                   </Button>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900 mb-2">Includes:</p>
-                      <ul className="space-y-2">
-                        {plan.features.map((feature, index) => (
-                          <li key={index} className="flex items-start">
-                            <Check className="w-5 h-5 text-[#25D366] mr-3 flex-shrink-0 mt-0.5" />
-                            <span className="text-gray-600 text-sm">{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
+                  <ul className="space-y-2 flex-1">
+                    {plan.features.map((feature, index) => (
+                      <li key={index} className="flex items-start text-sm text-[#4A5850]">
+                        <Check className="w-4 h-4 text-[#25D366] mr-2.5 flex-shrink-0 mt-0.5" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  {plan.notIncluded.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-black/5 space-y-2">
+                      {plan.notIncluded.map((item, index) => (
+                        <li key={index} className="flex items-start text-sm text-[#B91C1C] list-none">
+                          <X className="w-4 h-4 text-[#B91C1C] mr-2.5 flex-shrink-0 mt-0.5" />
+                          {item}
+                        </li>
+                      ))}
                     </div>
-                    
-                  </div>
+                  )}
                 </CardContent>
               </Card>
             );
           })}
         </div>
 
-        {/* AI Message Bundles */}
-        <Card className="mb-12 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">AI Message Token Bundles</CardTitle>
-            <CardDescription className="text-center">Need more AI replies? Purchase token bundles that never expire</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-lg border">
-                <h3 className="font-bold text-lg mb-2">Small</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">TZS 20,000</p>
-                <p className="text-sm text-gray-600 mb-3">3,000 AI replies</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg border">
-                <h3 className="font-bold text-lg mb-2">Medium</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">TZS 45,000</p>
-                <p className="text-sm text-gray-600 mb-3">7,000 AI replies</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg border border-[#25D366]">
-                <Badge className="mb-2 bg-[#25D366]">Best Value</Badge>
-                <h3 className="font-bold text-lg mb-2">Large</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">TZS 120,000</p>
-                <p className="text-sm text-gray-600 mb-3">20,000 AI replies</p>
-              </div>
-              <div className="bg-white p-4 rounded-lg border">
-                <h3 className="font-bold text-lg mb-2">Enterprise</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">TZS 280,000</p>
-                <p className="text-sm text-gray-600 mb-3">70,000 AI replies</p>
-              </div>
-            </div>
-            <p className="text-center text-sm text-gray-600 mt-4">
-              Tokens work across conversations, bookings, and store inquiries. No expiration date.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Store Image Add-ons */}
-        <Card className="mb-12 bg-gradient-to-r from-orange-50 to-red-50 border-orange-200">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Store Image Add-ons</CardTitle>
-            <CardDescription className="text-center">Need more product images? First 100 images are FREE with Store Package</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-              <div className="bg-white p-6 rounded-lg border text-center">
-                <h3 className="font-bold text-xl mb-2">+200 Images</h3>
-                <p className="text-3xl font-bold text-gray-900">TZS 20,000</p>
-              </div>
-              <div className="bg-white p-6 rounded-lg border border-orange-400 text-center">
-                <Badge className="mb-2 bg-orange-500">Popular</Badge>
-                <h3 className="font-bold text-xl mb-2">+1,000 Images</h3>
-                <p className="text-3xl font-bold text-gray-900">TZS 45,000</p>
-              </div>
-              <div className="bg-white p-6 rounded-lg border text-center">
-                <h3 className="font-bold text-xl mb-2">+5,000 Images</h3>
-                <p className="text-3xl font-bold text-gray-900">TZS 100,000</p>
-              </div>
-            </div>
-            <p className="text-center text-sm text-gray-600 mt-4">
-              Counted as active images. Deleting images frees up slots.
-            </p>
-          </CardContent>
-        </Card>
-
-        {/* Use Case Examples */}
-        <Card className="mb-20 bg-gradient-to-r from-[#25D366]/5 to-[#25D366]/10 border-[#25D366]/20">
-          <CardHeader>
-            <CardTitle className="text-2xl text-center">Common Use Case Examples</CardTitle>
-            <CardDescription className="text-center">See how businesses combine plans to fit their needs</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-lg border">
-                <h3 className="font-bold text-lg mb-3 text-gray-900">Basic Shop (No AI)</h3>
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Store package</span>
-                    <span className="font-semibold">25,000</span>
+        {/* Additional AI Chats */}
+        <div className="mb-20 max-w-4xl mx-auto">
+          <div className="text-center mb-8">
+            <h2 className="font-['Bricolage_Grotesque'] font-bold text-2xl md:text-3xl text-[#0B1F17]">Additional AI chats</h2>
+            <p className="text-[#4A5850] mt-2">Need more AI usage? Add extra customer chats to your plan.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {aiAddOns.map((addon) => (
+              <Card key={addon.label} className="border border-black/5 shadow-sm">
+                <CardContent className="p-6 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#0B1F17] rounded-xl flex items-center justify-center flex-shrink-0">
+                      <MessageSquare className="w-5 h-5 text-[#25D366]" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[#0B1F17]">{addon.label}</p>
+                      <p className="text-2xl font-bold font-['Bricolage_Grotesque'] text-[#0B1F17] mt-0.5">TSh {addon.price}<span className="text-sm font-normal text-[#4A5850]">/month</span></p>
+                    </div>
                   </div>
-                </div>
-                <div className="border-t pt-3">
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total</span>
-                    <span className="text-[#25D366]">TZS 25,000 / month</span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-lg border border-[#25D366]">
-                <Badge className="mb-2 bg-[#25D366]">Most Common</Badge>
-                <h3 className="font-bold text-lg mb-3 text-gray-900">Service Business (AI Only)</h3>
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Starter plan</span>
-                    <span className="font-semibold">45,000</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Extra 3,000 AI replies</span>
-                    <span className="font-semibold">20,000</span>
-                  </div>
-                </div>
-                <div className="border-t pt-3">
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total</span>
-                    <span className="text-[#25D366]">TZS 65,000 / month</span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white p-6 rounded-lg border">
-                <h3 className="font-bold text-lg mb-3 text-gray-900">Busy Business (Full Suite)</h3>
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Business plan</span>
-                    <span className="font-semibold">95,000</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Store package</span>
-                    <span className="font-semibold">25,000</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Extra 5,000 AI replies</span>
-                    <span className="font-semibold">45,000</span>
-                  </div>
-                </div>
-                <div className="border-t pt-3">
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total</span>
-                    <span className="text-[#25D366]">TZS 165,000 / month</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Additional Features */}
-        
-
-        {/* FAQs */}
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
-            Frequently Asked Questions
-          </h2>
-          <div className="space-y-6">
-            {faqs.map((faq, index) => (
-              <Card key={index}>
-                <CardHeader>
-                  <CardTitle className="text-lg">{faq.question}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-gray-600">{faq.answer}</p>
                 </CardContent>
               </Card>
             ))}
           </div>
         </div>
 
-        {/* CTA Section */}
-        <div className="text-center mt-20">
-          <Card className="bg-gradient-to-r from-[#25D366] to-[#20BD5A] text-white border-0">
-            <CardContent className="py-12">
-              <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
-              <p className="text-lg mb-6 opacity-90">
-                Start now with simple onboarding process.
-              </p>
-              <Button
-                size="lg"
-                variant="secondary"
-                onClick={() => navigate('/onboarding/account')}
-              >
-                Start Now
-              </Button>
-            </CardContent>
-          </Card>
+        {/* FAQs */}
+        <div className="max-w-3xl mx-auto mb-20">
+          <div className="text-center mb-12">
+            <span className="text-xs font-['JetBrains_Mono'] uppercase tracking-widest text-[#0E7A43] font-semibold">Questions</span>
+            <h2 className="font-['Bricolage_Grotesque'] font-bold text-3xl text-[#0B1F17] mt-3">Frequently asked questions</h2>
+          </div>
+          <div className="space-y-3">
+            {faqs.map((faq, index) => (
+              <Card key={index} className="border border-black/5 shadow-sm">
+                <CardContent className="p-5">
+                  <h3 className="font-bold font-['Bricolage_Grotesque'] text-[#0B1F17] mb-1.5">{faq.question}</h3>
+                  <p className="text-sm text-[#4A5850] leading-relaxed">{faq.answer}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
 
-        {/* Footer */}
-        <footer className="border-t bg-white/80 backdrop-blur-sm mt-20">
-          <div className="container mx-auto px-4 py-12">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain" />
-                </div>
-                <p className="text-gray-600 text-sm">
-                  Automate your business communications with AI-powered responses, online store, and booking system.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-4">Product</h4>
-                <ul className="space-y-2 text-sm">
-                  <li>
-                    <button onClick={() => navigate('/features')} className="text-gray-600 hover:text-[#25D366]">
-                      Features
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={() => navigate('/pricing')} className="text-gray-600 hover:text-[#25D366]">
-                      Pricing
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={() => navigate('/shop')} className="text-gray-600 hover:text-[#25D366]">
-                      Store Demo
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-4">Company</h4>
-                <ul className="space-y-2 text-sm">
-                  <li>
-                    <button onClick={() => navigate('/about')} className="text-gray-600 hover:text-[#25D366]">
-                      About
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={() => navigate('/contact')} className="text-gray-600 hover:text-[#25D366]">
-                      Contact Us
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={() => navigate('/terms')} className="text-gray-600 hover:text-[#25D366]">
-                      Terms & Conditions
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-4">Get Started</h4>
-                <Button 
-                  className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mb-3"
-                  onClick={() => navigate('/onboarding/account')}
-                >
-                  Start Now
-                </Button>
-              </div>
+        {/* CTA */}
+        <div className="mb-4">
+          <div className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-br from-[#0E7A43] to-[#0B1F17] px-8 py-14 md:py-16 text-center relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-52 h-52 bg-[#FFA630]/20 rounded-full blur-3xl" />
+            <ShieldCheck className="w-10 h-10 text-[#25D366] mx-auto mb-5" />
+            <h2 className="font-['Bricolage_Grotesque'] font-bold text-3xl md:text-4xl text-white max-w-xl mx-auto">
+              Ready to get started?
+            </h2>
+            <p className="text-white/70 mt-4 max-w-md mx-auto">
+              Start now — the onboarding is simple, and you can be live on WhatsApp today.
+            </p>
+            <Button
+              size="lg"
+              className="bg-[#25D366] hover:bg-white hover:text-[#0B1F17] text-[#0B1F17] text-base px-8 py-6 font-semibold mt-8 transition-colors"
+              onClick={() => navigate('/onboarding/account')}
+            >
+              Start now
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="border-t border-black/5 bg-white">
+        <div className="container mx-auto px-4 py-14">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
+            <div>
+              <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain mb-4" />
+              <p className="text-[#4A5850] text-sm leading-relaxed">
+                AI-powered WhatsApp replies, an online store, and payment
+                processing — everything a growing business needs, in one chat.
+              </p>
             </div>
-            <div className="border-t pt-8 text-center text-gray-600 text-sm">
-              <p>© 2026 Chati Solutions. Made for Tanzanian businesses.</p>
+            <div>
+              <h4 className="font-['Bricolage_Grotesque'] font-bold text-[#0B1F17] mb-4">Product</h4>
+              <ul className="space-y-2.5 text-sm">
+                <li><button onClick={() => navigate('/features')} className="text-[#4A5850] hover:text-[#0E7A43]">Features</button></li>
+                <li><button onClick={() => navigate('/pricing')} className="text-[#4A5850] hover:text-[#0E7A43]">Pricing</button></li>
+                <li><button onClick={() => navigate('/shop')} className="text-[#4A5850] hover:text-[#0E7A43]">Store demo</button></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-['Bricolage_Grotesque'] font-bold text-[#0B1F17] mb-4">Company</h4>
+              <ul className="space-y-2.5 text-sm">
+                <li><button onClick={() => navigate('/about')} className="text-[#4A5850] hover:text-[#0E7A43]">About</button></li>
+                <li><button onClick={() => navigate('/contact')} className="text-[#4A5850] hover:text-[#0E7A43]">Contact us</button></li>
+                <li><button onClick={() => navigate('/terms')} className="text-[#4A5850] hover:text-[#0E7A43]">Terms & Conditions</button></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-['Bricolage_Grotesque'] font-bold text-[#0B1F17] mb-4">Get started</h4>
+              <Button
+                className="w-full bg-[#0B1F17] hover:bg-[#0E7A43] text-white mb-3"
+                onClick={() => navigate('/onboarding/account')}
+              >
+                Start now
+              </Button>
+              <p className="text-xs text-[#4A5850]">Sign up today and let WhatsApp start selling for you.</p>
             </div>
           </div>
-        </footer>
-      </div>
+          <div className="border-t border-black/5 pt-7 text-center text-[#4A5850] text-sm">
+            <p>© 2026 Chati Solutions. Made for Tanzanian businesses.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

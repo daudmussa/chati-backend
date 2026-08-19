@@ -10,6 +10,7 @@ import nodemailer from "nodemailer";
 import sharp from "sharp";
 import crypto from "crypto";
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listStores as pgListStores, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById } from "./db-postgres.js";
+import { parseDateTime, getSuggestedExpressions } from "./src/lib/dateParser.js";
 
 
 console.log("[startup] Loading env...");
@@ -375,6 +376,8 @@ app.post("/webhook", async (req, res) => {
       let userPaymentItems = [];
       let userPaymentsEnabled = false;
       let bookingPaymentRequired = false;
+      let userProducts = [];
+      let userStoreEnabled = false;
       
       if (userCreds?.userId) {
         try {
@@ -405,6 +408,15 @@ app.post("/webhook", async (req, res) => {
             userPaymentItems = userPaymentItems.filter(item => item.isActive);
             console.log('[webhook] Active payment items:', userPaymentItems.length);
           }
+          
+          // Load products if store is enabled
+          userProducts = await listProducts(userCreds.userId);
+          userStoreEnabled = userProducts.length > 0;
+          console.log('[webhook] Store enabled:', userStoreEnabled, 'Products:', userProducts.length);
+        } catch (e) {
+          console.warn('[webhook] Failed to load booking/payment/settings:', e.message);
+        }
+      }
         } catch (e) {
           console.warn('[webhook] Failed to load booking/payment settings:', e.message);
         }
@@ -788,95 +800,24 @@ app.post("/webhook", async (req, res) => {
               : "Please provide your name.";
           }
         } else if (userState && userState.step === 'awaiting_time') {
-          // User is providing date and time
-          const userInput = incomingMsg.toLowerCase();
+          // User is providing date and time - use natural language parser
+          const lang = userState.language || 'en';
           
-          // Try to parse the date and time from user input
-          let selectedDate = null;
-          let selectedTime = null;
-          let foundDateMatch = false;
-          let foundTimeMatch = false;
+          // Use the improved natural language date/time parser
+          const parsed = parseDateTime(
+            incomingMsg,
+            userState.availableDates || [],
+            userState.timeSlots || [],
+            lang
+          );
           
-          // Enhanced date parsing - try multiple formats
-          for (const availDate of userState.availableDates) {
-            const dateObj = new Date(availDate);
-            const year = dateObj.getFullYear();
-            const month = dateObj.getMonth();
-            const day = dateObj.getDate();
-            
-            // Create various date format strings to match against
-            const formats = [
-              dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }), // "January 5"
-              dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }), // "January 5, 2025"
-              dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), // "Jan 5"
-              dateObj.toISOString().split('T')[0], // "2025-01-05"
-              `${month + 1}/${day}`, // "1/5"
-              `${month + 1}/${day}/${year}`, // "1/5/2025"
-              `${day}/${month + 1}`, // "5/1"
-              `${day}-${month + 1}`, // "5-1"
-              dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }), // "Monday, January 5"
-            ];
-            
-            // Check if any format matches the user input
-            for (const format of formats) {
-              if (userInput.includes(format.toLowerCase())) {
-                selectedDate = availDate;
-                foundDateMatch = true;
-                break;
-              }
-            }
-            
-            if (foundDateMatch) break;
-            
-            // Try to match just the day number if month/year context exists
-            const dayPattern = new RegExp(`\\b${day}\\b`);
-            const monthName = dateObj.toLocaleDateString('en-US', { month: 'long' }).toLowerCase();
-            const monthShort = dateObj.toLocaleDateString('en-US', { month: 'short' }).toLowerCase();
-            
-            if (dayPattern.test(userInput) && (userInput.includes(monthName) || userInput.includes(monthShort))) {
-              selectedDate = availDate;
-              foundDateMatch = true;
-              break;
-            }
-          }
-          
-          // Enhanced time parsing - try multiple formats
-          const timePatterns = [
-            /(\d{1,2}):(\d{2})\s*(am|pm)/i,     // "10:00 AM"
-            /(\d{1,2}):(\d{2})\s*([ap]m)/i,     // "10:00AM"
-            /(\d{1,2})\s*(am|pm)/i,             // "10 AM"
-            /(\d{1,2}):(\d{2})/,                // "10:00" (24-hour)
-            /(\d{1,2})\s*([ap]\.?m\.?)/i,      // "10am" or "10 a.m."
-          ];
-          
-          for (const pattern of timePatterns) {
-            const timeMatch = incomingMsg.match(pattern);
-            if (timeMatch) {
-              foundTimeMatch = true;
-              let hour = parseInt(timeMatch[1]);
-              const minute = timeMatch[2] || '00';
-              const meridiem = timeMatch[3] ? timeMatch[3].toUpperCase().replace(/\./g, '') : null;
-              
-              // Handle 12-hour format
-              if (meridiem) {
-                if (meridiem.startsWith('P') && hour < 12) hour += 12;
-                if (meridiem.startsWith('A') && hour === 12) hour = 0;
-                selectedTime = `${hour > 12 ? hour - 12 : hour || 12}:${minute} ${meridiem.startsWith('P') ? 'PM' : 'AM'}`;
-              } else {
-                // 24-hour format or assume based on hour
-                if (hour >= 12) {
-                  selectedTime = `${hour > 12 ? hour - 12 : 12}:${minute} PM`;
-                } else {
-                  selectedTime = `${hour || 12}:${minute} AM`;
-                }
-              }
-              break;
-            }
-          }
+          let selectedDate = parsed.date;
+          let selectedTime = parsed.time;
+          let foundDateMatch = parsed.dateFound;
+          let foundTimeMatch = parsed.timeFound;
           
           // If we couldn't parse, provide helpful response with available options
           if (!foundDateMatch && !foundTimeMatch) {
-            const lang = userState.language || 'en';
             const datesList = userState.availableDates.map((d, i) => {
               const date = new Date(d);
               return `${i + 1}. ${date.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}`;
@@ -888,24 +829,22 @@ app.post("/webhook", async (req, res) => {
               : '';
             
             if (lang === 'sw') {
-              messageToSend = `Samahani, sikuelewa tarehe na saa. Tafadhali toa katika muundo ulio wazi.\n\n📅 *Tarehe Zinazopatikana:*\n${datesList}${timesList ? `\n\n⏰ *Masaa Yanayopatikana:*\n${timesList}` : ''}\n\n*Mfano:* "Januari 5 saa 10:00 AM" au "2025-01-05 10:00 AM"`;
+              messageToSend = `Samahani, sikuelewa tarehe na saa. Tafadhali toa katika muundo ulio wazi.\n\n📅 *Tarehe Zinazopatikana:*\n${datesList}${timesList ? `\n\n⏰ *Masaa Yanayopatikana:*\n${timesList}` : ''}\n\n*Mifano:* "Kesho 10:00 AM", "5 Januari 2:00 PM", "10AM", "2:30PM"`;
             } else {
-              messageToSend = `I couldn't understand the date and time. Please provide them in a clear format.\n\n📅 *Available Dates:*\n${datesList}${timesList ? `\n\n⏰ *Available Times:*\n${timesList}` : ''}\n\n*Example:* "January 5 at 10:00 AM" or "2025-01-05 10:00 AM"`;
+              messageToSend = `I couldn't understand the date and time. Please provide them clearly.\n\n📅 *Available Dates:*\n${datesList}${timesList ? `\n\n⏰ *Available Times:*\n${timesList}` : ''}\n\n*Examples:* "Tomorrow 10:00 AM", "January 5 2:00 PM", "10AM", "2:30PM"`;
             }
           } else if (!foundDateMatch) {
-            const lang = userState.language || 'en';
             const datesList = userState.availableDates.map((d, i) => {
               const date = new Date(d);
               return `${i + 1}. ${date.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}`;
             }).join('\n');
             
             if (lang === 'sw') {
-              messageToSend = `Nimepata saa yako (${selectedTime || 'saa uliyoomba'}) lakini sikuelewa tarehe.\n\n📅 *Tafadhali chagua kutoka kwa tarehe zinazopatikana:*\n\n${datesList}\n\n*Jibu tena kwa tarehe na saa, mfano:* "Januari 5 saa ${selectedTime || '10:00 AM'}"`;  
+              messageToSend = `Nimepata saa yako (${selectedTime || 'saa uliyoomba'}) lakini sikuelewa tarehe.\n\n📅 *Tafadhali chagua kutoka kwa tarehe zinazopatikana:*\n\n${datesList}\n\n*Jibu tena kwa tarehe na saa, mfano:* "Kesho 10:00 AM" au "5 Januari 2:00 PM"`;  
             } else {
-              messageToSend = `I found your time (${selectedTime || 'your requested time'}) but couldn't understand the date.\n\n📅 *Please choose from our available dates:*\n\n${datesList}\n\n*Reply with the date and time again, for example:* "January 5 at ${selectedTime || '10:00 AM'}"`;  
+              messageToSend = `I found your time (${selectedTime || 'your requested time'}) but couldn't understand the date.\n\n📅 *Please choose from our available dates:*\n\n${datesList}\n\n*Reply with the date and time again, for example:* "Tomorrow 10:00 AM" or "January 5 2:00 PM"`;  
             }
           } else if (!foundTimeMatch) {
-            const lang = userState.language || 'en';
             const selectedService = userServices.find(s => s.id === userState.serviceId);
             const timesList = selectedService && selectedService.timeSlots && selectedService.timeSlots.length > 0
               ? selectedService.timeSlots.slice(0, 12).join(', ')
@@ -914,9 +853,9 @@ app.post("/webhook", async (req, res) => {
             const dateFormatted = new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
             
             if (lang === 'sw') {
-              messageToSend = `Nimepata tarehe yako (${dateFormatted}) lakini sikuelewa saa.\n\n⏰ *Masaa Yanayopatikana:*\n${timesList}\n\n*Tafadhali jibu kwa tarehe na saa kamili, mfano:* "${dateFormatted} saa 10:00 AM"`;  
+              messageToSend = `Nimepata tarehe yako (${dateFormatted}) lakini sikuelewa saa.\n\n⏰ *Masaa Yanayopatikana:*\n${timesList}\n\n*Tafadhali jibu kwa tarehe na saa kamili, mfano:* "${dateFormatted} 10:00 AM" au "${dateFormatted} 2:30PM"`;  
             } else {
-              messageToSend = `I found your date (${dateFormatted}) but couldn't understand the time.\n\n⏰ *Available Times:*\n${timesList}\n\n*Please reply with the complete date and time, for example:* "${dateFormatted} at 10:00 AM"`;  
+              messageToSend = `I found your date (${dateFormatted}) but couldn't understand the time.\n\n⏰ *Available Times:*\n${timesList}\n\n*Please reply with the complete date and time, for example:* "${dateFormatted} 10:00 AM" or "${dateFormatted} 2:30PM"`;  
             }
           } else if (selectedDate && selectedTime) {
             // Get the selected service to validate time slots
@@ -1209,6 +1148,242 @@ app.post("/webhook", async (req, res) => {
           }
         }
       } else {
+        // Check for product/store keywords
+        const productKeywords = ['product', 'products', 'store', 'shop', 'catalog', 'nunua', 'buy', 'order', 'show me'];
+        const isProductInquiry = productKeywords.some(keyword => 
+          incomingMsg.toLowerCase().includes(keyword)
+        );
+        
+        const productState = conversation.productState || null;
+        let productHandled = false;
+        
+        // Handle cancel during product ordering flow
+        if (isCancelRequest && productState) {
+          const lang = productState.language || conversation.language || 'en';
+          messageToSend = lang === 'sw'
+            ? "Sawa, nimeghairi oda yako. Je, kuna kitu kingine ninachoweza kukusaidia?"
+            : "Okay, I've cancelled your order. Is there anything else I can help you with?";
+          delete conversation.productState;
+          productHandled = true;
+        } else if (productState || (isProductInquiry && userStoreEnabled)) {
+          if (!productState && isProductInquiry) {
+            // Initial product inquiry
+            if (!conversation.language) {
+              const swahiliKeywords = ['ndiyo', 'ndio', 'nafasi', 'naomba', 'nataka', 'je', 'sawa', 'ahsante', 'tafadhali', 'habari', 'nunua', 'bidhaa'];
+              const isSwahili = swahiliKeywords.some(word => incomingMsg.toLowerCase().includes(word));
+              conversation.language = isSwahili ? 'sw' : 'en';
+            }
+            const lang = conversation.language || 'en';
+            
+            if (userStoreEnabled && userProducts.length > 0) {
+              let productsText = lang === 'sw'
+                ? "Karibu kwenye duka letu! 🛍️\n\nHizi ndizo bidhaa zilizopo:\n\n"
+                : "Welcome to our store! 🛍️\n\nHere are our available products:\n\n";
+              
+              userProducts.forEach((product, index) => {
+                productsText += `${index + 1}. *${product.title}*\n`;
+                productsText += `   💰 TSh ${product.price.toLocaleString()}\n`;
+                productsText += `   📝 ${product.description || 'No description'}\n`;
+                productsText += `   📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\n`;
+              });
+              
+              productsText += lang === 'sw'
+                ? "Tafadhali jibu kwa namba ya bidhaa unayotaka kuagiza."
+                : "Please reply with the number of the product you want to order.";
+              
+              conversation.productState = { step: 'awaiting_product', language: lang, cart: [] };
+              messageToSend = productsText;
+              productHandled = true;
+            } else {
+              messageToSend = lang === 'sw'
+                ? "Samahani, hakuna bidhaa zinazopatikana kwa sasa. Tafadhali wasiliana nasi moja kwa moja."
+                : "Sorry, there are no products available at the moment. Please contact us directly for assistance.";
+              productHandled = true;
+            }
+          } else if (productState && productState.step === 'awaiting_product') {
+            const lang = productState.language || 'en';
+            const productNum = parseInt(incomingMsg.trim());
+            
+            if (productNum > 0 && productNum <= userProducts.length) {
+              const selectedProduct = userProducts[productNum - 1];
+              
+              if (!selectedProduct.inStock) {
+                messageToSend = lang === 'sw'
+                  ? `Samahani, ${selectedProduct.title} haipo kwa sasa. Chagua bidhaa nyingine.`
+                  : `Sorry, ${selectedProduct.title} is out of stock. Please choose another product.`;
+                productHandled = true;
+              } else {
+                conversation.productState = {
+                  step: 'awaiting_quantity',
+                  language: lang,
+                  product: selectedProduct,
+                  cart: productState.cart || []
+                };
+                messageToSend = lang === 'sw'
+                  ? `Umechagua *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nJe, unataka idadi ngapi?`
+                  : `You selected *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nHow many would you like?`;
+                productHandled = true;
+              }
+            } else if (incomingMsg.toLowerCase() === 'checkout' || incomingMsg.toLowerCase() === 'maliza') {
+              // Proceed to checkout with items in cart
+              if (productState.cart && productState.cart.length > 0) {
+                conversation.productState = { step: 'awaiting_details', language: lang, cart: productState.cart };
+                messageToSend = lang === 'sw'
+                  ? "Sawa! Tafadhali toa jina lako kamili."
+                  : "Great! Please provide your full name.";
+                productHandled = true;
+              } else {
+                messageToSend = lang === 'sw'
+                  ? "Kikapu chako kimetupu. Tafadhali chagua bidhaa kwanza."
+                  : "Your cart is empty. Please select a product first.";
+                productHandled = true;
+              }
+            } else {
+              messageToSend = lang === 'sw'
+                ? "Tafadhali chagua namba halali (1-" + userProducts.length + ") au uandike 'checkout' kuagiza vilivyochaguliwa."
+                : "Please choose a valid number (1-" + userProducts.length + ") or type 'checkout' to order selected items.";
+              productHandled = true;
+            }
+          } else if (productState && productState.step === 'awaiting_quantity') {
+            const lang = productState.language || 'en';
+            const quantity = parseInt(incomingMsg.trim());
+            
+            if (quantity > 0 && quantity <= 50) {
+              const { product, cart } = productState;
+              const itemTotal = product.price * quantity;
+              
+              cart.push({
+                productId: product.id,
+                title: product.title,
+                price: product.price,
+                quantity: quantity,
+                itemTotal: itemTotal
+              });
+              
+              const cartTotal = cart.reduce((sum, item) => sum + item.itemTotal, 0);
+              const cartSummary = cart.map(item => `   - ${item.title} x${item.quantity} = TSh ${item.itemTotal.toLocaleString()}`).join('\n');
+              
+              conversation.productState = { step: 'awaiting_more', language: lang, cart };
+              messageToSend = lang === 'sw'
+                ? `✅ ${product.title} x${quantity} imeongezwa kwenye kikapu.\n\n🛒 *Kikapu chako:*\n${cartSummary}\n\nJumla: TSh ${cartTotal.toLocaleString()}\n\nJe, ungependa kuongeza bidhaa nyingine? Andika namba ya bidhaa au 'checkout' kuendelea.`
+                : `✅ ${product.title} x${quantity} added to cart.\n\n🛒 *Your Cart:*\n${cartSummary}\n\nTotal: TSh ${cartTotal.toLocaleString()}\n\nWould you like to add more products? Type the product number or 'checkout' to proceed.`;
+              productHandled = true;
+            } else {
+              messageToSend = lang === 'sw'
+                ? "Tafadhali ingiza idadi halali (1-50)."
+                : "Please enter a valid quantity (1-50).";
+              productHandled = true;
+            }
+          } else if (productState && productState.step === 'awaiting_more') {
+            const lang = productState.language || 'en';
+            
+            if (incomingMsg.toLowerCase() === 'checkout' || incomingMsg.toLowerCase() === 'maliza') {
+              conversation.productState = { step: 'awaiting_details', language: lang, cart: productState.cart };
+              messageToSend = lang === 'sw'
+                ? "Sawa! Tafadhali toa jina lako kamili."
+                : "Great! Please provide your full name.";
+              productHandled = true;
+            } else {
+              const productNum = parseInt(incomingMsg.trim());
+              if (productNum > 0 && productNum <= userProducts.length) {
+                const selectedProduct = userProducts[productNum - 1];
+                if (!selectedProduct.inStock) {
+                  messageToSend = lang === 'sw'
+                    ? `Samahani, ${selectedProduct.title} haipo kwa sasa. Chagua bidhaa nyingine.`
+                    : `Sorry, ${selectedProduct.title} is out of stock. Please choose another product.`;
+                  productHandled = true;
+                } else {
+                  conversation.productState = {
+                    step: 'awaiting_quantity',
+                    language: lang,
+                    product: selectedProduct,
+                    cart: productState.cart
+                  };
+                  messageToSend = lang === 'sw'
+                    ? `Umechagua *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nJe, unataka idadi ngapi?`
+                    : `You selected *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nHow many would you like?`;
+                  productHandled = true;
+                }
+              } else {
+                messageToSend = lang === 'sw'
+                  ? "Tafadhali chagua namba halali ya bidhaa au uandike 'checkout' kuendelea."
+                  : "Please choose a valid product number or type 'checkout' to proceed.";
+                productHandled = true;
+              }
+            }
+          } else if (productState && productState.step === 'awaiting_details') {
+            const lang = productState.language || 'en';
+            conversation.productState = { ...productState, step: 'awaiting_phone', customerName: incomingMsg.trim() };
+            messageToSend = lang === 'sw'
+              ? "Asante! Tafadhali toa nambari yako ya simu."
+              : "Thank you! Please provide your phone number.";
+            productHandled = true;
+          } else if (productState && productState.step === 'awaiting_phone') {
+            const lang = productState.language || 'en';
+            const customerPhone = incomingMsg.trim();
+            
+            if (customerPhone.length < 7) {
+              messageToSend = lang === 'sw'
+                ? "Tafadhali toa nambari ya simu halali."
+                : "Please provide a valid phone number.";
+              productHandled = true;
+            } else {
+              try {
+                const { cart, customerName } = productState;
+                const totalAmount = cart.reduce((sum, item) => sum + item.itemTotal, 0);
+                const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+                
+                const orderId = crypto.randomBytes(8).toString('hex');
+                await createOrder(userCreds.userId, {
+                  id: orderId,
+                  customerName: customerName,
+                  customerPhone: customerPhone,
+                  items: cart.map(item => ({
+                    productId: item.productId,
+                    title: item.title,
+                    price: item.price,
+                    quantity: item.quantity
+                  })),
+                  totalAmount: totalAmount,
+                  totalItems: totalItems,
+                  status: 'pending',
+                  paymentStatus: 'unpaid'
+                });
+                
+                const orderSummary = cart.map(item => `   - ${item.title} x${item.quantity} = TSh ${item.itemTotal.toLocaleString()}`).join('\n');
+                
+                if (lang === 'sw') {
+                  messageToSend = `✅ *Oda Imepokelewa!*\n\n` +
+                    `👤 Jina: ${customerName}\n` +
+                    `📱 Simu: ${customerPhone}\n` +
+                    `🆔 Nambari ya Oda: ${orderId}\n\n` +
+                    `🛒 *Vilivyochaguliwa:*\n${orderSummary}\n\n` +
+                    `💰 *Jumla: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                    `Tutawasiliana nawe hivi karibuni kwa ajili ya uthibitisho na malipo.`;
+                } else {
+                  messageToSend = `✅ *Order Received!*\n\n` +
+                    `👤 Name: ${customerName}\n` +
+                    `📱 Phone: ${customerPhone}\n` +
+                    `🆔 Order ID: ${orderId}\n\n` +
+                    `🛒 *Items:*\n${orderSummary}\n\n` +
+                    `💰 *Total: TSh ${totalAmount.toLocaleString()}*\n\n` +
+                    `We'll contact you soon for confirmation and payment.`;
+                }
+                
+                delete conversation.productState;
+                productHandled = true;
+              } catch (error) {
+                console.error('[webhook] Error creating order:', error);
+                messageToSend = lang === 'sw'
+                  ? "Samahani, kulikuwa na hitilafu kuchakata oda yako. Tafadhali jaribu tena baadaye."
+                  : "Sorry, there was an error processing your order. Please try again later.";
+                delete conversation.productState;
+                productHandled = true;
+              }
+            }
+          }
+        }
+        
         // Check for payment items keywords
         const paymentKeywords = ['pay', 'payment', 'lipa', 'malipo', 'order', 'order item', 'nunua', 'buy'];
         const isPaymentInquiry = paymentKeywords.some(keyword => 
@@ -1453,6 +1628,11 @@ CRITICAL RULES:
           // Add payment items information if enabled
           if (userPaymentsEnabled && userPaymentItems.length > 0) {
             systemPrompt += `\n\nIMPORTANT: This business has a payment system enabled. If a customer asks about payments, paying, ordering, or buying, inform them they can pay by saying "I want to pay" or "I want to order".`;
+          }
+          
+          // Add store/products information if enabled
+          if (userStoreEnabled && userProducts.length > 0) {
+            systemPrompt += `\n\nIMPORTANT: This business has an online store with products. If a customer asks about products, shopping, store, catalog, or wants to see/buy products, inform them they can browse products by saying "show products" or "show me products". They can order by selecting product numbers.`;
           }
 
           console.log(`Sending ${conversation.messages.length} messages to Claude for ${from}`);
