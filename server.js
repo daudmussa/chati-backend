@@ -1222,6 +1222,13 @@ app.post("/webhook", async (req, res) => {
           incomingMsg.toLowerCase().includes(keyword)
         );
         
+        // Check for image request (e.g., "img 1", "image 3", "picture 2")
+        const imageMatch = incomingMsg.toLowerCase().match(/^(img|image|picture|picha)\s*(\d+)/i);
+        
+        // Check for pagination commands
+        const isNextPage = ['next', 'mbele', 'following'].includes(incomingMsg.toLowerCase().trim());
+        const isPrevPage = ['prev', 'previous', 'back', 'nyuma'].includes(incomingMsg.toLowerCase().trim());
+        
         const productState = conversation.productState || null;
         let productHandled = false;
         
@@ -1233,6 +1240,57 @@ app.post("/webhook", async (req, res) => {
             : "Okay, I've cancelled your order. Is there anything else I can help you with?";
           delete conversation.productState;
           productHandled = true;
+        } else if (imageMatch && userStoreEnabled) {
+          // Handle image request
+          const productNum = parseInt(imageMatch[2]);
+          if (productNum > 0 && productNum <= userProducts.length) {
+            const product = userProducts[productNum - 1];
+            const lang = conversation.language || 'en';
+            
+            if (product.image) {
+              // Send image first
+              if (userTwilioClient) {
+                try {
+                  const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
+                  const fromNumber = USER_TWILIO_PHONE_NUMBER.startsWith('whatsapp:') ? USER_TWILIO_PHONE_NUMBER : `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
+                  
+                  await userTwilioClient.messages.create({
+                    from: fromNumber,
+                    to: toNumber,
+                    mediaUrl: [product.image],
+                  });
+                  
+                  // Then send product details
+                  messageToSend = lang === 'sw'
+                    ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nAndika namba ya bidhaa kuagiza, au "img X" kuona picha nyingine.`
+                    : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nType product number to order, or "img X" to see another image.`;
+                  productHandled = true;
+                } catch (err) {
+                  console.error('[webhook] Error sending product image:', err);
+                  messageToSend = lang === 'sw'
+                    ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nSamahani, picha haikuweza kutumwa. Tafadhali andika namba ya bidhaa kuagiza.`
+                    : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nSorry, image could not be sent. Please type product number to order.`;
+                  productHandled = true;
+                }
+              } else {
+                messageToSend = lang === 'sw'
+                  ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nAndika namba ya bidhaa kuagiza.`
+                  : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nType product number to order.`;
+                productHandled = true;
+              }
+            } else {
+              messageToSend = lang === 'sw'
+                ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nSamahani, hakuna picha ya bidhaa hii. Andika namba ya bidhaa kuagiza.`
+                : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nSorry, no image available for this product. Type product number to order.`;
+              productHandled = true;
+            }
+          } else {
+            const lang = conversation.language || 'en';
+            messageToSend = lang === 'sw'
+              ? "Tafadhali chagua namba halali ya bidhaa (k.m. 'img 1', 'img 2')."
+              : "Please choose a valid product number (e.g., 'img 1', 'img 2').";
+            productHandled = true;
+          }
         } else if (productState || (isProductInquiry && userStoreEnabled)) {
           if (!productState && isProductInquiry) {
             // Initial product inquiry
@@ -1244,22 +1302,44 @@ app.post("/webhook", async (req, res) => {
             const lang = conversation.language || 'en';
             
             if (userStoreEnabled && userProducts.length > 0) {
-              let productsText = lang === 'sw'
-                ? "Karibu kwenye duka letu! 🛍️\n\nHizi ndizo bidhaa zilizopo:\n\n"
-                : "Welcome to our store! 🛍️\n\nHere are our available products:\n\n";
+              // Initialize pagination
+              const productsPerPage = 10;
+              const totalPages = Math.ceil(userProducts.length / productsPerPage);
               
-              userProducts.forEach((product, index) => {
-                productsText += `${index + 1}. *${product.title}*\n`;
+              conversation.productState = { 
+                step: 'awaiting_product', 
+                language: lang, 
+                cart: [],
+                currentPage: 1,
+                totalPages: totalPages,
+                productsPerPage: productsPerPage
+              };
+              
+              // Show first page
+              const startIndex = 0;
+              const endIndex = Math.min(productsPerPage, userProducts.length);
+              const productsToShow = userProducts.slice(startIndex, endIndex);
+              
+              let productsText = lang === 'sw'
+                ? `Karibu kwenye duka letu! 🛍️\n\nTuna bidhaa ${userProducts.length} jumla. Hii ni kurasa ya 1/${totalPages}:\n\n`
+                : `Welcome to our store! 🛍️\n\nWe have ${userProducts.length} products. Showing page 1/${totalPages}:\n\n`;
+              
+              productsToShow.forEach((product, index) => {
+                const globalIndex = startIndex + index + 1;
+                productsText += `${globalIndex}. *${product.title}*\n`;
                 productsText += `   💰 TSh ${product.price.toLocaleString()}\n`;
-                productsText += `   📝 ${product.description || 'No description'}\n`;
+                if (product.description && product.description.length > 60) {
+                  productsText += `   📝 ${product.description.substring(0, 60)}...\n`;
+                } else {
+                  productsText += `   📝 ${product.description || 'No description'}\n`;
+                }
                 productsText += `   📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\n`;
               });
               
               productsText += lang === 'sw'
-                ? "Tafadhali jibu kwa namba ya bidhaa unayotaka kuagiza."
-                : "Please reply with the number of the product you want to order.";
+                ? `📸 Andika "img 1" kuona picha ya bidhaa #1\n🛒 Andika namba ya bidhaa kuagiza\n📄 Andika "next" kuona bidhaa zinazofuata`
+                : `📸 Type "img 1" to see image of product #1\n🛒 Type product number to order\n📄 Type "next" to see more products`;
               
-              conversation.productState = { step: 'awaiting_product', language: lang, cart: [] };
               messageToSend = productsText;
               productHandled = true;
             } else {
@@ -1270,31 +1350,87 @@ app.post("/webhook", async (req, res) => {
             }
           } else if (productState && productState.step === 'awaiting_product') {
             const lang = productState.language || 'en';
-            const productNum = parseInt(incomingMsg.trim());
             
-            if (productNum > 0 && productNum <= userProducts.length) {
-              const selectedProduct = userProducts[productNum - 1];
+            // Handle pagination
+            if (isNextPage && productState.currentPage < productState.totalPages) {
+              const newPage = productState.currentPage + 1;
+              const startIndex = (newPage - 1) * productState.productsPerPage;
+              const endIndex = Math.min(startIndex + productState.productsPerPage, userProducts.length);
+              const productsToShow = userProducts.slice(startIndex, endIndex);
               
-              if (!selectedProduct.inStock) {
-                messageToSend = lang === 'sw'
-                  ? `Samahani, ${selectedProduct.title} haipo kwa sasa. Chagua bidhaa nyingine.`
-                  : `Sorry, ${selectedProduct.title} is out of stock. Please choose another product.`;
-                productHandled = true;
-              } else {
-                conversation.productState = {
-                  step: 'awaiting_quantity',
-                  language: lang,
-                  product: selectedProduct,
-                  cart: productState.cart || []
-                };
-                messageToSend = lang === 'sw'
-                  ? `Umechagua *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nJe, unataka idadi ngapi?`
-                  : `You selected *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nHow many would you like?`;
-                productHandled = true;
+              let productsText = lang === 'sw'
+                ? `Bidhaa ${startIndex + 1}-${endIndex} kati ya ${userProducts.length}. Kurasa ya ${newPage}/${productState.totalPages}:\n\n`
+                : `Products ${startIndex + 1}-${endIndex} of ${userProducts.length}. Page ${newPage}/${productState.totalPages}:\n\n`;
+              
+              productsToShow.forEach((product, index) => {
+                const globalIndex = startIndex + index + 1;
+                productsText += `${globalIndex}. *${product.title}*\n`;
+                productsText += `   💰 TSh ${product.price.toLocaleString()}\n`;
+                if (product.description && product.description.length > 60) {
+                  productsText += `   📝 ${product.description.substring(0, 60)}...\n`;
+                } else {
+                  productsText += `   📝 ${product.description || 'No description'}\n`;
+                }
+                productsText += `   📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\n`;
+              });
+              
+              let navText = lang === 'sw'
+                ? `📸 Andika "img X" kuona picha\n🛒 Andika namba ya bidhaa kuagiza`
+                : `📸 Type "img X" to see image\n🛒 Type product number to order`;
+              
+              if (newPage < productState.totalPages) {
+                navText += lang === 'sw' ? `\n📄 Andika "next" kuona zaidi` : `\n📄 Type "next" to see more`;
               }
+              if (newPage > 1) {
+                navText += lang === 'sw' ? `\n🔙 Andika "prev" kurudi nyuma` : `\n🔙 Type "prev" to go back`;
+              }
+              
+              productsText += `\n${navText}`;
+              
+              conversation.productState.currentPage = newPage;
+              messageToSend = productsText;
+              productHandled = true;
+            } else if (isPrevPage && productState.currentPage > 1) {
+              const newPage = productState.currentPage - 1;
+              const startIndex = (newPage - 1) * productState.productsPerPage;
+              const endIndex = Math.min(startIndex + productState.productsPerPage, userProducts.length);
+              const productsToShow = userProducts.slice(startIndex, endIndex);
+              
+              let productsText = lang === 'sw'
+                ? `Bidhaa ${startIndex + 1}-${endIndex} kati ya ${userProducts.length}. Kurasa ya ${newPage}/${productState.totalPages}:\n\n`
+                : `Products ${startIndex + 1}-${endIndex} of ${userProducts.length}. Page ${newPage}/${productState.totalPages}:\n\n`;
+              
+              productsToShow.forEach((product, index) => {
+                const globalIndex = startIndex + index + 1;
+                productsText += `${globalIndex}. *${product.title}*\n`;
+                productsText += `   💰 TSh ${product.price.toLocaleString()}\n`;
+                if (product.description && product.description.length > 60) {
+                  productsText += `   📝 ${product.description.substring(0, 60)}...\n`;
+                } else {
+                  productsText += `   📝 ${product.description || 'No description'}\n`;
+                }
+                productsText += `   📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\n`;
+              });
+              
+              let navText = lang === 'sw'
+                ? `📸 Andika "img X" kuona picha\n🛒 Andika namba ya bidhaa kuagiza`
+                : `📸 Type "img X" to see image\n🛒 Type product number to order`;
+              
+              if (newPage < productState.totalPages) {
+                navText += lang === 'sw' ? `\n📄 Andika "next" kuona zaidi` : `\n📄 Type "next" to see more`;
+              }
+              if (newPage > 1) {
+                navText += lang === 'sw' ? `\n🔙 Andika "prev" kurudi nyuma` : `\n🔙 Type "prev" to go back`;
+              }
+              
+              productsText += `\n${navText}`;
+              
+              conversation.productState.currentPage = newPage;
+              messageToSend = productsText;
+              productHandled = true;
             } else if (incomingMsg.toLowerCase() === 'checkout' || incomingMsg.toLowerCase() === 'maliza') {
               if (productState.cart && productState.cart.length > 0) {
-                conversation.productState = { step: 'awaiting_details', language: lang, cart: productState.cart };
+                conversation.productState = { ...productState, step: 'awaiting_details', cart: productState.cart };
                 messageToSend = lang === 'sw'
                   ? "Sawa! Tafadhali toa jina lako kamili."
                   : "Great! Please provide your full name.";
@@ -1306,10 +1442,37 @@ app.post("/webhook", async (req, res) => {
                 productHandled = true;
               }
             } else {
-              messageToSend = lang === 'sw'
-                ? "Tafadhali chagua namba halali (1-" + userProducts.length + ") au uandike 'checkout' kuagiza vilivyochaguliwa."
-                : "Please choose a valid number (1-" + userProducts.length + ") or type 'checkout' to order selected items.";
-              productHandled = true;
+              const productNum = parseInt(incomingMsg.trim());
+              
+              if (productNum > 0 && productNum <= userProducts.length) {
+                const selectedProduct = userProducts[productNum - 1];
+                
+                if (!selectedProduct.inStock) {
+                  messageToSend = lang === 'sw'
+                    ? `Samahani, ${selectedProduct.title} haipo kwa sasa. Chagua bidhaa nyingine.`
+                    : `Sorry, ${selectedProduct.title} is out of stock. Please choose another product.`;
+                  productHandled = true;
+                } else {
+                  conversation.productState = {
+                    step: 'awaiting_quantity',
+                    language: lang,
+                    product: selectedProduct,
+                    cart: productState.cart || [],
+                    currentPage: productState.currentPage,
+                    totalPages: productState.totalPages,
+                    productsPerPage: productState.productsPerPage
+                  };
+                  messageToSend = lang === 'sw'
+                    ? `Umechagua *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nJe, unataka idadi ngapi? (1-50)`
+                    : `You selected *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nHow many would you like? (1-50)`;
+                  productHandled = true;
+                }
+              } else {
+                messageToSend = lang === 'sw'
+                  ? `Tafadhali chagua namba halali (1-${userProducts.length}), "next" kuona zaidi, au "img X" kuona picha.`
+                  : `Please choose a valid number (1-${userProducts.length}), "next" to see more, or "img X" to see an image.`;
+                productHandled = true;
+              }
             }
           } else if (productState && productState.step === 'awaiting_quantity') {
             const lang = productState.language || 'en';
@@ -1330,10 +1493,17 @@ app.post("/webhook", async (req, res) => {
               const cartTotal = cart.reduce((sum, item) => sum + item.itemTotal, 0);
               const cartSummary = cart.map(item => `   - ${item.title} x${item.quantity} = TSh ${item.itemTotal.toLocaleString()}`).join('\n');
               
-              conversation.productState = { step: 'awaiting_more', language: lang, cart };
+              conversation.productState = { 
+                step: 'awaiting_more', 
+                language: lang, 
+                cart,
+                currentPage: productState.currentPage,
+                totalPages: productState.totalPages,
+                productsPerPage: productState.productsPerPage
+              };
               messageToSend = lang === 'sw'
-                ? `✅ ${product.title} x${quantity} imeongezwa kwenye kikapu.\n\n🛒 *Kikapu chako:*\n${cartSummary}\n\nJumla: TSh ${cartTotal.toLocaleString()}\n\nJe, ungependa kuongeza bidhaa nyingine? Andika namba ya bidhaa au 'checkout' kuendelea.`
-                : `✅ ${product.title} x${quantity} added to cart.\n\n🛒 *Your Cart:*\n${cartSummary}\n\nTotal: TSh ${cartTotal.toLocaleString()}\n\nWould you like to add more products? Type the product number or 'checkout' to proceed.`;
+                ? `✅ ${product.title} x${quantity} imeongezwa kwenye kikapu.\n\n🛒 *Kikapu chako:*\n${cartSummary}\n\nJumla: TSh ${cartTotal.toLocaleString()}\n\nJe, ungependa kuongeza bidhaa nyingine? Andika namba ya bidhaa, "next" kuona zaidi, au 'checkout' kuendelea.`
+                : `✅ ${product.title} x${quantity} added to cart.\n\n🛒 *Your Cart:*\n${cartSummary}\n\nTotal: TSh ${cartTotal.toLocaleString()}\n\nWould you like to add more products? Type product number, "next" to see more, or 'checkout' to proceed.`;
               productHandled = true;
             } else {
               messageToSend = lang === 'sw'
@@ -1344,11 +1514,84 @@ app.post("/webhook", async (req, res) => {
           } else if (productState && productState.step === 'awaiting_more') {
             const lang = productState.language || 'en';
             
-            if (incomingMsg.toLowerCase() === 'checkout' || incomingMsg.toLowerCase() === 'maliza') {
+            // Check for image request
+            const imageMatch = incomingMsg.toLowerCase().match(/^(img|image|picture|picha)\s*(\d+)/i);
+            if (imageMatch) {
+              const productNum = parseInt(imageMatch[2]);
+              if (productNum > 0 && productNum <= userProducts.length) {
+                const product = userProducts[productNum - 1];
+                
+                if (product.image && userTwilioClient) {
+                  try {
+                    const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
+                    const fromNumber = USER_TWILIO_PHONE_NUMBER.startsWith('whatsapp:') ? USER_TWILIO_PHONE_NUMBER : `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
+                    
+                    await userTwilioClient.messages.create({
+                      from: fromNumber,
+                      to: toNumber,
+                      mediaUrl: [product.image],
+                    });
+                    
+                    messageToSend = lang === 'sw'
+                      ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nAndika namba ya bidhaa kuagiza, au "checkout" kuendelea.`
+                      : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nType product number to order, or "checkout" to proceed.`;
+                    productHandled = true;
+                  } catch (err) {
+                    console.error('[webhook] Error sending product image:', err);
+                  }
+                }
+                
+                if (!productHandled) {
+                  messageToSend = lang === 'sw'
+                    ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nAndika namba ya bidhaa kuagiza, au "checkout" kuendelea.`
+                    : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nType product number to order, or "checkout" to proceed.`;
+                  productHandled = true;
+                }
+              }
+            } else if (incomingMsg.toLowerCase() === 'checkout' || incomingMsg.toLowerCase() === 'maliza') {
               conversation.productState = { step: 'awaiting_details', language: lang, cart: productState.cart };
               messageToSend = lang === 'sw'
                 ? "Sawa! Tafadhali toa jina lako kamili."
                 : "Great! Please provide your full name.";
+              productHandled = true;
+            } else if (isNextPage && productState.currentPage < productState.totalPages) {
+              // Show next page of products
+              const newPage = productState.currentPage + 1;
+              const startIndex = (newPage - 1) * productState.productsPerPage;
+              const endIndex = Math.min(startIndex + productState.productsPerPage, userProducts.length);
+              const productsToShow = userProducts.slice(startIndex, endIndex);
+              
+              let productsText = lang === 'sw'
+                ? `Bidhaa ${startIndex + 1}-${endIndex} kati ya ${userProducts.length}. Kurasa ya ${newPage}/${productState.totalPages}:\n\n`
+                : `Products ${startIndex + 1}-${endIndex} of ${userProducts.length}. Page ${newPage}/${productState.totalPages}:\n\n`;
+              
+              productsToShow.forEach((product, index) => {
+                const globalIndex = startIndex + index + 1;
+                productsText += `${globalIndex}. *${product.title}*\n`;
+                productsText += `   💰 TSh ${product.price.toLocaleString()}\n`;
+                if (product.description && product.description.length > 60) {
+                  productsText += `   📝 ${product.description.substring(0, 60)}...\n`;
+                } else {
+                  productsText += `   📝 ${product.description || 'No description'}\n`;
+                }
+                productsText += `   📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\n`;
+              });
+              
+              let navText = lang === 'sw'
+                ? `📸 Andika "img X" kuona picha\n🛒 Andika namba ya bidhaa kuagiza`
+                : `📸 Type "img X" to see image\n🛒 Type product number to order`;
+              
+              if (newPage < productState.totalPages) {
+                navText += lang === 'sw' ? `\n📄 Andika "next" kuona zaidi` : `\n📄 Type "next" to see more`;
+              }
+              if (newPage > 1) {
+                navText += lang === 'sw' ? `\n🔙 Andika "prev" kurudi nyuma` : `\n🔙 Type "prev" to go back`;
+              }
+              
+              productsText += `\n${navText}\n\n💬 Au "checkout" kuendelea na oda`;
+              
+              conversation.productState = { ...productState, currentPage: newPage };
+              messageToSend = productsText;
               productHandled = true;
             } else {
               const productNum = parseInt(incomingMsg.trim());
@@ -1364,17 +1607,20 @@ app.post("/webhook", async (req, res) => {
                     step: 'awaiting_quantity',
                     language: lang,
                     product: selectedProduct,
-                    cart: productState.cart
+                    cart: productState.cart,
+                    currentPage: productState.currentPage,
+                    totalPages: productState.totalPages,
+                    productsPerPage: productState.productsPerPage
                   };
                   messageToSend = lang === 'sw'
-                    ? `Umechagua *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nJe, unataka idadi ngapi?`
-                    : `You selected *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nHow many would you like?`;
+                    ? `Umechagua *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nJe, unataka idadi ngapi? (1-50)`
+                    : `You selected *${selectedProduct.title}* (TSh ${selectedProduct.price.toLocaleString()})\n\nHow many would you like? (1-50)`;
                   productHandled = true;
                 }
               } else {
                 messageToSend = lang === 'sw'
-                  ? "Tafadhali chagua namba halali ya bidhaa au uandike 'checkout' kuendelea."
-                  : "Please choose a valid product number or type 'checkout' to proceed.";
+                  ? "Tafadhali chagua namba halali ya bidhaa, 'next' kuona zaidi, au 'checkout' kuendelea."
+                  : "Please choose a valid product number, 'next' to see more, or 'checkout' to proceed.";
                 productHandled = true;
               }
             }
