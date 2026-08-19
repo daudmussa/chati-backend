@@ -1222,6 +1222,9 @@ app.post("/webhook", async (req, res) => {
           incomingMsg.toLowerCase().includes(keyword)
         );
         
+        const productState = conversation.productState || null;
+        let productHandled = false;
+        
         // Check for image request (e.g., "img 1", "image 3", "picture 2")
         const imageMatch = incomingMsg.toLowerCase().match(/^(img|image|picture|picha)\s*(\d+)/i);
         
@@ -1236,9 +1239,6 @@ app.post("/webhook", async (req, res) => {
         // Check for pagination commands
         const isNextPage = ['next', 'mbele', 'following'].includes(incomingMsg.toLowerCase().trim());
         const isPrevPage = ['prev', 'previous', 'back', 'nyuma'].includes(incomingMsg.toLowerCase().trim());
-        
-        const productState = conversation.productState || null;
-        let productHandled = false;
         
         // Handle image request FIRST (before cancel check)
         if (imageMatch && userStoreEnabled && userProducts.length > 0) {
