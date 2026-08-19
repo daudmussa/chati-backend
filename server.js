@@ -1225,6 +1225,14 @@ app.post("/webhook", async (req, res) => {
         // Check for image request (e.g., "img 1", "image 3", "picture 2")
         const imageMatch = incomingMsg.toLowerCase().match(/^(img|image|picture|picha)\s*(\d+)/i);
         
+        console.log('[webhook] Product flow check:', {
+          incomingMsg: incomingMsg.trim(),
+          imageMatch: imageMatch ? imageMatch[0] : null,
+          userStoreEnabled,
+          userProductsCount: userProducts.length,
+          hasProductState: !!productState
+        });
+        
         // Check for pagination commands
         const isNextPage = ['next', 'mbele', 'following'].includes(incomingMsg.toLowerCase().trim());
         const isPrevPage = ['prev', 'previous', 'back', 'nyuma'].includes(incomingMsg.toLowerCase().trim());
@@ -1232,16 +1240,9 @@ app.post("/webhook", async (req, res) => {
         const productState = conversation.productState || null;
         let productHandled = false;
         
-        // Handle cancel during product ordering flow
-        if (isCancelRequest && productState) {
-          const lang = productState.language || conversation.language || 'en';
-          messageToSend = lang === 'sw'
-            ? "Sawa, nimeghairi oda yako. Je, kuna kitu kingine ninachoweza kukusaidia?"
-            : "Okay, I've cancelled your order. Is there anything else I can help you with?";
-          delete conversation.productState;
-          productHandled = true;
-        } else if (imageMatch && userStoreEnabled) {
-          // Handle image request
+        // Handle image request FIRST (before cancel check)
+        if (imageMatch && userStoreEnabled && userProducts.length > 0) {
+          console.log('[webhook] Handling image request:', imageMatch[0]);
           const productNum = parseInt(imageMatch[2]);
           if (productNum > 0 && productNum <= userProducts.length) {
             const product = userProducts[productNum - 1];
@@ -1299,7 +1300,17 @@ app.post("/webhook", async (req, res) => {
               : "Please choose a valid product number (e.g., 'img 1', 'img 2').";
             productHandled = true;
           }
-        } else if (productState || (isProductInquiry && userStoreEnabled)) {
+        }
+        
+        // Handle cancel during product ordering flow
+        if (isCancelRequest && productState) {
+          const lang = productState.language || conversation.language || 'en';
+          messageToSend = lang === 'sw'
+            ? "Sawa, nimeghairi oda yako. Je, kuna kitu kingine ninachoweza kukusaidia?"
+            : "Okay, I've cancelled your order. Is there anything else I can help you with?";
+          delete conversation.productState;
+          productHandled = true;
+        } else if (!productHandled && (productState || (isProductInquiry && userStoreEnabled))) {
           if (!productState && isProductInquiry) {
             // Initial product inquiry
             if (!conversation.language) {
