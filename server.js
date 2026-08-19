@@ -1259,20 +1259,23 @@ app.post("/webhook", async (req, res) => {
                   
                   console.log('[webhook] Sending image via Twilio:', product.image);
                   
-                  // Send image as media message
-                  const mediaMessage = await userTwilioClient.messages.create({
-                    from: fromNumber,
-                    to: toNumber,
-                    body: `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}`,
-                    mediaUrl: product.image,
-                  });
+                  // Try to send as media message (may not work in all WhatsApp configs)
+                  try {
+                    const mediaMessage = await userTwilioClient.messages.create({
+                      from: fromNumber,
+                      to: toNumber,
+                      body: `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}`,
+                      mediaUrl: product.image,
+                    });
+                    console.log('[webhook] Media message sent, SID:', mediaMessage.sid);
+                  } catch (mediaErr) {
+                    console.warn('[webhook] Media message failed, sending link instead:', mediaErr.message);
+                  }
                   
-                  console.log('[webhook] Image sent successfully, SID:', mediaMessage.sid);
-                  
-                  // Send product details as separate text message
+                  // Always send product details with clickable image link (100% reliable)
                   messageToSend = lang === 'sw'
-                    ? `📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nAndika namba ya bidhaa kuagiza, au "img X" kuona picha nyingine.`
-                    : `📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nType product number to order, or "img X" to see another image.`;
+                    ? `📸 *Picha:* ${product.image}\n\n*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nAndika namba ya bidhaa kuagiza, au "img X" kuona picha nyingine.`
+                    : `📸 *Image:* ${product.image}\n\n*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nType product number to order, or "img X" to see another image.`;
                   productHandled = true;
                 } catch (err) {
                   console.error('[webhook] Error sending product image:', err.message, err.response?.data);
