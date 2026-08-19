@@ -1247,6 +1247,8 @@ app.post("/webhook", async (req, res) => {
             const product = userProducts[productNum - 1];
             const lang = conversation.language || 'en';
             
+            console.log('[webhook] Image request for product:', productNum, 'Product:', product.title, 'Image URL:', product.image);
+            
             if (product.image) {
               // Send image first
               if (userTwilioClient) {
@@ -1254,11 +1256,15 @@ app.post("/webhook", async (req, res) => {
                   const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
                   const fromNumber = USER_TWILIO_PHONE_NUMBER.startsWith('whatsapp:') ? USER_TWILIO_PHONE_NUMBER : `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
                   
+                  console.log('[webhook] Sending image via Twilio:', product.image);
+                  
                   await userTwilioClient.messages.create({
                     from: fromNumber,
                     to: toNumber,
                     mediaUrl: [product.image],
                   });
+                  
+                  console.log('[webhook] Image sent successfully');
                   
                   // Then send product details
                   messageToSend = lang === 'sw'
@@ -1266,19 +1272,21 @@ app.post("/webhook", async (req, res) => {
                     : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nType product number to order, or "img X" to see another image.`;
                   productHandled = true;
                 } catch (err) {
-                  console.error('[webhook] Error sending product image:', err);
+                  console.error('[webhook] Error sending product image:', err.message, err.response?.data);
                   messageToSend = lang === 'sw'
                     ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nSamahani, picha haikuweza kutumwa. Tafadhali andika namba ya bidhaa kuagiza.`
                     : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nSorry, image could not be sent. Please type product number to order.`;
                   productHandled = true;
                 }
               } else {
+                console.log('[webhook] Twilio client not available for sending image');
                 messageToSend = lang === 'sw'
                   ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nAndika namba ya bidhaa kuagiza.`
                   : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nType product number to order.`;
                 productHandled = true;
               }
             } else {
+              console.log('[webhook] Product has no image');
               messageToSend = lang === 'sw'
                 ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nSamahani, hakuna picha ya bidhaa hii. Andika namba ya bidhaa kuagiza.`
                 : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nSorry, no image available for this product. Type product number to order.`;
