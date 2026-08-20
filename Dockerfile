@@ -18,6 +18,7 @@ WORKDIR /app
 COPY --from=builder /app/node_modules ./node_modules
 
 # Copy application files
+COPY server/ ./server/
 COPY server.js ./
 COPY db-credentials.js ./
 COPY db-postgres.js ./
