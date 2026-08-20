@@ -61,6 +61,11 @@ export const API_ENDPOINTS = {
   // User Credentials
   USER_CREDENTIALS: `${API_BASE_URL}/api/user/credentials`,
   
+  // Meta WhatsApp Embedded Signup
+  META_AUTH_URL: `${API_BASE_URL}/api/meta/auth-url`,
+  META_STATUS: `${API_BASE_URL}/api/meta/status`,
+  META_DISCONNECT: `${API_BASE_URL}/api/meta/disconnect`,
+  
   // Payment
   PAYMENT_SETTINGS: `${API_BASE_URL}/api/payment/settings`,
   PAYMENT_CREATE: `${API_BASE_URL}/api/payment/create`,

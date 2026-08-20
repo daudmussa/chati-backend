@@ -3,13 +3,71 @@ import bodyParser from "body-parser";
 import axios from "axios";
 import dotenv from "dotenv";
 import Twilio from "twilio";
+import { parseMetaWebhook, verifyWebhook, sendTextMessage, sendMediaMessage, normalizeNumber, exchangeCodeForToken, debugToken, subscribeAppToWaba, registerPhoneNumber, getPhoneNumbersByWaba, GRAPH_API_VERSION } from "./server/wa-api.js";
+
+// Unified WhatsApp message sender — prefers WABA (Meta Cloud API) when available,
+// otherwise falls back to Twilio.
+async function sendWhatsAppResponse({ userCreds, userTwilioClient, twilioFromNumber, to, body, mediaUrl }) {
+  const cleanTo = normalizeNumber(to);
+
+  if (userCreds?.wabaAccessToken && userCreds?.wabaPhoneNumberId) {
+    try {
+      if (mediaUrl) {
+        await sendMediaMessage({
+          accessToken: userCreds.wabaAccessToken,
+          phoneNumberId: userCreds.wabaPhoneNumberId,
+          to: cleanTo,
+          link: mediaUrl,
+          caption: body || '',
+        });
+      } else {
+        await sendTextMessage({
+          accessToken: userCreds.wabaAccessToken,
+          phoneNumberId: userCreds.wabaPhoneNumberId,
+          to: cleanTo,
+          body: body,
+        });
+      }
+      console.log('[send] ✅ Sent via WABA (Meta Cloud API)');
+      return;
+    } catch (err) {
+      console.error('[send] WABA send failed, trying Twilio fallback:', err.message);
+    }
+  }
+
+  if (userTwilioClient && twilioFromNumber) {
+    const toNumber = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+    const fromNumber = twilioFromNumber.startsWith('whatsapp:') ? twilioFromNumber : `whatsapp:${twilioFromNumber}`;
+    try {
+      if (mediaUrl) {
+        await userTwilioClient.messages.create({
+          from: fromNumber,
+          to: toNumber,
+          body: body || '',
+          mediaUrl: mediaUrl,
+        });
+      } else {
+        await userTwilioClient.messages.create({
+          body: body,
+          from: fromNumber,
+          to: toNumber,
+        });
+      }
+      console.log('[send] ✅ Sent via Twilio');
+    } catch (err) {
+      console.error('[send] Twilio send failed:', err.message);
+    }
+  } else {
+    console.warn('[send] ⚠️ No messaging provider configured (neither WABA nor Twilio)');
+  }
+}
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
 import crypto from "crypto";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listStores as pgListStores, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, clearWabaCredentials, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listStores as pgListStores, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -79,11 +137,25 @@ const BYPASS_CLAUDE =
   process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true";
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
+// Meta (WhatsApp Cloud API / Embedded Signup) OAuth configuration
+const META_APP_ID = stripQuotes(process.env.META_APP_ID);
+const META_APP_SECRET = stripQuotes(process.env.META_APP_SECRET);
+const META_CLIENT_TOKEN = stripQuotes(process.env.META_CLIENT_TOKEN);
+const META_CONFIG_ID = stripQuotes(process.env.META_CONFIG_ID);
+const META_VERIFY_TOKEN = stripQuotes(process.env.META_VERIFY_TOKEN);
+const META_AUTH_REDIRECT_URI = stripQuotes(process.env.META_AUTH_REDIRECT_URI);
+const APP_BASE_URL = stripQuotes(process.env.APP_BASE_URL) || "http://localhost:3000";
+
 console.log("[config] Environment check:");
 console.log("- CLAUDE_API_KEY:", CLAUDE_API_KEY ? `Set (${CLAUDE_API_KEY.substring(0, 10)}...)` : "MISSING");
 console.log("- TWILIO_ACCOUNT_SID:", TWILIO_ACCOUNT_SID ? `Set (${TWILIO_ACCOUNT_SID.substring(0, 10)}...)` : "MISSING");
 console.log("- TWILIO_AUTH_TOKEN:", TWILIO_AUTH_TOKEN ? "Set" : "MISSING");
 console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
+console.log("- META_APP_ID:", META_APP_ID ? "Set" : "MISSING");
+console.log("- META_APP_SECRET:", META_APP_SECRET ? "Set" : "MISSING");
+console.log("- META_CONFIG_ID:", META_CONFIG_ID ? "Set" : "MISSING");
+console.log("- META_VERIFY_TOKEN:", META_VERIFY_TOKEN ? "Set" : "MISSING");
+console.log("- META_AUTH_REDIRECT_URI:", META_AUTH_REDIRECT_URI || "MISSING");
 console.log("- BYPASS_CLAUDE:", BYPASS_CLAUDE);
 console.log("- JWT_SECRET:", JWT_SECRET !== "your-secret-key-change-in-production" ? "Set" : "Using default (CHANGE THIS)");
 
@@ -348,16 +420,39 @@ setInterval(() => {
   }
 }, 10 * 60 * 1000); // Check every 10 minutes
 
+// Meta WhatsApp Cloud API webhook verification (GET)
+app.get("/webhook", (req, res) => {
+  const result = verifyWebhook(req.query, META_VERIFY_TOKEN);
+  if (result) {
+    console.log('[webhook] Meta webhook verified successfully, returning challenge');
+    res.status(200).send(result.challenge);
+  } else {
+    console.log('[webhook] Webhook verification failed — token mismatch or not a Meta verification request');
+    res.status(403).send('Forbidden');
+  }
+});
+
 app.post("/webhook", async (req, res) => {
-  const incomingMsg = req.body.Body || req.body.body || "";
-  const from = req.body.From || req.body.from || "";
-  const to = req.body.To || req.body.to || "";
+  let incomingMsg, from, to;
 
-  console.log("Message from WhatsApp:", incomingMsg, "from:", from);
-
-  // Send immediate acknowledgment to Twilio
-  res.type("text/xml");
-  res.send(`<Response></Response>`);
+  // Detect Meta WhatsApp Cloud API webhook format (JSON)
+  const metaPayload = parseMetaWebhook(req.body);
+  if (metaPayload) {
+    incomingMsg = metaPayload.body;
+    from = metaPayload.from;
+    to = metaPayload.to;
+    console.log("[webhook] Meta webhook parsed:", { from, to, body: incomingMsg?.substring(0, 100) });
+    res.sendStatus(200); // Meta expects plain 200 OK
+  } else {
+    // Twilio webhook format (URL-encoded form)
+    incomingMsg = req.body.Body || req.body.body || "";
+    from = req.body.From || req.body.from || "";
+    to = req.body.To || req.body.to || "";
+    console.log("Message from WhatsApp:", incomingMsg, "from:", from);
+    // Send immediate acknowledgment to Twilio
+    res.type("text/xml");
+    res.send(`<Response></Response>`);
+  }
 
   // Process asynchronously with 5-7 second random delay
   const randomDelay = Math.floor(Math.random() * (7000 - 5000 + 1)) + 5000;
@@ -432,6 +527,9 @@ app.post("/webhook", async (req, res) => {
       }
 
       console.log(`[webhook] Using ${userCreds ? 'user-specific' : 'default'} credentials for ${from}`);
+      if (userCreds?.wabaAccessToken) {
+        console.log('[webhook] WABA (Meta Cloud API) configured — prefer direct WhatsApp API');
+      }
 
       // Check conversation limit before creating new conversation
       if (!conversationHistory.has(from) && userCreds?.userId) {
@@ -442,15 +540,13 @@ app.post("/webhook", async (req, res) => {
         if (existingConversations.length >= userLimits.maxConversations) {
           console.log(`[webhook] Conversation limit reached for user ${userCreds.userId}`);
           // Send a message to the customer that the business has reached their limit
-          if (userTwilioClient && USER_TWILIO_PHONE_NUMBER) {
-            const fromNumber = USER_TWILIO_PHONE_NUMBER.startsWith('whatsapp:') ? USER_TWILIO_PHONE_NUMBER : `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
-            const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
-            await userTwilioClient.messages.create({
-              body: "We're currently at capacity and unable to start new conversations. Please try again later or contact us through another channel.",
-              from: fromNumber,
-              to: toNumber,
-            });
-          }
+          await sendWhatsAppResponse({
+            userCreds,
+            userTwilioClient,
+            twilioFromNumber: USER_TWILIO_PHONE_NUMBER,
+            to: from,
+            body: "We're currently at capacity and unable to start new conversations. Please try again later or contact us through another channel.",
+          });
           return;
         }
       }
@@ -1251,46 +1347,26 @@ app.post("/webhook", async (req, res) => {
             console.log('[webhook] Image request for product:', productNum, 'Product:', product.title, 'Image URL:', product.image);
             
             if (product.image) {
-              // Send image first
-              if (userTwilioClient) {
-                try {
-                  const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
-                  const fromNumber = USER_TWILIO_PHONE_NUMBER.startsWith('whatsapp:') ? USER_TWILIO_PHONE_NUMBER : `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
-                  
-                  console.log('[webhook] Sending image via Twilio:', product.image);
-                  
-                  // Try to send as media message (may not work in all WhatsApp configs)
-                  try {
-                    const mediaMessage = await userTwilioClient.messages.create({
-                      from: fromNumber,
-                      to: toNumber,
-                      body: `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}`,
-                      mediaUrl: product.image,
-                    });
-                    console.log('[webhook] Media message sent, SID:', mediaMessage.sid);
-                  } catch (mediaErr) {
-                    console.warn('[webhook] Media message failed, sending link instead:', mediaErr.message);
-                  }
-                  
-                  // Always send product details with clickable image link (100% reliable)
-                  messageToSend = lang === 'sw'
-                    ? `📸 *Picha:* ${product.image}\n\n*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nAndika namba ya bidhaa kuagiza, au "img X" kuona picha nyingine.`
-                    : `📸 *Image:* ${product.image}\n\n*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nType product number to order, or "img X" to see another image.`;
-                  productHandled = true;
-                } catch (err) {
-                  console.error('[webhook] Error sending product image:', err.message, err.response?.data);
-                  messageToSend = lang === 'sw'
-                    ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nSamahani, picha haikuweza kutumwa. Tafadhali andika namba ya bidhaa kuagiza.`
-                    : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n\nSorry, image could not be sent. Please type product number to order.`;
-                  productHandled = true;
-                }
-              } else {
-                console.log('[webhook] Twilio client not available for sending image');
-                messageToSend = lang === 'sw'
-                  ? `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nAndika namba ya bidhaa kuagiza.`
-                  : `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nType product number to order.`;
-                productHandled = true;
+              // Send image first via WABA or Twilio
+              try {
+                console.log('[webhook] Sending product image:', product.image);
+                await sendWhatsAppResponse({
+                  userCreds,
+                  userTwilioClient,
+                  twilioFromNumber: USER_TWILIO_PHONE_NUMBER,
+                  to: from,
+                  body: `*${product.title}*\n💰 TSh ${product.price.toLocaleString()}`,
+                  mediaUrl: product.image,
+                });
+              } catch (mediaErr) {
+                console.warn('[webhook] Media message failed:', mediaErr.message);
               }
+              
+              // Always send product details with clickable image link (100% reliable)
+              messageToSend = lang === 'sw'
+                ? `📸 *Picha:* ${product.image}\n\n*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nAndika namba ya bidhaa kuagiza, au "img X" kuona picha nyingine.`
+                : `📸 *Image:* ${product.image}\n\n*${product.title}*\n💰 TSh ${product.price.toLocaleString()}\n📝 ${product.description || 'No description'}\n📦 ${product.inStock ? 'In Stock' : 'Out of Stock'}\n\nType product number to order, or "img X" to see another image.`;
+              productHandled = true;
             } else {
               console.log('[webhook] Product has no image');
               messageToSend = lang === 'sw'
@@ -1545,14 +1621,13 @@ app.post("/webhook", async (req, res) => {
               if (productNum > 0 && productNum <= userProducts.length) {
                 const product = userProducts[productNum - 1];
                 
-                if (product.image && userTwilioClient) {
+                if (product.image) {
                   try {
-                    const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
-                    const fromNumber = USER_TWILIO_PHONE_NUMBER.startsWith('whatsapp:') ? USER_TWILIO_PHONE_NUMBER : `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
-                    
-                    await userTwilioClient.messages.create({
-                      from: fromNumber,
-                      to: toNumber,
+                    await sendWhatsAppResponse({
+                      userCreds,
+                      userTwilioClient,
+                      twilioFromNumber: USER_TWILIO_PHONE_NUMBER,
+                      to: from,
                       mediaUrl: product.image,
                     });
                     
@@ -2131,25 +2206,17 @@ CRITICAL RULES:
         }
       }
 
-      // Send the message via Twilio
-      if (userTwilioClient && from) {
-        try {
-          const toNumber = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`;
-          const fromNumber = USER_TWILIO_PHONE_NUMBER.startsWith('whatsapp:') ? USER_TWILIO_PHONE_NUMBER : `whatsapp:${USER_TWILIO_PHONE_NUMBER}`;
-          
-          console.log(`Sending message from ${fromNumber} to ${toNumber}`);
-          
-          await userTwilioClient.messages.create({
-            body: messageToSend,
-            from: fromNumber,
-            to: toNumber,
-          });
-          console.log("✓ Message sent successfully to", toNumber);
-        } catch (err) {
-          console.error("✗ Error sending message via Twilio:", err.message);
-        }
+      // Send the message via WABA (Meta Cloud API) or Twilio fallback
+      if (from) {
+        await sendWhatsAppResponse({
+          userCreds,
+          userTwilioClient,
+          twilioFromNumber: USER_TWILIO_PHONE_NUMBER,
+          to: from,
+          body: messageToSend,
+        });
       } else {
-        console.warn("Cannot send message - missing Twilio client or phone number");
+        console.warn("[webhook] Cannot send message - no 'from' address");
       }
     } catch (err) {
       console.error("Error in message handler:", err);
@@ -3050,7 +3117,7 @@ app.get("/api/admin/users", async (req, res) => {
         name: dbUser.name,
         role: dbUser.role,
         storeName: settings?.businessName || settings?.businessDescription || 'No business name',
-        storePhone: credentials?.twilioPhoneNumber || 'No phone',
+        storePhone: credentials?.twilioPhoneNumber || credentials?.wabaPhoneNumberId || 'No phone',
         storeId: storeSettings?.storeId || dbUser.id.slice(0, 8),
         ordersCount: orders.length,
         bookingsCount: bookings.length,
@@ -3534,6 +3601,166 @@ app.get("/api/auth/me", async (req, res) => {
 });
 
 // ========================================
+// META OAUTH / EMBEDDED SIGNUP CALLBACK
+// ========================================
+// Meta redirects the customer's browser here with ?code=...&state=<userId>.
+// We exchange the code server-side, subscribe to the WABA, register the phone
+// number, save the credentials, then redirect back to the frontend dashboard.
+app.get("/auth/meta/callback", async (req, res) => {
+  const { code, state, error, error_description } = req.query;
+
+  if (error) {
+    console.error('[meta-oauth] Meta returned an error:', error, error_description);
+    return res.redirect(`${APP_BASE_URL}/dashboard?whatsapp=error&reason=${encodeURIComponent(error_description || error)}`);
+  }
+
+  if (!code) {
+    console.error('[meta-oauth] No authorization code in callback');
+    return res.redirect(`${APP_BASE_URL}/dashboard?whatsapp=error&reason=missing_code`);
+  }
+
+  const userId = state || null;
+
+  try {
+    // Step 1: Exchange the authorization code for a customer-scoped BISU token.
+    const { accessToken } = await exchangeCodeForToken({
+      appId: META_APP_ID,
+      appSecret: META_APP_SECRET,
+      code,
+      redirectUri: META_AUTH_REDIRECT_URI,
+    });
+
+    // Step 2: Discover the WABA IDs the token can access.
+    const debug = await debugToken({
+      accessToken,
+      appAccessToken: META_CLIENT_TOKEN,
+    });
+    const wabaId = debug.wabaIds?.[0];
+    if (!wabaId) {
+      throw new Error('No WhatsApp Business Account found in token scopes');
+    }
+
+    // Step 3: Subscribe our app to the customer's WABA for webhooks.
+    await subscribeAppToWaba({ wabaId, accessToken });
+
+    // Step 4: Register the business phone number (required to send messages).
+    const phoneNumbers = await getPhoneNumbersByWaba({ wabaId, accessToken });
+    const phone = phoneNumbers?.[0];
+    let phoneNumberId = phone?.id || null;
+    const displayPhone = phone?.displayPhoneNumber || null;
+    if (phoneNumberId) {
+      try {
+        await registerPhoneNumber({ phoneNumberId, pin: '000000', accessToken });
+      } catch (err) {
+        console.warn('[meta-oauth] Phone registration skipped:', err.message);
+      }
+    }
+
+    // Step 5: Persist the credentials so the app can send/receive messages.
+    if (userId) {
+      await saveUserCredentials(userId, {
+        wabaAccessToken: accessToken,
+        wabaPhoneNumberId: phoneNumberId,
+        wabaBusinessId: wabaId,
+        wabaVerifyToken: META_VERIFY_TOKEN,
+        wabaDisplayPhone: displayPhone,
+      });
+      if (phoneNumberId) {
+        await mapPhoneToUser(phoneNumberId, userId);
+      }
+      console.log('[meta-oauth] Credentials saved for user', userId, 'waba:', wabaId, 'phone:', displayPhone, 'phoneId:', phoneNumberId);
+    }
+
+    const query = [
+      'whatsapp=connected',
+      displayPhone ? `wa_phone=${encodeURIComponent(displayPhone)}` : '',
+    ].filter(Boolean).join('&');
+
+    return res.redirect(`${APP_BASE_URL}/dashboard?${query}`);
+  } catch (err) {
+    console.error('[meta-oauth] Callback processing failed:', err.message);
+    return res.redirect(`${APP_BASE_URL}/dashboard?whatsapp=error&reason=${encodeURIComponent(err.message)}`);
+  }
+});
+
+// ========================================
+// META WHATSAPP EMBEDDED SIGNUP API
+// ========================================
+
+// Returns the Meta Embedded Signup OAuth URL for the authenticated user.
+// The frontend redirects the browser to this URL to start the flow.
+app.get("/api/meta/auth-url", (req, res) => {
+  const userId = req.headers['x-user-id'];
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User ID required' });
+  }
+
+  if (!META_APP_ID || !META_CONFIG_ID || !META_AUTH_REDIRECT_URI) {
+    return res.status(500).json({ error: 'Meta integration not configured. Set META_APP_ID, META_CONFIG_ID, and META_AUTH_REDIRECT_URI.' });
+  }
+
+  const params = new URLSearchParams({
+    client_id: META_APP_ID,
+    redirect_uri: META_AUTH_REDIRECT_URI,
+    state: userId,
+    config_id: META_CONFIG_ID,
+    response_type: 'code',
+    override_default_response_type: 'true',
+  });
+
+  const authUrl = `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth?${params.toString()}`;
+
+  console.log('[meta-auth-url] Generated Embedded Signup URL for user', userId);
+  res.json({ url: authUrl });
+});
+
+// Returns the WhatsApp connection status for the authenticated user.
+app.get("/api/meta/status", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID required' });
+    }
+
+    const creds = await getUserCredentials(userId);
+
+    if (!creds || !creds.wabaAccessToken || !creds.wabaPhoneNumberId) {
+      return res.json({ connected: false });
+    }
+
+    res.json({
+      connected: true,
+      phone: creds.wabaDisplayPhone || null,
+      wabaId: creds.wabaBusinessId || null,
+      phoneNumberId: creds.wabaPhoneNumberId || null,
+    });
+  } catch (err) {
+    console.error('[meta-status] Error:', err.message);
+    res.status(500).json({ error: 'Failed to get WhatsApp status' });
+  }
+});
+
+// Disconnects WhatsApp for the authenticated user (clears WABA credentials).
+app.post("/api/meta/disconnect", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID required' });
+    }
+
+    await clearWabaCredentials(userId);
+    console.log('[meta-disconnect] WhatsApp disconnected for user', userId);
+    res.json({ success: true, message: 'WhatsApp disconnected successfully' });
+  } catch (err) {
+    console.error('[meta-disconnect] Error:', err.message);
+    res.status(500).json({ error: 'Failed to disconnect WhatsApp' });
+  }
+});
+
+// ========================================
 // USER CREDENTIALS MANAGEMENT API
 // ========================================
 
@@ -3547,7 +3774,9 @@ app.put("/api/user/credentials", async (req, res) => {
       hasClaudeKey: !!req.body.claudeApiKey,
       hasTwilioSid: !!req.body.twilioAccountSid,
       hasTwilioToken: !!req.body.twilioAuthToken,
-      twilioPhone: req.body.twilioPhoneNumber
+      twilioPhone: req.body.twilioPhoneNumber,
+      hasWabaToken: !!req.body.wabaAccessToken,
+      wabaPhoneId: req.body.wabaPhoneNumberId,
     });
     
     if (!userId) {
@@ -3560,6 +3789,11 @@ app.put("/api/user/credentials", async (req, res) => {
       twilioAccountSid,
       twilioAuthToken,
       twilioPhoneNumber,
+      wabaAccessToken,
+      wabaPhoneNumberId,
+      wabaBusinessId,
+      wabaVerifyToken,
+      wabaDisplayPhone,
       businessContext,
       bypassClaude
     } = req.body;
@@ -3570,13 +3804,19 @@ app.put("/api/user/credentials", async (req, res) => {
       twilioAccountSid,
       twilioAuthToken,
       twilioPhoneNumber,
+      wabaAccessToken,
+      wabaPhoneNumberId,
+      wabaBusinessId,
+      wabaVerifyToken,
+      wabaDisplayPhone,
       businessContext,
       bypassClaude
     });
 
-    // Map phone number to user if provided
-    if (twilioPhoneNumber) {
-      await mapPhoneToUser(twilioPhoneNumber, userId);
+    // Map phone number to user if provided (Twilio or WABA)
+    if (twilioPhoneNumber || wabaPhoneNumberId) {
+      const phoneToMap = twilioPhoneNumber || wabaPhoneNumberId;
+      await mapPhoneToUser(phoneToMap, userId);
     }
 
     console.log('[credentials] Successfully saved credentials for user:', userId);
@@ -3712,6 +3952,11 @@ app.get("/api/user/credentials", async (req, res) => {
       twilioAccountSid: credentials.twilioAccountSid ? '****' + credentials.twilioAccountSid.slice(-4) : null,
       twilioAuthToken: credentials.twilioAuthToken ? '********' : null,
       twilioPhoneNumber: credentials.twilioPhoneNumber,
+      wabaAccessToken: credentials.wabaAccessToken ? '****' + credentials.wabaAccessToken.slice(-4) : null,
+      wabaPhoneNumberId: credentials.wabaPhoneNumberId,
+      wabaBusinessId: credentials.wabaBusinessId,
+      wabaVerifyToken: credentials.wabaVerifyToken ? '****' + credentials.wabaVerifyToken.slice(-4) : null,
+      wabaDisplayPhone: credentials.wabaDisplayPhone,
       businessContext: credentials.businessContext,
       bypassClaude: credentials.bypassClaude,
       updatedAt: credentials.updatedAt

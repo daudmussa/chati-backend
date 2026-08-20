@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { MessageSquare, Send, Users, Calendar, CheckCircle, AlertCircle, Phone, Mail } from 'lucide-react';
+import { MessageSquare, Send, Users, Calendar, CheckCircle, AlertCircle, Phone, Mail, Link, Unlink } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { API_ENDPOINTS } from '@/config/api';
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [stats, setStats] = useState({
     totalMessages: 0,
     aiReplies: 0,
@@ -22,15 +23,87 @@ export default function Dashboard() {
 
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [whatsappStatus, setWhatsappStatus] = useState<{ connected: boolean; phone?: string | null; wabaId?: string | null }>({ connected: false });
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const [waError, setWaError] = useState<string | null>(null);
+
+  const fetchWhatsappStatus = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(API_ENDPOINTS.META_STATUS, {
+        headers: { 'x-user-id': user.id }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWhatsappStatus(data);
+      }
+    } catch (err) {
+      console.error('Error fetching WhatsApp status:', err);
+    }
+  }, [user?.id]);
+
+  // Check URL params for OAuth callback result
+  useEffect(() => {
+    const waParam = searchParams.get('whatsapp');
+    if (waParam === 'connected') {
+      fetchWhatsappStatus();
+    } else if (waParam === 'error') {
+      const reason = searchParams.get('reason') || 'Unknown error';
+      setWaError(`WhatsApp connection failed: ${decodeURIComponent(reason)}`);
+      setTimeout(() => setWaError(null), 8000);
+    }
+  }, [searchParams, fetchWhatsappStatus]);
 
   useEffect(() => {
     if (user?.id) {
       fetchDashboardData();
-      // Refresh every 10 seconds
+      fetchWhatsappStatus();
       const interval = setInterval(fetchDashboardData, 10000);
       return () => clearInterval(interval);
     }
-  }, [user?.id]);
+  }, [user?.id, fetchWhatsappStatus]);
+
+  const handleConnectWhatsApp = async () => {
+    if (!user?.id) return;
+    setWhatsappLoading(true);
+    setWaError(null);
+    try {
+      const res = await fetch(API_ENDPOINTS.META_AUTH_URL, {
+        headers: { 'x-user-id': user.id }
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to get auth URL');
+      }
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (err: any) {
+      setWaError(err.message || 'Failed to start WhatsApp connection');
+      setWhatsappLoading(false);
+    }
+  };
+
+  const handleDisconnectWhatsApp = async () => {
+    if (!user?.id) return;
+    setWhatsappLoading(true);
+    try {
+      const res = await fetch(API_ENDPOINTS.META_DISCONNECT, {
+        method: 'POST',
+        headers: { 'x-user-id': user.id }
+      });
+      if (res.ok) {
+        setWhatsappStatus({ connected: false });
+      } else {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to disconnect');
+      }
+    } catch (err: any) {
+      setWaError(err.message || 'Failed to disconnect WhatsApp');
+      setTimeout(() => setWaError(null), 5000);
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
 
   const fetchDashboardData = async () => {
     if (!user?.id) return;
@@ -93,6 +166,73 @@ export default function Dashboard() {
             Monitor your AI assistant's performance
           </p>
         </div>
+
+        {/* WhatsApp Connection Error Alert */}
+        {waError && (
+          <Alert className="border-2 border-red-500 bg-red-50">
+            <AlertCircle className="h-5 w-5 text-red-600" />
+            <AlertTitle className="text-sm font-bold text-red-900">WhatsApp Connection</AlertTitle>
+            <AlertDescription className="text-red-800 text-sm">
+              {waError}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* WhatsApp Connection Card */}
+        <Card className={whatsappStatus.connected ? 'border-[#25D366] border-2' : ''}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-[#25D366]" />
+              WhatsApp Connection
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {whatsappStatus.connected ? (
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-5 h-5 text-[#25D366]" />
+                    <span className="text-lg font-semibold text-gray-900">WhatsApp Connected</span>
+                  </div>
+                  {whatsappStatus.phone && (
+                    <p className="text-sm text-gray-600">
+                      Connected number: <span className="font-mono font-medium">{whatsappStatus.phone}</span>
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-400">
+                    WhatsApp Business Account ID: {whatsappStatus.wabaId || '—'}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleDisconnectWhatsApp}
+                  disabled={whatsappLoading}
+                  className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                >
+                  <Unlink className="w-4 h-4 mr-2" />
+                  {whatsappLoading ? 'Disconnecting...' : 'Disconnect WhatsApp'}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-600">
+                  Connect your WhatsApp Business account to start chatting with customers through your AI assistant.
+                </p>
+                <Button
+                  onClick={handleConnectWhatsApp}
+                  disabled={whatsappLoading}
+                  className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                >
+                  <Link className="w-4 h-4 mr-2" />
+                  {whatsappLoading ? 'Redirecting...' : 'Connect WhatsApp'}
+                </Button>
+                <p className="text-xs text-gray-400">
+                  You'll be redirected to Meta/Facebook to authorize and select your WhatsApp Business account.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Payment Required Alert */}
         {!user?.payDate && (

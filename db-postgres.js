@@ -113,6 +113,28 @@ export async function initSchema() {
     ADD COLUMN IF NOT EXISTS payments_enabled BOOLEAN DEFAULT FALSE;
   `);
   
+  // Migration: Add waba (WhatsApp Cloud API) columns to user_credentials
+  await p.query(`
+    ALTER TABLE user_credentials 
+    ADD COLUMN IF NOT EXISTS waba_access_token TEXT;
+  `);
+  await p.query(`
+    ALTER TABLE user_credentials 
+    ADD COLUMN IF NOT EXISTS waba_phone_number_id TEXT;
+  `);
+  await p.query(`
+    ALTER TABLE user_credentials 
+    ADD COLUMN IF NOT EXISTS waba_business_id TEXT;
+  `);
+  await p.query(`
+    ALTER TABLE user_credentials 
+    ADD COLUMN IF NOT EXISTS waba_verify_token TEXT;
+  `);
+  await p.query(`
+    ALTER TABLE user_credentials 
+    ADD COLUMN IF NOT EXISTS waba_display_phone TEXT;
+  `);
+
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_credentials (
       user_id TEXT PRIMARY KEY,
@@ -120,6 +142,11 @@ export async function initSchema() {
       twilio_account_sid TEXT,
       twilio_auth_token TEXT,
       twilio_phone_number TEXT,
+      waba_access_token TEXT,
+      waba_phone_number_id TEXT,
+      waba_business_id TEXT,
+      waba_verify_token TEXT,
+      waba_display_phone TEXT,
       business_context TEXT,
       bypass_claude BOOLEAN DEFAULT FALSE,
       updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -386,13 +413,20 @@ export async function saveUserCredentials(userId, credentials) {
   await p.query(`
     INSERT INTO user_credentials (
       user_id, claude_api_key, twilio_account_sid, twilio_auth_token,
-      twilio_phone_number, business_context, bypass_claude, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+      twilio_phone_number, waba_access_token, waba_phone_number_id,
+      waba_business_id, waba_verify_token, waba_display_phone,
+      business_context, bypass_claude, updated_at
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
     ON CONFLICT (user_id) DO UPDATE SET
       claude_api_key = EXCLUDED.claude_api_key,
       twilio_account_sid = EXCLUDED.twilio_account_sid,
       twilio_auth_token = EXCLUDED.twilio_auth_token,
       twilio_phone_number = EXCLUDED.twilio_phone_number,
+      waba_access_token = EXCLUDED.waba_access_token,
+      waba_phone_number_id = EXCLUDED.waba_phone_number_id,
+      waba_business_id = EXCLUDED.waba_business_id,
+      waba_verify_token = EXCLUDED.waba_verify_token,
+      waba_display_phone = EXCLUDED.waba_display_phone,
       business_context = EXCLUDED.business_context,
       bypass_claude = EXCLUDED.bypass_claude,
       updated_at = NOW();
@@ -402,6 +436,11 @@ export async function saveUserCredentials(userId, credentials) {
     encrypt(credentials.twilioAccountSid),
     encrypt(credentials.twilioAuthToken),
     credentials.twilioPhoneNumber,
+    encrypt(credentials.wabaAccessToken || ''),
+    credentials.wabaPhoneNumberId || '',
+    credentials.wabaBusinessId || '',
+    credentials.wabaVerifyToken || '',
+    credentials.wabaDisplayPhone || '',
     credentials.businessContext,
     !!credentials.bypassClaude,
   ]);
@@ -419,6 +458,11 @@ export async function getUserCredentials(userId) {
     twilioAccountSid: decrypt(r.twilio_account_sid),
     twilioAuthToken: decrypt(r.twilio_auth_token),
     twilioPhoneNumber: r.twilio_phone_number,
+    wabaAccessToken: decrypt(r.waba_access_token),
+    wabaPhoneNumberId: r.waba_phone_number_id,
+    wabaBusinessId: r.waba_business_id,
+    wabaVerifyToken: r.waba_verify_token,
+    wabaDisplayPhone: r.waba_display_phone,
     businessContext: r.business_context,
     bypassClaude: !!r.bypass_claude,
     updatedAt: r.updated_at,
@@ -452,9 +496,37 @@ export async function getUserByPhoneNumber(phoneNumber) {
     twilioAccountSid: decrypt(r.twilio_account_sid),
     twilioAuthToken: decrypt(r.twilio_auth_token),
     twilioPhoneNumber: r.twilio_phone_number,
+    wabaAccessToken: decrypt(r.waba_access_token),
+    wabaPhoneNumberId: r.waba_phone_number_id,
+    wabaBusinessId: r.waba_business_id,
+    wabaVerifyToken: r.waba_verify_token,
+    wabaDisplayPhone: r.waba_display_phone,
     businessContext: r.business_context,
     bypassClaude: !!r.bypass_claude,
   };
+}
+
+export async function clearWabaCredentials(userId) {
+  const p = ensurePool();
+  if (!p) return;
+
+  const { rows } = await p.query('SELECT waba_phone_number_id FROM user_credentials WHERE user_id = $1', [userId]);
+  const phoneNumberId = rows[0]?.waba_phone_number_id;
+
+  await p.query(`
+    UPDATE user_credentials SET
+      waba_access_token = NULL,
+      waba_phone_number_id = NULL,
+      waba_business_id = NULL,
+      waba_verify_token = NULL,
+      waba_display_phone = NULL,
+      updated_at = NOW()
+    WHERE user_id = $1
+  `, [userId]);
+
+  if (phoneNumberId) {
+    await p.query('DELETE FROM phone_user_mapping WHERE phone_number = $1', [phoneNumberId]);
+  }
 }
 
 export async function deleteUserCredentials(userId) {
