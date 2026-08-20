@@ -3615,8 +3615,10 @@ app.get("/auth/meta/callback", async (req, res) => {
   }
 
   if (!code) {
-    console.error('[meta-oauth] No authorization code in callback');
-    return res.redirect(`${APP_BASE_URL}/dashboard?whatsapp=error&reason=missing_code`);
+    // Meta probes the redirect URI during Embedded Signup config validation with
+    // a GET request that has no `code`. Return 200 so validation passes.
+    console.log('[meta-oauth] Callback requested without auth code (likely validation probe), returning 200');
+    return res.status(200).send('OK');
   }
 
   const userId = state || null;
