@@ -783,7 +783,7 @@ export default function Bookings() {
                                       <RadioGroupItem value="mobile" id="mobile-booking" />
                                       <Label htmlFor="mobile-booking" className="flex items-center gap-2">
                                         <Phone className="w-4 h-4" />
-                                        Mobile Money (M-Pesa, Airtel, Tigo)
+                                        Mobile Money (M-Pesa, Airtel, Tigo, Halotel)
                                       </Label>
                                     </div>
                                     <div className="flex items-center space-x-2">

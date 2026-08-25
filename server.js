@@ -3718,6 +3718,10 @@ app.get("/api/meta/auth-url", (req, res) => {
 });
 
 // Returns the WhatsApp connection status for the authenticated user.
+// IMPORTANT: This actually verifies the token and phone number with Meta rather
+// than trusting that stored credentials mean "connected". A token that has
+// expired or been revoked, or a phone number that is not registered/verified,
+// is reported as NOT connected with a human-readable reason.
 app.get("/api/meta/status", async (req, res) => {
   try {
     const userId = req.headers['x-user-id'];
@@ -3732,12 +3736,65 @@ app.get("/api/meta/status", async (req, res) => {
       return res.json({ connected: false });
     }
 
-    res.json({
-      connected: true,
-      phone: creds.wabaDisplayPhone || null,
-      wabaId: creds.wabaBusinessId || null,
-      phoneNumberId: creds.wabaPhoneNumberId || null,
-    });
+    const { accessToken, wabaId, phoneNumberId, displayPhone } = creds;
+
+    // Verify the stored token is still valid and the phone number is usable.
+    // Any failure here means the connection is NOT actually working.
+    try {
+      const debug = await debugToken({
+        accessToken,
+        appAccessToken: META_CLIENT_TOKEN,
+      });
+
+      const tokenValid = debug && debug.is_valid !== false;
+      if (!tokenValid) {
+        console.warn('[meta-status] Token is not valid for user', userId, ':', debug?.error?.message || 'is_valid=false');
+        return res.json({
+          connected: false,
+          error: 'WhatsApp token is expired or revoked. Please reconnect your WhatsApp Business account.',
+          code: 'invalid_token',
+        });
+      }
+
+      // Verify the phone number is actually registered & verified under this WABA.
+      const phoneNumbers = wabaId ? await getPhoneNumbersByWaba({ wabaId, accessToken }) : [];
+      const phone = phoneNumbers.find(p => String(p.id) === String(phoneNumberId)) || phoneNumbers[0];
+      const verificationStatus = phone?.codeVerificationStatus;
+
+      if (!phone) {
+        console.warn('[meta-status] No phone number found for WABA', wabaId, 'user', userId);
+        return res.json({
+          connected: false,
+          error: 'No WhatsApp Business phone number found for this account. Please reconnect.',
+          code: 'no_phone',
+        });
+      }
+
+      if (verificationStatus && verificationStatus !== 'VERIFIED') {
+        console.warn('[meta-status] Phone not verified (', verificationStatus, ') for user', userId);
+        return res.json({
+          connected: false,
+          error: `WhatsApp phone number is not verified (status: ${verificationStatus}). Complete verification in Meta Business Manager.`,
+          code: 'phone_not_verified',
+          phone: phone.displayPhoneNumber,
+        });
+      }
+
+      res.json({
+        connected: true,
+        phone: displayPhone || phone?.displayPhoneNumber || null,
+        wabaId: wabaId || null,
+        phoneNumberId: phoneNumberId || phone?.id || null,
+      });
+    } catch (verifyErr) {
+      // Most likely the token is invalid/expired so the Meta call itself failed.
+      console.warn('[meta-status] Verification call to Meta failed for user', userId, ':', verifyErr.message);
+      return res.json({
+        connected: false,
+        error: `WhatsApp connection check failed: ${verifyErr.message}`,
+        code: 'verification_failed',
+      });
+    }
   } catch (err) {
     console.error('[meta-status] Error:', err.message);
     res.status(500).json({ error: 'Failed to get WhatsApp status' });

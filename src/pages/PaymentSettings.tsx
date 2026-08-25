@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/components/ui/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { API_ENDPOINTS } from '@/config/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { Save, Key, Webhook, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Save, Key, Webhook, Loader2, AlertCircle, CheckCircle, EyeOff, Pencil } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function PaymentSettings() {
@@ -21,8 +22,10 @@ export default function PaymentSettings() {
     snippeWebhookSecret: '',
     snippeEnabled: false,
   });
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
+  const [webhookDialogOpen, setWebhookDialogOpen] = useState(false);
+  const [tempApiKey, setTempApiKey] = useState('');
+  const [tempWebhookSecret, setTempWebhookSecret] = useState('');
 
   useEffect(() => {
     fetchSettings();
@@ -119,23 +122,55 @@ export default function PaymentSettings() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="apiKey">API Key</Label>
-              <div className="relative">
-                <Input
-                  id="apiKey"
-                  type={showApiKey ? 'text' : 'password'}
-                  value={settings.snippeApiKey}
-                  onChange={(e) => setSettings({ ...settings, snippeApiKey: e.target.value })}
-                  placeholder="sn_live_..."
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 hover:text-gray-700"
-                >
-                  {showApiKey ? 'Hide' : 'Show'}
-                </button>
+              <Label>API Key</Label>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                <EyeOff className="w-4 h-4 text-gray-400 shrink-0" />
+                <span className="text-sm text-gray-500 flex-1">
+                  {settings.snippeApiKey ? 'API key is configured' : 'No API key set'}
+                </span>
+                <Dialog open={apiKeyDialogOpen} onOpenChange={(open) => { setApiKeyDialogOpen(open); if (!open) setTempApiKey(''); }}>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="outline" size="sm">
+                      <Pencil className="w-3.5 h-3.5 mr-1" />
+                      {settings.snippeApiKey ? 'Change' : 'Set'}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{settings.snippeApiKey ? 'Change' : 'Set'} API Key</DialogTitle>
+                      <DialogDescription>
+                        Enter your payment gateway API key. It will be stored securely and never shown again.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Input
+                        type="password"
+                        value={tempApiKey}
+                        onChange={(e) => setTempApiKey(e.target.value)}
+                        placeholder="sn_live_..."
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => { setApiKeyDialogOpen(false); setTempApiKey(''); }}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (tempApiKey) {
+                            setSettings({ ...settings, snippeApiKey: tempApiKey });
+                            setApiKeyDialogOpen(false);
+                            setTempApiKey('');
+                          }
+                        }}
+                        disabled={!tempApiKey}
+                        className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                      >
+                        Save
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
               <p className="text-xs text-muted-foreground">
                 Your API key (starts with sn_live_ or sn_test_)
@@ -143,23 +178,55 @@ export default function PaymentSettings() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="webhookSecret">Webhook Secret</Label>
-              <div className="relative">
-                <Input
-                  id="webhookSecret"
-                  type={showWebhookSecret ? 'text' : 'password'}
-                  value={settings.snippeWebhookSecret}
-                  onChange={(e) => setSettings({ ...settings, snippeWebhookSecret: e.target.value })}
-                  placeholder="whsec_..."
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowWebhookSecret(!showWebhookSecret)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500 hover:text-gray-700"
-                >
-                  {showWebhookSecret ? 'Hide' : 'Show'}
-                </button>
+              <Label>Webhook Secret</Label>
+              <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border">
+                <EyeOff className="w-4 h-4 text-gray-400 shrink-0" />
+                <span className="text-sm text-gray-500 flex-1">
+                  {settings.snippeWebhookSecret ? 'Webhook secret is configured' : 'No webhook secret set'}
+                </span>
+                <Dialog open={webhookDialogOpen} onOpenChange={(open) => { setWebhookDialogOpen(open); if (!open) setTempWebhookSecret(''); }}>
+                  <DialogTrigger asChild>
+                    <Button type="button" variant="outline" size="sm">
+                      <Pencil className="w-3.5 h-3.5 mr-1" />
+                      {settings.snippeWebhookSecret ? 'Change' : 'Set'}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>{settings.snippeWebhookSecret ? 'Change' : 'Set'} Webhook Secret</DialogTitle>
+                      <DialogDescription>
+                        Enter your webhook signing secret. It will be stored securely and never shown again.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                      <Input
+                        type="password"
+                        value={tempWebhookSecret}
+                        onChange={(e) => setTempWebhookSecret(e.target.value)}
+                        placeholder="whsec_..."
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => { setWebhookDialogOpen(false); setTempWebhookSecret(''); }}>
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          if (tempWebhookSecret) {
+                            setSettings({ ...settings, snippeWebhookSecret: tempWebhookSecret });
+                            setWebhookDialogOpen(false);
+                            setTempWebhookSecret('');
+                          }
+                        }}
+                        disabled={!tempWebhookSecret}
+                        className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+                      >
+                        Save
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
               <p className="text-xs text-muted-foreground">
                 Webhook signing secret (starts with whsec_) - used to verify webhook payloads

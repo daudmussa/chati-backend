@@ -36,6 +36,10 @@ export default function Dashboard() {
       if (res.ok) {
         const data = await res.json();
         setWhatsappStatus(data);
+        if (!data.connected && data.error) {
+          setWaError(`WhatsApp not actually connected: ${data.error}`);
+          setTimeout(() => setWaError(null), 10000);
+        }
       }
     } catch (err) {
       console.error('Error fetching WhatsApp status:', err);

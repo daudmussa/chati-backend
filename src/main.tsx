@@ -3,6 +3,9 @@ import ReactDOM from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { BrowserRouter } from "react-router-dom";
+import { initDevtoolsProtection } from "./utils/devtoolsProtection";
+
+initDevtoolsProtection();
 
 const basename = import.meta.env.BASE_URL;
 

@@ -45,6 +45,7 @@ interface UserData {
   credentials?: {
     hasCredentials: boolean;
     twilioPhoneNumber?: string;
+    wabaPhoneNumberId?: string;
     bypassClaude?: boolean;
   };
 }
@@ -71,6 +72,10 @@ export default function Admin() {
     twilioAccountSid: string;
     twilioAuthToken: string;
     twilioPhoneNumber: string;
+    wabaAccessToken: string;
+    wabaPhoneNumberId: string;
+    wabaBusinessId: string;
+    wabaVerifyToken: string;
   }}>({});
   const [editingUserInfo, setEditingUserInfo] = useState<{[userId: string]: {
     email: string;
@@ -447,6 +452,10 @@ export default function Admin() {
           twilioAccountSid: credentials.twilioAccountSid,
           twilioAuthToken: credentials.twilioAuthToken,
           twilioPhoneNumber: credentials.twilioPhoneNumber,
+          wabaAccessToken: credentials.wabaAccessToken,
+          wabaPhoneNumberId: credentials.wabaPhoneNumberId,
+          wabaBusinessId: credentials.wabaBusinessId,
+          wabaVerifyToken: credentials.wabaVerifyToken,
         }),
       });
 
@@ -458,6 +467,7 @@ export default function Admin() {
             credentials: {
               hasCredentials: true,
               twilioPhoneNumber: credentials.twilioPhoneNumber,
+              wabaPhoneNumberId: credentials.wabaPhoneNumberId,
               bypassClaude: u.credentials?.bypassClaude || false
             }
           } : u
@@ -1501,6 +1511,10 @@ export default function Admin() {
                                         twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
                                         twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
                                         twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                        wabaAccessToken: editingCredentials[userData.userId]?.wabaAccessToken ?? '',
+                                        wabaPhoneNumberId: editingCredentials[userData.userId]?.wabaPhoneNumberId ?? userData.credentials?.wabaPhoneNumberId ?? '',
+                                        wabaBusinessId: editingCredentials[userData.userId]?.wabaBusinessId ?? '',
+                                        wabaVerifyToken: editingCredentials[userData.userId]?.wabaVerifyToken ?? '',
                                       }
                                     })}
                                     autoComplete="off"
@@ -1535,6 +1549,10 @@ export default function Admin() {
                                         twilioAccountSid: e.target.value,
                                         twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
                                         twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                        wabaAccessToken: editingCredentials[userData.userId]?.wabaAccessToken ?? '',
+                                        wabaPhoneNumberId: editingCredentials[userData.userId]?.wabaPhoneNumberId ?? userData.credentials?.wabaPhoneNumberId ?? '',
+                                        wabaBusinessId: editingCredentials[userData.userId]?.wabaBusinessId ?? '',
+                                        wabaVerifyToken: editingCredentials[userData.userId]?.wabaVerifyToken ?? '',
                                       }
                                     })}
                                     autoComplete="off"
@@ -1569,6 +1587,10 @@ export default function Admin() {
                                         twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
                                         twilioAuthToken: e.target.value,
                                         twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                        wabaAccessToken: editingCredentials[userData.userId]?.wabaAccessToken ?? '',
+                                        wabaPhoneNumberId: editingCredentials[userData.userId]?.wabaPhoneNumberId ?? userData.credentials?.wabaPhoneNumberId ?? '',
+                                        wabaBusinessId: editingCredentials[userData.userId]?.wabaBusinessId ?? '',
+                                        wabaVerifyToken: editingCredentials[userData.userId]?.wabaVerifyToken ?? '',
                                       }
                                     })}
                                     autoComplete="off"
@@ -1603,6 +1625,10 @@ export default function Admin() {
                                         twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
                                         twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
                                         twilioPhoneNumber: e.target.value,
+                                        wabaAccessToken: editingCredentials[userData.userId]?.wabaAccessToken ?? '',
+                                        wabaPhoneNumberId: editingCredentials[userData.userId]?.wabaPhoneNumberId ?? userData.credentials?.wabaPhoneNumberId ?? '',
+                                        wabaBusinessId: editingCredentials[userData.userId]?.wabaBusinessId ?? '',
+                                        wabaVerifyToken: editingCredentials[userData.userId]?.wabaVerifyToken ?? '',
                                       }
                                     })}
                                     className="flex-1 h-8 text-sm"
@@ -1620,6 +1646,174 @@ export default function Admin() {
                                 <p className="text-xs text-emerald-700 mt-1">
                                   Your WhatsApp-enabled phone number (with country code)
                                 </p>
+                              </div>
+
+                              {/* WhatsApp Cloud API (Meta) — Optional: use instead of Twilio */}
+                              <div className="mt-4 pt-4 border-t border-dashed border-gray-300">
+                                <h5 className="text-xs text-gray-500 uppercase tracking-wide mb-3 font-semibold">Or connect directly via Meta Cloud API (no Twilio needed)</h5>
+                                <div className="space-y-3">
+                                  {/* WABA Access Token */}
+                                  <div className="p-3 rounded bg-green-50 border border-green-200">
+                                    <Label className="text-sm font-medium text-green-900 mb-2 block">
+                                      🔐 Meta Access Token
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="password"
+                                        placeholder="EAA..."
+                                        value={editingCredentials[userData.userId]?.wabaAccessToken ?? ''}
+                                        onChange={(e) => setEditingCredentials({
+                                          ...editingCredentials,
+                                          [userData.userId]: {
+                                            claudeApiKey: editingCredentials[userData.userId]?.claudeApiKey ?? '',
+                                            twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
+                                            twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
+                                            twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                            wabaAccessToken: e.target.value,
+                                            wabaPhoneNumberId: editingCredentials[userData.userId]?.wabaPhoneNumberId ?? userData.credentials?.wabaPhoneNumberId ?? '',
+                                            wabaBusinessId: editingCredentials[userData.userId]?.wabaBusinessId ?? '',
+                                            wabaVerifyToken: editingCredentials[userData.userId]?.wabaVerifyToken ?? '',
+                                          }
+                                        })}
+                                        autoComplete="off"
+                                        className="flex-1 h-8 text-sm"
+                                      />
+                                      {editingCredentials[userData.userId] && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => updateUserCredentials(userData.userId)}
+                                          className="h-8"
+                                        >
+                                          <Save className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-green-700 mt-1">
+                                      System User or permanent access token from Meta Business
+                                    </p>
+                                  </div>
+
+                                  {/* WABA Phone Number ID */}
+                                  <div className="p-3 rounded bg-lime-50 border border-lime-200">
+                                    <Label className="text-sm font-medium text-lime-900 mb-2 block">
+                                      📱 Phone Number ID
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        placeholder="123456789012345"
+                                        value={editingCredentials[userData.userId]?.wabaPhoneNumberId ?? userData.credentials?.wabaPhoneNumberId ?? ''}
+                                        onChange={(e) => setEditingCredentials({
+                                          ...editingCredentials,
+                                          [userData.userId]: {
+                                            claudeApiKey: editingCredentials[userData.userId]?.claudeApiKey ?? '',
+                                            twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
+                                            twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
+                                            twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                            wabaAccessToken: editingCredentials[userData.userId]?.wabaAccessToken ?? '',
+                                            wabaPhoneNumberId: e.target.value,
+                                            wabaBusinessId: editingCredentials[userData.userId]?.wabaBusinessId ?? '',
+                                            wabaVerifyToken: editingCredentials[userData.userId]?.wabaVerifyToken ?? '',
+                                          }
+                                        })}
+                                        className="flex-1 h-8 text-sm"
+                                      />
+                                      {editingCredentials[userData.userId] && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => updateUserCredentials(userData.userId)}
+                                          className="h-8"
+                                        >
+                                          <Save className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-lime-700 mt-1">
+                                      From WhatsApp &gt; API Setup in your Meta Business account
+                                    </p>
+                                  </div>
+
+                                  {/* WABA Business ID */}
+                                  <div className="p-3 rounded bg-amber-50 border border-amber-200">
+                                    <Label className="text-sm font-medium text-amber-900 mb-2 block">
+                                      🏢 WhatsApp Business Account ID
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        placeholder="123456789012345"
+                                        value={editingCredentials[userData.userId]?.wabaBusinessId ?? ''}
+                                        onChange={(e) => setEditingCredentials({
+                                          ...editingCredentials,
+                                          [userData.userId]: {
+                                            claudeApiKey: editingCredentials[userData.userId]?.claudeApiKey ?? '',
+                                            twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
+                                            twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
+                                            twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                            wabaAccessToken: editingCredentials[userData.userId]?.wabaAccessToken ?? '',
+                                            wabaPhoneNumberId: editingCredentials[userData.userId]?.wabaPhoneNumberId ?? userData.credentials?.wabaPhoneNumberId ?? '',
+                                            wabaBusinessId: e.target.value,
+                                            wabaVerifyToken: editingCredentials[userData.userId]?.wabaVerifyToken ?? '',
+                                          }
+                                        })}
+                                        className="flex-1 h-8 text-sm"
+                                      />
+                                      {editingCredentials[userData.userId] && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => updateUserCredentials(userData.userId)}
+                                          className="h-8"
+                                        >
+                                          <Save className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-amber-700 mt-1">
+                                      Optional — your WhatsApp Business Account ID
+                                    </p>
+                                  </div>
+
+                                  {/* WABA Verify Token */}
+                                  <div className="p-3 rounded bg-orange-50 border border-orange-200">
+                                    <Label className="text-sm font-medium text-orange-900 mb-2 block">
+                                      ✅ Webhook Verify Token
+                                    </Label>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="password"
+                                        placeholder="my-custom-token"
+                                        value={editingCredentials[userData.userId]?.wabaVerifyToken ?? ''}
+                                        onChange={(e) => setEditingCredentials({
+                                          ...editingCredentials,
+                                          [userData.userId]: {
+                                            claudeApiKey: editingCredentials[userData.userId]?.claudeApiKey ?? '',
+                                            twilioAccountSid: editingCredentials[userData.userId]?.twilioAccountSid ?? '',
+                                            twilioAuthToken: editingCredentials[userData.userId]?.twilioAuthToken ?? '',
+                                            twilioPhoneNumber: editingCredentials[userData.userId]?.twilioPhoneNumber ?? userData.credentials?.twilioPhoneNumber ?? '',
+                                            wabaAccessToken: editingCredentials[userData.userId]?.wabaAccessToken ?? '',
+                                            wabaPhoneNumberId: editingCredentials[userData.userId]?.wabaPhoneNumberId ?? userData.credentials?.wabaPhoneNumberId ?? '',
+                                            wabaBusinessId: editingCredentials[userData.userId]?.wabaBusinessId ?? '',
+                                            wabaVerifyToken: e.target.value,
+                                          }
+                                        })}
+                                        autoComplete="off"
+                                        className="flex-1 h-8 text-sm"
+                                      />
+                                      {editingCredentials[userData.userId] && (
+                                        <Button
+                                          size="sm"
+                                          onClick={() => updateUserCredentials(userData.userId)}
+                                          className="h-8"
+                                        >
+                                          <Save className="h-3 w-3" />
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-orange-700 mt-1">
+                                      Set this in your Meta webhook config, then verify with GET /webhook
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>

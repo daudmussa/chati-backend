@@ -16,8 +16,7 @@ import {
   MessageSquare,
   Send,
   ShoppingBag,
-  CreditCard,
-  Smartphone,
+    Smartphone,
   Loader2,
   CheckCircle2,
   ExternalLink
@@ -567,16 +566,10 @@ export default function Cart() {
                   <RadioGroupItem value="mobile" id="mobile-payment" />
                   <Label htmlFor="mobile-payment" className="flex items-center gap-2">
                     <Smartphone className="w-4 h-4" />
-                    Mobile Money (M-Pesa, Airtel, Tigo)
+                    Mobile Money (M-Pesa, Airtel, Tigo, Halotel)
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="card" id="card-payment" />
-                  <Label htmlFor="card-payment" className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4" />
-                    Card Payment (Visa/Mastercard)
-                  </Label>
-                </div>
+                
               </RadioGroup>
               
               <div className="space-y-2">

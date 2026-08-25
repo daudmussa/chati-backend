@@ -310,7 +310,7 @@ export default function Billing() {
                                 <RadioGroupItem value="mobile" id="mobile" />
                                 <Label htmlFor="mobile" className="flex items-center gap-2">
                                   <Smartphone className="w-4 h-4" />
-                                  Mobile Money (M-Pesa, Airtel, Tigo)
+                                  Mobile Money (M-Pesa, Airtel, Tigo, Halotel)
                                 </Label>
                               </div>
                               <div className="flex items-center space-x-2">
@@ -455,7 +455,7 @@ export default function Billing() {
                                 <RadioGroupItem value="mobile" id="mobile-combo" />
                                 <Label htmlFor="mobile-combo" className="flex items-center gap-2">
                                   <Smartphone className="w-4 h-4" />
-                                  Mobile Money (M-Pesa, Airtel, Tigo)
+                                  Mobile Money (M-Pesa, Airtel, Tigo, Halotel)
                                 </Label>
                               </div>
                               <div className="flex items-center space-x-2">

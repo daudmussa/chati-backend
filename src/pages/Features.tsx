@@ -1,7 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { useState } from 'react';
 import SEO from '@/components/SEO';
 import {
@@ -25,7 +24,15 @@ import {
   CreditCard,
   Menu,
   X,
+  Sparkles,
+  ArrowRight,
+  ShieldCheck,
+  Wallet,
 } from 'lucide-react';
+
+/* Shares the design tokens set on the homepage:
+   Ink #0B1F17 · Canvas #F5F7F2 · Brand #25D366 · Brand Deep #0E7A43 · Amber #FFA630
+   Display 'Bricolage Grotesque' · Body 'Inter' · Mono 'JetBrains Mono' */
 
 export default function Features() {
   const navigate = useNavigate();
@@ -34,265 +41,136 @@ export default function Features() {
   const mainFeatures = [
     {
       icon: Bot,
-      title: 'AI-Powered Responses',
-      description: 'Intelligent automated replies that understand context and respond naturally to customer inquiries 24/7.',
-      benefits: [
-        'Natural language processing',
-        'Context-aware conversations',
-        'Multi-language support',
-        'Custom personality training',
-      ],
-      color: 'bg-blue-500',
+      title: 'AI-powered responses',
+      description: 'Automated replies that understand context and answer customers naturally, 24/7.',
+      benefits: ['Natural language processing', 'Context-aware conversations', 'Multi-language support', 'Custom personality training'],
     },
     {
       icon: ShoppingBag,
-      title: 'Online Store Management',
-      description: 'Complete e-commerce solution with product catalog, inventory tracking, and WhatsApp checkout integration.',
+      title: 'Online store management',
+      description: 'A full e-commerce setup — product catalog, inventory, and checkout, built into WhatsApp.',
       benefits: [
         'Unlimited product listings',
         'Image gallery support',
         'Inventory management',
         'Shopping cart & checkout',
+        'Accept mobile money & card payments',
+        'Payment transaction history',
       ],
-      color: 'bg-purple-500',
     },
     {
       icon: CalendarCheck,
-      title: 'Booking System',
-      description: 'Calendar-based appointment scheduling with automated confirmations and reminders via WhatsApp.',
-      benefits: [
-        'Service management',
-        'Time slot blocking',
-        'Automated reminders',
-        'Booking history tracking',
-      ],
-      color: 'bg-green-500',
+      title: 'Booking system',
+      description: 'Calendar-based scheduling with automatic confirmations and reminders on WhatsApp.',
+      benefits: ['Service management', 'Time slot blocking', 'Automated reminders', 'Booking history tracking'],
     },
   ];
 
   const additionalFeatures = [
-    {
-      icon: MessageSquare,
-      title: 'Conversation Management',
-      description: 'View and manage all customer conversations in one place with searchable history.',
-    },
-    {
-      icon: BarChart3,
-      title: 'Analytics & Insights',
-      description: 'Track message volume, response times, popular products, and booking trends.',
-    },
-    {
-      icon: Clock,
-      title: '24/7 Availability',
-      description: 'Never miss a customer inquiry, even outside business hours.',
-    },
-    {
-      icon: Shield,
-      title: 'Secure & Compliant',
-      description: 'Enterprise-grade security with encrypted data storage and GDPR compliance.',
-    },
-    {
-      icon: Zap,
-      title: 'Instant Setup',
-      description: 'Get started in minutes with our simple 4-step onboarding wizard.',
-    },
-    {
-      icon: Globe,
-      title: 'Multi-Language',
-      description: 'Support customers in English, Swahili, and other languages.',
-    },
-    {
-      icon: Users,
-      title: 'Multi-Tenant',
-      description: 'Manage multiple businesses or locations from a single account.',
-    },
-    {
-      icon: Settings,
-      title: 'Customizable AI',
-      description: 'Train the AI with your business tone, FAQs, and brand voice.',
-    },
-    {
-      icon: Smartphone,
-      title: 'Mobile Optimized',
-      description: 'Fully responsive design works perfectly on phones and tablets.',
-    },
-    {
-      icon: TrendingUp,
-      title: 'Scalable',
-      description: 'Grows with your business from startup to enterprise.',
-    },
-    {
-      icon: Bell,
-      title: 'Real-Time Notifications',
-      description: 'Get instant alerts for important messages and bookings.',
-    },
-    {
-      icon: Lock,
-      title: 'Data Privacy',
-      description: 'Your data is yours. We never share or sell customer information.',
-    },
-  ];
-
-  const integrations = [
-    
+    { icon: MessageSquare, title: 'Conversation management', description: 'Every customer conversation in one place, with searchable history.' },
+    { icon: BarChart3, title: 'Analytics & insights', description: 'Track message volume, response times, and what is actually selling.' },
+    { icon: Clock, title: '24/7 availability', description: 'Never miss an inquiry, even outside business hours.' },
+    { icon: Shield, title: 'Secure & compliant', description: 'Encrypted data storage, built to enterprise-grade security standards.' },
+    { icon: Zap, title: 'Instant setup', description: 'Get started in minutes with a simple 4-step onboarding wizard.' },
+    { icon: Globe, title: 'Multi-language', description: 'Support customers in English, Swahili, and beyond.' },
+    { icon: Users, title: 'Multi-tenant', description: 'Manage multiple businesses or locations from a single account.' },
+    { icon: Settings, title: 'Customizable AI', description: 'Train the AI on your tone, your FAQs, your brand voice.' },
+    { icon: Smartphone, title: 'Mobile optimized', description: 'Fully responsive — works exactly as well on a phone as a laptop.' },
+    { icon: TrendingUp, title: 'Built to scale', description: 'Grows with you, from a single duka to a multi-branch business.' },
+    { icon: Bell, title: 'Real-time notifications', description: 'Instant alerts for the messages, orders, and bookings that matter.' },
+    { icon: Wallet, title: 'Payment processing', description: 'Accept M-Pesa, Airtel Money, Tigo Pesa, Halotel, and card payments from customers.' },
+    { icon: Lock, title: 'Data privacy', description: 'Your data is yours. We never share or sell customer information.' },
   ];
 
   const useCases = [
-    {
-      title: 'Retail Stores',
-      description: 'Manage product inquiries, process orders, and handle customer support automatically.',
-      icon: ShoppingBag,
-    },
-    {
-      title: 'Service Businesses',
-      description: 'Accept bookings for salons, clinics, consultations, and appointments.',
-      icon: CalendarCheck,
-    },
-    {
-      title: 'Restaurants',
-      description: 'Take orders, manage reservations, and answer menu questions instantly.',
-      icon: Package,
-    },
-    {
-      title: 'Professional Services',
-      description: 'Schedule consultations, share information, and qualify leads automatically.',
-      icon: Headphones,
-    },
+    { title: 'Retail stores', description: 'Handle product questions, process orders, and support customers automatically.', icon: ShoppingBag },
+    { title: 'Service businesses', description: 'Take bookings for salons, clinics, consultations, and appointments.', icon: CalendarCheck },
+    { title: 'Restaurants', description: 'Take orders, manage reservations, and answer menu questions instantly.', icon: Package },
+    { title: 'Professional services', description: 'Schedule consultations, share information, and qualify leads automatically.', icon: Headphones },
+  ];
+
+  const steps = [
+    { step: '01', title: 'Create your account', desc: 'Sign up with your business details.' },
+    { step: '02', title: 'Choose a plan', desc: 'Pick the package that fits your business.' },
+    { step: '03', title: 'Configure your AI', desc: 'Set up your business personality and FAQs.' },
+    { step: '04', title: 'Go live', desc: 'Start receiving automated responses on WhatsApp.' },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-[#F5F7F2] font-['Inter'] text-[#0B1F17]">
+      <SEO
+        title="Features - AI WhatsApp Automation, Online Store & Booking System | Chati Solutions"
+        description="Explore Chati Solutions features: AI-powered WhatsApp automation, online store management, booking system, staff management, and analytics. Perfect for Tanzanian businesses."
+        keywords="WhatsApp AI features, business automation features, online store features, booking system Tanzania, WhatsApp chatbot features, automated customer service"
+        canonical="https://chati.solutions/features"
+      />
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap');
+      `}</style>
+
       {/* Header */}
-      <header className="border-b bg-white/80 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-black/5 bg-[#F5F7F2]/90 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
             <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain" />
           </div>
-          
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-3">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/features')}
-            >
-              Features
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/pricing')}
-            >
-              Pricing
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/about')}
-            >
-              About
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/shop')}
-            >
-              <ShoppingBag className="w-4 h-4 mr-2" />
-              Shop
-            </Button>
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/contact')}
-            >
-              Contact
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => navigate('/signin')}
-            >
+
+          <div className="hidden md:flex items-center gap-1">
+            {[
+              ['Features', '/features'],
+              ['Pricing', '/pricing'],
+              ['About', '/about'],
+              ['Shop', '/shop'],
+              ['Contact', '/contact'],
+            ].map(([label, path]) => (
+              <Button
+                key={path}
+                variant="ghost"
+                className="font-['Inter'] font-medium text-[#0B1F17]/80 hover:text-[#0B1F17] hover:bg-black/5"
+                onClick={() => navigate(path)}
+              >
+                {label}
+              </Button>
+            ))}
+            <Button variant="outline" className="ml-2 border-[#0B1F17]/15" onClick={() => navigate('/signin')}>
               Sign In
             </Button>
             <Button
-              className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
+              className="bg-[#0B1F17] hover:bg-[#0E7A43] text-white font-medium transition-colors"
               onClick={() => navigate('/onboarding/account')}
             >
               Get Started
             </Button>
           </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            className="md:hidden"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            {isMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
+          <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)} aria-label="Toggle menu">
+            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
 
-        {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden border-t bg-white">
-            <div className="container mx-auto px-4 py-4 space-y-2">
-              <button
-                onClick={() => {
-                  navigate('/features');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Features
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/pricing');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Pricing
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/about');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                About
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/shop');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Shop
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/contact');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Contact
-              </button>
-              <button
-                onClick={() => {
-                  navigate('/signin');
-                  setIsMenuOpen(false);
-                }}
-                className="block w-full text-left px-4 py-2 hover:bg-gray-100 rounded"
-              >
-                Sign In
-              </button>
+          <div className="md:hidden border-t border-black/5 bg-[#F5F7F2]">
+            <div className="container mx-auto px-4 py-4 space-y-1">
+              {[
+                ['Features', '/features'],
+                ['Pricing', '/pricing'],
+                ['About', '/about'],
+                ['Shop', '/shop'],
+                ['Contact', '/contact'],
+                ['Sign In', '/signin'],
+              ].map(([label, path]) => (
+                <button
+                  key={path}
+                  onClick={() => { navigate(path); setIsMenuOpen(false); }}
+                  className="block w-full text-left px-4 py-2.5 hover:bg-black/5 rounded-lg font-medium"
+                >
+                  {label}
+                </button>
+              ))}
               <Button
-                className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mt-2"
-                onClick={() => {
-                  navigate('/onboarding/account');
-                  setIsMenuOpen(false);
-                }}
+                className="w-full bg-[#0B1F17] hover:bg-[#0E7A43] text-white mt-2"
+                onClick={() => { navigate('/onboarding/account'); setIsMenuOpen(false); }}
               >
                 Get Started
               </Button>
@@ -301,47 +179,47 @@ export default function Features() {
         )}
       </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <SEO 
-          title="Features - AI WhatsApp Automation, Online Store & Booking System | Chati Solutions"
-          description="Explore Chati Solutions features: AI-powered WhatsApp automation, online store management, booking system, staff management, and analytics. Perfect for Tanzanian businesses."
-          keywords="WhatsApp AI features, business automation features, online store features, booking system Tanzania, WhatsApp chatbot features, automated customer service"
-          canonical="https://chati.solutions/features"
-        />
-        
-        {/* Hero Section */}
-        <div className="text-center mb-16">
-          <Badge className="mb-4 bg-[#25D366] hover:bg-[#20BD5A]">
-            All-in-One Platform
-          </Badge>
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Everything You Need to Automate
-            <br />
-            <span className="text-[#25D366]">Your Business Communications</span>
-          </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Combine AI-powered messaging, online store, and booking system in one powerful platform designed for Tanzanian businesses.
-          </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
+        {/* Hero */}
+        <div className="relative overflow-hidden">
+          <div className="absolute top-0 -left-24 w-72 h-72 bg-[#25D366]/15 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 right-0 w-72 h-72 bg-[#FFA630]/10 rounded-full blur-3xl" />
+
+          <div className="text-center mb-20 max-w-3xl mx-auto relative">
+            <div className="inline-flex items-center gap-2 bg-white border border-[#25D366]/30 text-[#0E7A43] px-3.5 py-1.5 rounded-full text-xs font-semibold font-['JetBrains_Mono'] tracking-wide uppercase mb-5">
+              <Sparkles className="w-3.5 h-3.5" />
+              All-in-one platform
+            </div>
+            <h1 className="font-['Bricolage_Grotesque'] font-extrabold text-4xl md:text-5xl leading-tight text-[#0B1F17]">
+              Everything you need to automate
+              <br />
+              <span className="text-[#25D366]">your business communication</span>
+            </h1>
+            <p className="text-lg text-[#4A5850] max-w-2xl mx-auto mt-5">
+              AI-powered messaging, an online store with payments built in, and a booking
+              system — combined in one platform made for Tanzanian businesses.
+            </p>
+          </div>
         </div>
 
         {/* Main Features */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-24 max-w-6xl mx-auto">
           {mainFeatures.map((feature) => {
             const Icon = feature.icon;
             return (
-              <Card key={feature.title} className="border-2 hover:border-[#25D366] transition-colors">
+              <Card key={feature.title} className="border border-black/5 hover:border-[#25D366] shadow-sm hover:shadow-lg transition-all duration-300">
                 <CardHeader>
-                  <div className={`w-14 h-14 ${feature.color} rounded-xl flex items-center justify-center mb-4`}>
-                    <Icon className="w-7 h-7 text-white" />
+                  <div className="w-14 h-14 bg-[#0B1F17] rounded-2xl flex items-center justify-center mb-4">
+                    <Icon className="w-7 h-7 text-[#25D366]" />
                   </div>
-                  <CardTitle className="text-2xl">{feature.title}</CardTitle>
-                  <CardDescription className="text-base">{feature.description}</CardDescription>
+                  <CardTitle className="text-2xl font-['Bricolage_Grotesque'] font-bold text-[#0B1F17]">{feature.title}</CardTitle>
+                  <CardDescription className="text-base text-[#4A5850]">{feature.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ul className="space-y-2">
+                  <ul className="space-y-2.5">
                     {feature.benefits.map((benefit, index) => (
-                      <li key={index} className="flex items-center text-gray-600">
-                        <div className="w-1.5 h-1.5 bg-[#25D366] rounded-full mr-3" />
+                      <li key={index} className="flex items-center text-sm text-[#4A5850]">
+                        <div className="w-1.5 h-1.5 bg-[#25D366] rounded-full mr-3 flex-shrink-0" />
                         {benefit}
                       </li>
                     ))}
@@ -353,21 +231,30 @@ export default function Features() {
         </div>
 
         {/* Additional Features Grid */}
-        <div className="mb-20">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
-            Packed with Powerful Features
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {additionalFeatures.map((feature) => {
+        <div className="mb-24">
+          <div className="text-center mb-14 max-w-2xl mx-auto">
+            <span className="text-xs font-['JetBrains_Mono'] uppercase tracking-widest text-[#0E7A43] font-semibold">Down to the details</span>
+            <h2 className="font-['Bricolage_Grotesque'] font-bold text-3xl md:text-4xl text-[#0B1F17] mt-3">
+              Packed with the features that matter
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto">
+            {additionalFeatures.map((feature, index) => {
               const Icon = feature.icon;
+              const tinted = index % 3 === 1;
               return (
-                <Card key={feature.title} className="hover:shadow-lg transition-shadow">
-                  <CardContent className="pt-6">
-                    <div className="w-12 h-12 bg-[#25D366]/10 rounded-lg flex items-center justify-center mb-4">
+                <Card
+                  key={feature.title}
+                  className={`border-0 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 ${
+                    tinted ? 'bg-[#DCF8C6]/40' : 'bg-white'
+                  }`}
+                >
+                  <CardContent className="pt-6 pb-5">
+                    <div className="w-12 h-12 bg-[#0B1F17] rounded-2xl flex items-center justify-center mb-4">
                       <Icon className="w-6 h-6 text-[#25D366]" />
                     </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                    <p className="text-sm text-gray-600">{feature.description}</p>
+                    <h3 className="font-bold font-['Bricolage_Grotesque'] text-[#0B1F17] mb-2">{feature.title}</h3>
+                    <p className="text-sm text-[#4A5850]">{feature.description}</p>
                   </CardContent>
                 </Card>
               );
@@ -376,179 +263,126 @@ export default function Features() {
         </div>
 
         {/* Use Cases */}
-        <div className="mb-20">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-4">
-            Perfect for Any Business
-          </h2>
-          <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            Our platform adapts to your industry and business needs
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="mb-24">
+          <div className="text-center mb-14 max-w-2xl mx-auto">
+            <span className="text-xs font-['JetBrains_Mono'] uppercase tracking-widest text-[#0E7A43] font-semibold">Built to fit</span>
+            <h2 className="font-['Bricolage_Grotesque'] font-bold text-3xl md:text-4xl text-[#0B1F17] mt-3">Perfect for any business</h2>
+            <p className="text-[#4A5850] mt-3">Our platform adapts to your industry and business needs</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto">
             {useCases.map((useCase) => {
               const Icon = useCase.icon;
               return (
-                <Card key={useCase.title} className="text-center">
-                  <CardContent className="pt-6">
-                    <div className="w-16 h-16 bg-gradient-to-br from-[#25D366] to-[#20BD5A] rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Icon className="w-8 h-8 text-white" />
+                <Card key={useCase.title} className="text-center border border-black/5 shadow-sm hover:shadow-lg hover:border-[#25D366] transition-all duration-300">
+                  <CardContent className="pt-8 pb-7">
+                    <div className="w-14 h-14 bg-[#25D366] rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Icon className="w-7 h-7 text-white" />
                     </div>
-                    <h3 className="font-bold text-gray-900 mb-2">{useCase.title}</h3>
-                    <p className="text-sm text-gray-600">{useCase.description}</p>
+                    <h3 className="font-bold font-['Bricolage_Grotesque'] text-[#0B1F17] mb-2">{useCase.title}</h3>
+                    <p className="text-sm text-[#4A5850]">{useCase.description}</p>
                   </CardContent>
                 </Card>
               );
             })}
           </div>
         </div>
-
-        {/* Integrations */}
-        {/* <div className="mb-20">
-          <h2 className="text-3xl font-bold text-gray-900 text-center mb-12">
-            Seamless Integrations
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {integrations.map((integration) => {
-              const Icon = integration.icon;
-              return (
-                <Card key={integration.name} className="border-2">
-                  <CardContent className="pt-6 text-center">
-                    <div className="w-14 h-14 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-                      <Icon className="w-7 h-7 text-gray-700" />
-                    </div>
-                    <h3 className="font-semibold text-gray-900 mb-1">{integration.name}</h3>
-                    <p className="text-sm text-gray-600">{integration.description}</p>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        </div> */}
 
         {/* How It Works */}
-        <Card className="mb-20 bg-gradient-to-r from-[#25D366]/5 to-[#25D366]/10 border-[#25D366]/20">
-          <CardHeader>
-            <CardTitle className="text-3xl text-center">How It Works</CardTitle>
-            <CardDescription className="text-center text-base">
-              Get started in 4 simple steps
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-              {[
-                { step: '1', title: 'Create Account', desc: 'Sign up with your business details' },
-                { step: '2', title: 'Make a payment', desc: 'Choose the package that you want and pay for it' },
-                { step: '3', title: 'Configure AI', desc: 'Set up your business personality' },
-                { step: '4', title: 'Go Live', desc: 'Start receiving automated responses' },
-              ].map((item) => (
-                <div key={item.step} className="text-center">
-                  <div className="w-12 h-12 bg-[#25D366] text-white rounded-full flex items-center justify-center text-xl font-bold mx-auto mb-4">
-                    {item.step}
-                  </div>
-                  <h3 className="font-semibold text-gray-900 mb-2">{item.title}</h3>
-                  <p className="text-sm text-gray-600">{item.desc}</p>
+        <div className="mb-24 bg-[#0B1F17] rounded-3xl px-8 py-14 md:py-16">
+          <div className="text-center mb-14 max-w-xl mx-auto">
+            <span className="text-xs font-['JetBrains_Mono'] uppercase tracking-widest text-[#25D366] font-semibold">From zero to live</span>
+            <h2 className="font-['Bricolage_Grotesque'] font-bold text-3xl md:text-4xl text-white mt-3">How it works</h2>
+            <p className="text-white/60 mt-3">Get started in four simple steps</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-5xl mx-auto">
+            {steps.map((item) => (
+              <div key={item.step} className="text-center">
+                <div className="w-12 h-12 bg-[#25D366] text-[#0B1F17] rounded-full flex items-center justify-center text-sm font-bold font-['JetBrains_Mono'] mx-auto mb-4">
+                  {item.step}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* CTA Section */}
-        <div className="text-center">
-          <Card className="bg-gradient-to-r from-[#25D366] to-[#20BD5A] text-white border-0">
-            <CardContent className="py-12">
-              <h2 className="text-3xl font-bold mb-4">Ready to Transform Your Business?</h2>
-              <p className="text-lg mb-6 opacity-90 max-w-2xl mx-auto">
-                Join hundreds of Tanzanian businesses using AI to automate customer service, sell products, and manage bookings.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button
-                  size="lg"
-                  variant="secondary"
-                  onClick={() => navigate('/onboarding/account')}
-                >
-                  Start Now!
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="bg-white/10 border-white text-white hover:bg-white/20"
-                  onClick={() => navigate('/pricing')}
-                >
-                  View Pricing
-                </Button>
+                <h3 className="font-semibold text-white mb-1.5">{item.title}</h3>
+                <p className="text-sm text-white/60">{item.desc}</p>
               </div>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
         </div>
 
-        {/* Footer */}
-        <footer className="border-t bg-white/80 backdrop-blur-sm mt-20">
-          <div className="container mx-auto px-4 py-12">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-              <div>
-                <div className="flex items-center gap-2 mb-4">
-                  <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain" />
-                </div>
-                <p className="text-gray-600 text-sm">
-                  Automate your business communications with AI-powered responses, online store, and booking system.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-4">Product</h4>
-                <ul className="space-y-2 text-sm">
-                  <li>
-                    <button onClick={() => navigate('/features')} className="text-gray-600 hover:text-[#25D366]">
-                      Features
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={() => navigate('/pricing')} className="text-gray-600 hover:text-[#25D366]">
-                      Pricing
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={() => navigate('/shop')} className="text-gray-600 hover:text-[#25D366]">
-                      Store Demo
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-4">Company</h4>
-                <ul className="space-y-2 text-sm">
-                  <li>
-                    <button onClick={() => navigate('/about')} className="text-gray-600 hover:text-[#25D366]">
-                      About
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={() => navigate('/contact')} className="text-gray-600 hover:text-[#25D366]">
-                      Contact Us
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={() => navigate('/terms')} className="text-gray-600 hover:text-[#25D366]">
-                      Terms & Conditions
-                    </button>
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-4">Get Started</h4>
-                <Button 
-                  className="w-full bg-[#25D366] hover:bg-[#20BD5A] text-white mb-3"
-                  onClick={() => navigate('/onboarding/account')}
-                >
-                  Start Now
-                </Button>
-              </div>
-            </div>
-            <div className="border-t pt-8 text-center text-gray-600 text-sm">
-              <p>© 2026 Chati Solutions. Made for Tanzanian businesses.</p>
+        {/* CTA */}
+        <div className="mb-4">
+          <div className="max-w-5xl mx-auto rounded-3xl bg-gradient-to-br from-[#0E7A43] to-[#0B1F17] px-8 py-14 md:py-16 text-center relative overflow-hidden">
+            <div className="absolute -top-10 -right-10 w-52 h-52 bg-[#FFA630]/20 rounded-full blur-3xl" />
+            <ShieldCheck className="w-10 h-10 text-[#25D366] mx-auto mb-5" />
+            <h2 className="font-['Bricolage_Grotesque'] font-bold text-3xl md:text-4xl text-white max-w-xl mx-auto">
+              Ready to transform your business?
+            </h2>
+            <p className="text-white/70 mt-4 max-w-md mx-auto">
+              Join Tanzanian businesses already using AI to automate customer service, sell products, and manage bookings.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center mt-8">
+              <Button
+                size="lg"
+                className="bg-[#25D366] hover:bg-white hover:text-[#0B1F17] text-[#0B1F17] text-base px-8 py-6 font-semibold transition-colors"
+                onClick={() => navigate('/onboarding/account')}
+              >
+                Start now
+                <ArrowRight className="w-5 h-5 ml-2" />
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-base px-8 py-6 border-white/30 text-black hover:text-white hover:bg-white/10"
+                onClick={() => navigate('/pricing')}
+              >
+                View pricing
+              </Button>
             </div>
           </div>
-        </footer>
+        </div>
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-black/5 bg-white">
+        <div className="container mx-auto px-4 py-14">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-10">
+            <div>
+              <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain mb-4" />
+              <p className="text-[#4A5850] text-sm leading-relaxed">
+                AI-powered WhatsApp replies, an online store, and payment
+                processing — everything a growing business needs, in one chat.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-['Bricolage_Grotesque'] font-bold text-[#0B1F17] mb-4">Product</h4>
+              <ul className="space-y-2.5 text-sm">
+                <li><button onClick={() => navigate('/features')} className="text-[#4A5850] hover:text-[#0E7A43]">Features</button></li>
+                <li><button onClick={() => navigate('/pricing')} className="text-[#4A5850] hover:text-[#0E7A43]">Pricing</button></li>
+                <li><button onClick={() => navigate('/shop')} className="text-[#4A5850] hover:text-[#0E7A43]">Store demo</button></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-['Bricolage_Grotesque'] font-bold text-[#0B1F17] mb-4">Company</h4>
+              <ul className="space-y-2.5 text-sm">
+                <li><button onClick={() => navigate('/about')} className="text-[#4A5850] hover:text-[#0E7A43]">About</button></li>
+                <li><button onClick={() => navigate('/contact')} className="text-[#4A5850] hover:text-[#0E7A43]">Contact us</button></li>
+                <li><button onClick={() => navigate('/terms')} className="text-[#4A5850] hover:text-[#0E7A43]">Terms & Conditions</button></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-['Bricolage_Grotesque'] font-bold text-[#0B1F17] mb-4">Get started</h4>
+              <Button
+                className="w-full bg-[#0B1F17] hover:bg-[#0E7A43] text-white mb-3"
+                onClick={() => navigate('/onboarding/account')}
+              >
+                Start now
+              </Button>
+              <p className="text-xs text-[#4A5850]">Sign up today and let WhatsApp start selling for you.</p>
+            </div>
+          </div>
+          <div className="border-t border-black/5 pt-7 text-center text-[#4A5850] text-sm">
+            <p>© 2026 Chati Solutions. Made for Tanzanian businesses.</p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
