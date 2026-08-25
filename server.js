@@ -3847,19 +3847,30 @@ app.put("/api/user/credentials", async (req, res) => {
       return res.status(401).json({ error: "User ID required" });
     }
 
-    const {
-      claudeApiKey,
-      twilioAccountSid,
-      twilioAuthToken,
-      twilioPhoneNumber,
-      wabaAccessToken,
-      wabaPhoneNumberId,
-      wabaBusinessId,
-      wabaVerifyToken,
-      wabaDisplayPhone,
-      businessContext,
-      bypassClaude
-    } = req.body;
+    const body = req.body || {};
+
+    // Merge with existing credentials so that fields left blank (not provided in
+    // this request) do NOT wipe previously-saved values. The Admin form only sends
+    // the field currently being edited, so this prevents tokens/IDs from clearing.
+    const existing = await getUserCredentials(userId) || {};
+    const pick = (name, defaultValue = '') => {
+      const v = body[name];
+      if (v === undefined || v === null) return existing[name] ?? defaultValue;
+      if (typeof v === 'string' && v.trim() === '') return existing[name] ?? defaultValue;
+      return v;
+    };
+
+    const claudeApiKey = pick('claudeApiKey');
+    const twilioAccountSid = pick('twilioAccountSid');
+    const twilioAuthToken = pick('twilioAuthToken');
+    const twilioPhoneNumber = pick('twilioPhoneNumber');
+    const wabaAccessToken = pick('wabaAccessToken');
+    const wabaPhoneNumberId = pick('wabaPhoneNumberId');
+    const wabaBusinessId = pick('wabaBusinessId');
+    const wabaVerifyToken = pick('wabaVerifyToken');
+    const wabaDisplayPhone = pick('wabaDisplayPhone');
+    const businessContext = pick('businessContext', existing.businessContext ?? undefined);
+    const bypassClaude = body.bypassClaude !== undefined ? !!body.bypassClaude : existing.bypassClaude;
 
     // Save credentials to database
     await saveUserCredentials(userId, {

@@ -46,8 +46,17 @@ interface UserData {
     hasCredentials: boolean;
     twilioPhoneNumber?: string;
     wabaPhoneNumberId?: string;
+    wabaBusinessId?: string;
+    wabaDisplayPhone?: string;
     bypassClaude?: boolean;
+    waStatus?: WaStatus;
   };
+}
+
+interface WaStatus {
+  connected: boolean;
+  phone?: string | null;
+  error?: string;
 }
 
 export default function Admin() {
@@ -202,12 +211,28 @@ export default function Admin() {
               
               if (credResponse.ok) {
                 const credData = await credResponse.json();
+                let waStatus: WaStatus = { connected: false };
+                try {
+                  const statusRes = await fetch(API_ENDPOINTS.META_STATUS, {
+                    headers: { 'x-user-id': userData.userId }
+                  });
+                  if (statusRes.ok) {
+                    const s = await statusRes.json();
+                    waStatus = { connected: !!s.connected, error: s.error, phone: s.phone };
+                  }
+                } catch (e) {
+                  console.error('Failed to fetch WhatsApp status for', userData.userId, e);
+                }
                 return {
                   ...userData,
                   credentials: {
                     hasCredentials: credData.hasCredentials || false,
                     twilioPhoneNumber: credData.twilioPhoneNumber || '',
-                    bypassClaude: credData.bypassClaude || false
+                    wabaPhoneNumberId: credData.wabaPhoneNumberId || '',
+                    wabaBusinessId: credData.wabaBusinessId || '',
+                    wabaDisplayPhone: credData.wabaDisplayPhone || '',
+                    bypassClaude: credData.bypassClaude || false,
+                    waStatus
                   }
                 };
               }
@@ -460,23 +485,12 @@ export default function Admin() {
       });
 
       if (response.ok) {
-        // Update local state
-        setUsers(users.map(u => 
-          u.userId === userId ? { 
-            ...u, 
-            credentials: {
-              hasCredentials: true,
-              twilioPhoneNumber: credentials.twilioPhoneNumber,
-              wabaPhoneNumberId: credentials.wabaPhoneNumberId,
-              bypassClaude: u.credentials?.bypassClaude || false
-            }
-          } : u
-        ));
-
-        // Clear editing state
+        // Clear editing state, then re-fetch from the server so the UI reflects
+        // what was actually saved (including live WhatsApp connection status).
         const newEditingCredentials = { ...editingCredentials };
         delete newEditingCredentials[userId];
         setEditingCredentials(newEditingCredentials);
+        await fetchUsers();
 
         toast({
           title: "Credentials Updated",
@@ -1492,7 +1506,33 @@ export default function Admin() {
                                 <Badge variant="default" className="bg-green-500 text-xs">Configured</Badge>
                               )}
                             </div>
-                            
+
+                            {/* WhatsApp Connection Status */}
+                            {userData.credentials?.waStatus && (
+                              <div className={`mb-3 p-3 rounded border ${userData.credentials.waStatus.connected ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                <div className="flex items-center justify-between">
+                                  <span className={`text-sm font-medium ${userData.credentials.waStatus.connected ? 'text-green-800' : 'text-red-800'}`}>
+                                    WhatsApp: {userData.credentials.waStatus.connected ? 'Connected' : 'Not connected'}
+                                  </span>
+                                  {!userData.credentials.waStatus.connected && (
+                                    <Badge variant="outline" className="text-red-600 border-red-300">
+                                      Needs attention
+                                    </Badge>
+                                  )}
+                                </div>
+                                {userData.credentials.waStatus.connected && userData.credentials.waStatus.phone && (
+                                  <p className="text-xs text-green-700 mt-1">
+                                    Number: {userData.credentials.waStatus.phone}
+                                  </p>
+                                )}
+                                {userData.credentials.waStatus.error && (
+                                  <p className="text-xs text-red-700 mt-1 break-words">
+                                    {userData.credentials.waStatus.error}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+
                             <div className="space-y-3">
                               {/* Claude API Key */}
                               <div className="p-3 rounded bg-violet-50 border border-violet-200">
