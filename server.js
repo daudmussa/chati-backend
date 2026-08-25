@@ -3751,21 +3751,25 @@ app.get("/api/meta/status", async (req, res) => {
         console.warn('[meta-status] Token is not valid for user', userId, ':', debug?.error?.message || 'is_valid=false');
         return res.json({
           connected: false,
-          error: 'WhatsApp token is expired or revoked. Please reconnect your WhatsApp Business account.',
+          error: 'The saved WhatsApp access token is not a valid Meta token. Check the token in the Users page (real tokens start with "EAA").',
           code: 'invalid_token',
         });
       }
 
+      // If no WABA id was stored (e.g. entered manually in the Users page), derive
+      // it from the token's own scopes so verification still works.
+      const effectiveWabaId = wabaId || debug.wabaIds?.[0];
+
       // Verify the phone number is actually registered & verified under this WABA.
-      const phoneNumbers = wabaId ? await getPhoneNumbersByWaba({ wabaId, accessToken }) : [];
+      const phoneNumbers = effectiveWabaId ? await getPhoneNumbersByWaba({ wabaId: effectiveWabaId, accessToken }) : [];
       const phone = phoneNumbers.find(p => String(p.id) === String(phoneNumberId)) || phoneNumbers[0];
       const verificationStatus = phone?.codeVerificationStatus;
 
       if (!phone) {
-        console.warn('[meta-status] No phone number found for WABA', wabaId, 'user', userId);
+        console.warn('[meta-status] No phone number found for WABA', effectiveWabaId, 'user', userId);
         return res.json({
           connected: false,
-          error: 'No WhatsApp Business phone number found for this account. Please reconnect.',
+          error: `No WhatsApp Business phone number (${phoneNumberId}) found under WABA ${effectiveWabaId}.`,
           code: 'no_phone',
         });
       }
@@ -3783,7 +3787,7 @@ app.get("/api/meta/status", async (req, res) => {
       res.json({
         connected: true,
         phone: displayPhone || phone?.displayPhoneNumber || null,
-        wabaId: wabaId || null,
+        wabaId: effectiveWabaId || null,
         phoneNumberId: phoneNumberId || phone?.id || null,
       });
     } catch (verifyErr) {
