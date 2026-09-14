@@ -3824,8 +3824,8 @@ app.post("/api/meta/register", async (req, res) => {
     }
 
     const { pin } = req.body || {};
-    if (!pin || !/^\d{6}$/.test(pin)) {
-      return res.status(400).json({ error: 'A 6-digit PIN is required' });
+    if (pin && !/^\d{6}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN must be 6 digits' });
     }
 
     await registerPhoneNumber({

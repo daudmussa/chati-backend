@@ -1573,7 +1573,7 @@ export default function Admin() {
                                   <div className="mt-2 flex items-center gap-2">
                                     <Input
                                       type="password"
-                                      placeholder="6-digit PIN"
+                                      placeholder="6-digit PIN (leave empty if 2-step off)"
                                       value={registerPin[userData.userId] || ''}
                                       onChange={(e) => setRegisterPin({...registerPin, [userData.userId]: e.target.value})}
                                       className="flex-1 h-7 text-xs"
@@ -1585,8 +1585,8 @@ export default function Admin() {
                                       onClick={async (e) => {
                                         e.stopPropagation();
                                         const pin = registerPin[userData.userId] || '';
-                                        if (!/^\d{6}$/.test(pin)) {
-                                          toast({ title: "Error", description: "Enter the 6-digit two-step verification PIN", variant: "destructive" });
+                                        if (pin && !/^\d{6}$/.test(pin)) {
+                                          toast({ title: "Error", description: "PIN must be 6 digits (or empty if two-step verification is off)", variant: "destructive" });
                                           return;
                                         }
                                         const regRes = await fetch(API_ENDPOINTS.META_REGISTER, {
