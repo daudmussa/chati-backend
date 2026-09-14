@@ -141,6 +141,10 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-producti
 const META_APP_ID = stripQuotes(process.env.META_APP_ID);
 const META_APP_SECRET = stripQuotes(process.env.META_APP_SECRET);
 const META_CLIENT_TOKEN = stripQuotes(process.env.META_CLIENT_TOKEN);
+// A real app access token is `APP_ID|APP_SECRET`. The client token (META_CLIENT_TOKEN)
+// is NOT accepted by /debug_token, so build the proper app access token for debugging.
+const META_APP_ACCESS_TOKEN =
+  (META_APP_ID && META_APP_SECRET) ? `${META_APP_ID}|${META_APP_SECRET}` : '';
 const META_CONFIG_ID = stripQuotes(process.env.META_CONFIG_ID);
 const META_VERIFY_TOKEN = stripQuotes(process.env.META_VERIFY_TOKEN);
 const META_AUTH_REDIRECT_URI = stripQuotes(process.env.META_AUTH_REDIRECT_URI);
@@ -3635,7 +3639,7 @@ app.get("/auth/meta/callback", async (req, res) => {
     // Step 2: Discover the WABA IDs the token can access.
     const debug = await debugToken({
       accessToken,
-      appAccessToken: META_CLIENT_TOKEN,
+      appAccessToken: META_APP_ACCESS_TOKEN,
     });
     const wabaId = debug.wabaIds?.[0];
     if (!wabaId) {
@@ -3743,7 +3747,7 @@ app.get("/api/meta/status", async (req, res) => {
     try {
       const debug = await debugToken({
         accessToken,
-        appAccessToken: META_CLIENT_TOKEN,
+        appAccessToken: META_APP_ACCESS_TOKEN,
       });
 
       const tokenValid = debug && debug.is_valid !== false;
