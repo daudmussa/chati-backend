@@ -157,6 +157,7 @@ console.log("- TWILIO_AUTH_TOKEN:", TWILIO_AUTH_TOKEN ? "Set" : "MISSING");
 console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
 console.log("- META_APP_ID:", META_APP_ID ? "Set" : "MISSING");
 console.log("- META_APP_SECRET:", META_APP_SECRET ? "Set" : "MISSING");
+console.log("- META_APP_ACCESS_TOKEN:", META_APP_ACCESS_TOKEN ? `Set (${META_APP_ACCESS_TOKEN.substring(0, 15)}...)` : "MISSING");
 console.log("- META_CONFIG_ID:", META_CONFIG_ID ? "Set" : "MISSING");
 console.log("- META_VERIFY_TOKEN:", META_VERIFY_TOKEN ? "Set" : "MISSING");
 console.log("- META_AUTH_REDIRECT_URI:", META_AUTH_REDIRECT_URI || "MISSING");
