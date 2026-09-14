@@ -229,10 +229,10 @@ export async function exchangeCodeForToken({ appId, appSecret, code, redirectUri
  * Reads the `granular_scopes[].target_ids` as ground truth for the WABA IDs.
  */
 export async function debugToken({ accessToken, appAccessToken }) {
-  const url = `${GRAPH_API_BASE}/debug_token?input_token=${encodeURIComponent(accessToken)}`;
-  const headers = appAccessToken ? { 'Authorization': `Bearer ${appAccessToken}` } : {};
+  // Meta's /debug_token endpoint requires access_token as a query parameter, not in headers.
+  const url = `${GRAPH_API_BASE}/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(appAccessToken)}`;
 
-  const response = await fetch(url, { method: 'GET', headers });
+  const response = await fetch(url, { method: 'GET' });
   const json = await response.json();
 
   if (!response.ok || !json.data) {
