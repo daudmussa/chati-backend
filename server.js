@@ -145,6 +145,9 @@ const META_CLIENT_TOKEN = stripQuotes(process.env.META_CLIENT_TOKEN);
 // is NOT accepted by /debug_token, so build the proper app access token for debugging.
 const META_APP_ACCESS_TOKEN =
   (META_APP_ID && META_APP_SECRET) ? `${META_APP_ID}|${META_APP_SECRET}` : '';
+// Fallback: if META_APP_ACCESS_TOKEN is set directly in env, use that instead
+const META_APP_ACCESS_TOKEN_OVERRIDE = stripQuotes(process.env.META_APP_ACCESS_TOKEN || '');
+const EFFECTIVE_APP_ACCESS_TOKEN = META_APP_ACCESS_TOKEN_OVERRIDE || META_APP_ACCESS_TOKEN;
 const META_CONFIG_ID = stripQuotes(process.env.META_CONFIG_ID);
 const META_VERIFY_TOKEN = stripQuotes(process.env.META_VERIFY_TOKEN);
 const META_AUTH_REDIRECT_URI = stripQuotes(process.env.META_AUTH_REDIRECT_URI);
@@ -158,6 +161,7 @@ console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
 console.log("- META_APP_ID:", META_APP_ID ? "Set" : "MISSING");
 console.log("- META_APP_SECRET:", META_APP_SECRET ? "Set" : "MISSING");
 console.log("- META_APP_ACCESS_TOKEN:", META_APP_ACCESS_TOKEN ? `Set (${META_APP_ACCESS_TOKEN.substring(0, 15)}...)` : "MISSING");
+console.log("- EFFECTIVE_APP_ACCESS_TOKEN:", EFFECTIVE_APP_ACCESS_TOKEN ? `Set (${EFFECTIVE_APP_ACCESS_TOKEN.substring(0, 15)}...)` : "MISSING");
 console.log("- META_CONFIG_ID:", META_CONFIG_ID ? "Set" : "MISSING");
 console.log("- META_VERIFY_TOKEN:", META_VERIFY_TOKEN ? "Set" : "MISSING");
 console.log("- META_AUTH_REDIRECT_URI:", META_AUTH_REDIRECT_URI || "MISSING");
@@ -3640,7 +3644,7 @@ app.get("/auth/meta/callback", async (req, res) => {
     // Step 2: Discover the WABA IDs the token can access.
     const debug = await debugToken({
       accessToken,
-      appAccessToken: META_APP_ACCESS_TOKEN,
+      appAccessToken: EFFECTIVE_APP_ACCESS_TOKEN,
     });
     const wabaId = debug.wabaIds?.[0];
     if (!wabaId) {
