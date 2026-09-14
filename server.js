@@ -3742,6 +3742,9 @@ app.get("/api/meta/status", async (req, res) => {
     }
 
     const { accessToken, wabaId, phoneNumberId, displayPhone } = creds;
+    if (process.env.DEBUG_META === '1') {
+      console.log('[meta-status] token prefix:', accessToken?.substring(0, 12), 'len:', accessToken?.length, 'phoneId:', phoneNumberId);
+    }
 
     // Verify the stored token is still valid and the phone number is usable.
     // Any failure here means the connection is NOT actually working.
