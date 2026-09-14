@@ -3752,7 +3752,6 @@ app.get("/api/meta/status", async (req, res) => {
 
       const tokenValid = debug && debug.is_valid !== false;
       if (!tokenValid) {
-        console.warn('[meta-status] Token is not valid for user', userId, ':', debug?.error?.message || 'is_valid=false');
         return res.json({
           connected: false,
           error: 'The saved WhatsApp access token is not a valid Meta token. Check the token in the Users page (real tokens start with "EAA").',
@@ -3770,7 +3769,6 @@ app.get("/api/meta/status", async (req, res) => {
       const verificationStatus = phone?.codeVerificationStatus;
 
       if (!phone) {
-        console.warn('[meta-status] No phone number found for WABA', effectiveWabaId, 'user', userId);
         return res.json({
           connected: false,
           error: `No WhatsApp Business phone number (${phoneNumberId}) found under WABA ${effectiveWabaId}.`,
@@ -3779,7 +3777,6 @@ app.get("/api/meta/status", async (req, res) => {
       }
 
       if (verificationStatus && verificationStatus !== 'VERIFIED') {
-        console.warn('[meta-status] Phone not verified (', verificationStatus, ') for user', userId);
         return res.json({
           connected: false,
           error: `WhatsApp phone number is not verified (status: ${verificationStatus}). Complete verification in Meta Business Manager.`,
@@ -3796,7 +3793,6 @@ app.get("/api/meta/status", async (req, res) => {
       });
     } catch (verifyErr) {
       // Most likely the token is invalid/expired so the Meta call itself failed.
-      console.warn('[meta-status] Verification call to Meta failed for user', userId, ':', verifyErr.message);
       return res.json({
         connected: false,
         error: `WhatsApp connection check failed: ${verifyErr.message}`,
