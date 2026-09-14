@@ -236,10 +236,6 @@ export async function debugToken({ accessToken, appAccessToken }) {
   const json = await response.json();
 
   if (!response.ok || !json.data) {
-    console.error('[wa-api] debug_token failed:', {
-      status: response.status,
-      error: json.error?.message || json,
-    });
     throw new Error(json.error?.message || `debug_token failed (HTTP ${response.status})`);
   }
 
@@ -255,7 +251,6 @@ export async function debugToken({ accessToken, appAccessToken }) {
     ),
   ];
 
-  console.log('[wa-api] debug_token scopes:', granularScopes.map(s => `${s.scope}:${s.targetIds.join(',')}`).join(' | '));
   return { ...json.data, granularScopes, wabaIds };
 }
 

@@ -149,19 +149,16 @@ export default function Admin() {
   };
 
   const fetchWhatsAppStatus = async (userId: string) => {
-    console.log('[Admin] Fetching WhatsApp status for user:', userId);
     try {
       const statusRes = await fetch(API_ENDPOINTS.META_STATUS, {
         headers: { 'x-user-id': userId }
       });
-      console.log('[Admin] WhatsApp status response status:', statusRes.status);
       if (statusRes.ok) {
         const s = await statusRes.json();
-        console.log('[Admin] WhatsApp status:', s);
         return { connected: !!s.connected, error: s.error, phone: s.phone };
       }
     } catch (e) {
-      console.error('Failed to fetch WhatsApp status for', userId, e);
+      console.error('WhatsApp status fetch failed for', userId, e);
     }
     return { connected: false };
   };

@@ -3723,7 +3723,6 @@ app.get("/api/meta/auth-url", (req, res) => {
 
 // Returns the WhatsApp connection status for the authenticated user.
 app.get("/api/meta/status", async (req, res) => {
-  console.log('[meta-status] Request for userId:', req.headers['x-user-id']);
   try {
     const userId = req.headers['x-user-id'];
 
@@ -3732,14 +3731,12 @@ app.get("/api/meta/status", async (req, res) => {
     }
 
     const creds = await getUserCredentials(userId);
-    console.log('[meta-status] Credentials found:', !!creds, 'has token:', !!creds?.wabaAccessToken, 'has phoneId:', !!creds?.wabaPhoneNumberId);
 
     if (!creds || !creds.wabaAccessToken || !creds.wabaPhoneNumberId) {
       return res.json({ connected: false });
     }
 
     const { accessToken, wabaId, phoneNumberId, displayPhone } = creds;
-    console.log('[meta-status] Token starts with:', accessToken.substring(0, 10), 'META_APP_ACCESS_TOKEN set:', !!META_APP_ACCESS_TOKEN);
 
     // Verify the stored token is still valid and the phone number is usable.
     // Any failure here means the connection is NOT actually working.
