@@ -3741,7 +3741,7 @@ app.get("/api/meta/status", async (req, res) => {
       return res.json({ connected: false });
     }
 
-    const { wabaAccessToken: accessToken, wabaId, phoneNumberId, displayPhone } = creds;
+    const { wabaAccessToken: accessToken, wabaBusinessId: wabaId, wabaPhoneNumberId: phoneNumberId, wabaDisplayPhone: displayPhone } = creds;
     if (process.env.DEBUG_META === '1') {
       console.log('[meta-status] token prefix:', accessToken?.substring(0, 12), 'len:', accessToken?.length, 'phoneId:', phoneNumberId);
     }
