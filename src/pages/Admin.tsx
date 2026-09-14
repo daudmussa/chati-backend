@@ -148,6 +148,21 @@ export default function Admin() {
     }
   };
 
+  const fetchWhatsAppStatus = async (userId: string) => {
+    try {
+      const statusRes = await fetch(API_ENDPOINTS.META_STATUS, {
+        headers: { 'x-user-id': userId }
+      });
+      if (statusRes.ok) {
+        const s = await statusRes.json();
+        return { connected: !!s.connected, error: s.error, phone: s.phone };
+      }
+    } catch (e) {
+      console.error('Failed to fetch WhatsApp status for', userId, e);
+    }
+    return { connected: false };
+  };
+
   const availableFeatures = [
     { id: 'conversations', label: 'Conversations', icon: '💬' },
     { id: 'store', label: 'Store', icon: '🏪' },
@@ -199,7 +214,7 @@ export default function Admin() {
         console.log('[Admin] Users data:', data);
         console.log('[Admin] First user payDate:', data[0]?.payDate);
         
-        // Fetch credentials for each user
+        // Fetch credentials for each user (skip WhatsApp status fetch for now - load on demand)
         const usersWithCredentials = await Promise.all(
           data.map(async (userData: UserData) => {
             try {
@@ -211,18 +226,6 @@ export default function Admin() {
               
               if (credResponse.ok) {
                 const credData = await credResponse.json();
-                let waStatus: WaStatus = { connected: false };
-                try {
-                  const statusRes = await fetch(API_ENDPOINTS.META_STATUS, {
-                    headers: { 'x-user-id': userData.userId }
-                  });
-                  if (statusRes.ok) {
-                    const s = await statusRes.json();
-                    waStatus = { connected: !!s.connected, error: s.error, phone: s.phone };
-                  }
-                } catch (e) {
-                  console.error('Failed to fetch WhatsApp status for', userData.userId, e);
-                }
                 return {
                   ...userData,
                   credentials: {
@@ -232,7 +235,7 @@ export default function Admin() {
                     wabaBusinessId: credData.wabaBusinessId || '',
                     wabaDisplayPhone: credData.wabaDisplayPhone || '',
                     bypassClaude: credData.bypassClaude || false,
-                    waStatus
+                    waStatus: { connected: false }
                   }
                 };
               }
@@ -485,12 +488,17 @@ export default function Admin() {
       });
 
       if (response.ok) {
-        // Clear editing state, then re-fetch from the server so the UI reflects
-        // what was actually saved (including live WhatsApp connection status).
         const newEditingCredentials = { ...editingCredentials };
         delete newEditingCredentials[userId];
         setEditingCredentials(newEditingCredentials);
-        await fetchUsers();
+        
+        const status = await fetchWhatsAppStatus(userId);
+        const updatedUsers = users.map(u => 
+          u.userId === userId 
+            ? { ...u, credentials: { ...u.credentials, waStatus: status }}
+            : u
+        );
+        setUsers(updatedUsers);
 
         toast({
           title: "Credentials Updated",
@@ -977,7 +985,18 @@ export default function Admin() {
                   <Collapsible
                     key={userData.userId}
                     open={expandedUsers[userData.userId]}
-                    onOpenChange={(open) => setExpandedUsers({...expandedUsers, [userData.userId]: open})}
+                    onOpenChange={async (open) => {
+                      setExpandedUsers({...expandedUsers, [userData.userId]: open});
+                      if (open && !userData.credentials?.waStatus?.connected && !userData.credentials?.waStatus?.error) {
+                        const status = await fetchWhatsAppStatus(userData.userId);
+                        const updatedUsers = users.map(u => 
+                          u.userId === userData.userId 
+                            ? { ...u, credentials: { ...u.credentials, waStatus: status }}
+                            : u
+                        );
+                        setUsers(updatedUsers);
+                      }
+                    }}
                   >
                     <div
                       className={`rounded-lg border ${
