@@ -149,12 +149,15 @@ export default function Admin() {
   };
 
   const fetchWhatsAppStatus = async (userId: string) => {
+    console.log('[Admin] Fetching WhatsApp status for user:', userId);
     try {
       const statusRes = await fetch(API_ENDPOINTS.META_STATUS, {
         headers: { 'x-user-id': userId }
       });
+      console.log('[Admin] WhatsApp status response status:', statusRes.status);
       if (statusRes.ok) {
         const s = await statusRes.json();
+        console.log('[Admin] WhatsApp status:', s);
         return { connected: !!s.connected, error: s.error, phone: s.phone };
       }
     } catch (e) {
@@ -987,7 +990,7 @@ export default function Admin() {
                     open={expandedUsers[userData.userId]}
                     onOpenChange={async (open) => {
                       setExpandedUsers({...expandedUsers, [userData.userId]: open});
-                      if (open && !userData.credentials?.waStatus?.connected && !userData.credentials?.waStatus?.error) {
+                      if (open && !userData.credentials?.waStatus?.connected) {
                         const status = await fetchWhatsAppStatus(userData.userId);
                         const updatedUsers = users.map(u => 
                           u.userId === userData.userId 
@@ -1533,11 +1536,30 @@ export default function Admin() {
                                   <span className={`text-sm font-medium ${userData.credentials.waStatus.connected ? 'text-green-800' : 'text-red-800'}`}>
                                     WhatsApp: {userData.credentials.waStatus.connected ? 'Connected' : 'Not connected'}
                                   </span>
-                                  {!userData.credentials.waStatus.connected && (
-                                    <Badge variant="outline" className="text-red-600 border-red-300">
-                                      Needs attention
-                                    </Badge>
-                                  )}
+                                  <div className="flex items-center gap-2">
+                                    {!userData.credentials.waStatus.connected && (
+                                      <Badge variant="outline" className="text-red-600 border-red-300">
+                                        Needs attention
+                                      </Badge>
+                                    )}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        const status = await fetchWhatsAppStatus(userData.userId);
+                                        const updatedUsers = users.map(u => 
+                                          u.userId === userData.userId 
+                                            ? { ...u, credentials: { ...u.credentials, waStatus: status }}
+                                            : u
+                                        );
+                                        setUsers(updatedUsers);
+                                      }}
+                                      className="h-6 text-xs"
+                                    >
+                                      Refresh
+                                    </Button>
+                                  </div>
                                 </div>
                                 {userData.credentials.waStatus.connected && userData.credentials.waStatus.phone && (
                                   <p className="text-xs text-green-700 mt-1">
