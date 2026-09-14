@@ -76,6 +76,7 @@ export default function Admin() {
   const [changingPassword, setChangingPassword] = useState<{userId: string; newPassword: string} | null>(null);
   const [deletingUser, setDeletingUser] = useState<{userId: string; userName: string} | null>(null);
   const [expandedUsers, setExpandedUsers] = useState<{[userId: string]: boolean}>({});
+  const [registerPin, setRegisterPin] = useState<{[userId: string]: string}>({});
   const [editingCredentials, setEditingCredentials] = useState<{[userId: string]: {
     claudeApiKey: string;
     twilioAccountSid: string;
@@ -1567,6 +1568,51 @@ export default function Admin() {
                                   <p className="text-xs text-red-700 mt-1 break-words">
                                     {userData.credentials.waStatus.error}
                                   </p>
+                                )}
+                                {!userData.credentials.waStatus.connected && (
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <Input
+                                      type="password"
+                                      placeholder="6-digit PIN"
+                                      value={registerPin[userData.userId] || ''}
+                                      onChange={(e) => setRegisterPin({...registerPin, [userData.userId]: e.target.value})}
+                                      className="flex-1 h-7 text-xs"
+                                      maxLength={6}
+                                    />
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        const pin = registerPin[userData.userId] || '';
+                                        if (!/^\d{6}$/.test(pin)) {
+                                          toast({ title: "Error", description: "Enter the 6-digit two-step verification PIN", variant: "destructive" });
+                                          return;
+                                        }
+                                        const regRes = await fetch(API_ENDPOINTS.META_REGISTER, {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json', 'x-user-id': userData.userId },
+                                          body: JSON.stringify({ pin }),
+                                        });
+                                        if (regRes.ok) {
+                                          toast({ title: "Registered", description: "Phone number registered. Refreshing status..." });
+                                          const status = await fetchWhatsAppStatus(userData.userId);
+                                          const updatedUsers = users.map(u => 
+                                            u.userId === userData.userId 
+                                              ? { ...u, credentials: { ...u.credentials, waStatus: status }}
+                                              : u
+                                          );
+                                          setUsers(updatedUsers);
+                                        } else {
+                                          const er = await regRes.json().catch(() => ({}));
+                                          toast({ title: "Error", description: er.error || 'Registration failed', variant: "destructive" });
+                                        }
+                                      }}
+                                      className="h-7 text-xs"
+                                    >
+                                      Register Phone
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
                             )}

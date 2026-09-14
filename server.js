@@ -3809,6 +3809,38 @@ app.get("/api/meta/status", async (req, res) => {
   }
 });
 
+// Registers a WhatsApp phone number with the two-step verification PIN.
+app.post("/api/meta/register", async (req, res) => {
+  try {
+    const userId = req.headers['x-user-id'];
+
+    if (!userId) {
+      return res.status(401).json({ error: 'User ID required' });
+    }
+
+    const creds = await getUserCredentials(userId);
+    if (!creds || !creds.wabaAccessToken || !creds.wabaPhoneNumberId) {
+      return res.status(400).json({ error: 'WhatsApp credentials not configured' });
+    }
+
+    const { pin } = req.body || {};
+    if (!pin || !/^\d{6}$/.test(pin)) {
+      return res.status(400).json({ error: 'A 6-digit PIN is required' });
+    }
+
+    await registerPhoneNumber({
+      phoneNumberId: creds.wabaPhoneNumberId,
+      pin,
+      accessToken: creds.wabaAccessToken,
+    });
+    console.log('[meta-register] Phone number registered for user', userId);
+    res.json({ success: true, message: 'Phone number registered successfully' });
+  } catch (err) {
+    console.error('[meta-register] Error:', err.message);
+    res.status(500).json({ error: `Failed to register phone number: ${err.message}` });
+  }
+});
+
 // Disconnects WhatsApp for the authenticated user (clears WABA credentials).
 app.post("/api/meta/disconnect", async (req, res) => {
   try {

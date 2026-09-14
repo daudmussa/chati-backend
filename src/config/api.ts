@@ -64,6 +64,7 @@ export const API_ENDPOINTS = {
   // Meta WhatsApp Embedded Signup
   META_AUTH_URL: `${API_BASE_URL}/api/meta/auth-url`,
   META_STATUS: `${API_BASE_URL}/api/meta/status`,
+  META_REGISTER: `${API_BASE_URL}/api/meta/register`,
   META_DISCONNECT: `${API_BASE_URL}/api/meta/disconnect`,
   
   // Payment
