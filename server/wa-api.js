@@ -294,11 +294,9 @@ export async function registerPhoneNumber({ phoneNumberId, pin, accessToken }) {
   const json = await response.json();
 
   if (!response.ok) {
-    console.error('[wa-api] Register phone number failed:', {
-      status: response.status,
-      error: json.error?.message || json,
-    });
-    throw new Error(json.error?.message || `Register phone number failed (HTTP ${response.status})`);
+    const detail = json.error?.error_data?.details;
+    const msg = json.error?.message || `Register phone number failed (HTTP ${response.status})`;
+    throw new Error(detail ? `${msg} — ${detail}` : msg);
   }
 
   console.log('[wa-api] Phone number registered:', phoneNumberId);
