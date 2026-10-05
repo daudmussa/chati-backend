@@ -9,6 +9,28 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 
+type WhatsAppDiagnostic = {
+  id: string;
+  time: string;
+  level: 'info' | 'success' | 'error';
+  step: string;
+  message: string;
+  endpoint?: string;
+  httpStatus?: number;
+  sessionTokenPresent?: boolean;
+};
+
+const WHATSAPP_DIAGNOSTICS_KEY = 'whatsapp_connection_diagnostics';
+
+function loadWhatsAppDiagnostics(): WhatsAppDiagnostic[] {
+  try {
+    const saved = localStorage.getItem(WHATSAPP_DIAGNOSTICS_KEY);
+    return saved ? JSON.parse(saved) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -26,38 +48,122 @@ export default function Dashboard() {
   const [whatsappStatus, setWhatsappStatus] = useState<{ connected: boolean; phone?: string | null; wabaId?: string | null }>({ connected: false });
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [waError, setWaError] = useState<string | null>(null);
+  const [whatsappDiagnostics, setWhatsappDiagnostics] = useState<WhatsAppDiagnostic[]>(loadWhatsAppDiagnostics);
+
+  const recordWhatsAppDiagnostic = useCallback((entry: Omit<WhatsAppDiagnostic, 'id' | 'time'>) => {
+    const diagnostic: WhatsAppDiagnostic = {
+      ...entry,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      time: new Date().toISOString(),
+    };
+    setWhatsappDiagnostics(previous => {
+      const next = [diagnostic, ...previous].slice(0, 20);
+      try {
+        localStorage.setItem(WHATSAPP_DIAGNOSTICS_KEY, JSON.stringify(next));
+      } catch (error) {
+        console.warn('Could not persist WhatsApp connection diagnostics:', error);
+      }
+      return next;
+    });
+  }, []);
 
   const fetchWhatsappStatus = useCallback(async () => {
     const token = localStorage.getItem('auth_token');
-    if (!token) return;
+    if (!token) {
+      const message = 'No Chati login token was found in this browser. Sign out, sign in again, then retry.';
+      setWaError(message);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Check WhatsApp status',
+        message,
+        endpoint: API_ENDPOINTS.META_STATUS,
+        sessionTokenPresent: false,
+      });
+      return;
+    }
     try {
       const res = await fetch(API_ENDPOINTS.META_STATUS, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setWhatsappStatus(data);
-        if (!data.connected && data.error) {
-          setWaError(`WhatsApp not actually connected: ${data.error}`);
-          setTimeout(() => setWaError(null), 10000);
-        }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message = data.error || `Status request failed (HTTP ${res.status})`;
+        setWaError(message);
+        recordWhatsAppDiagnostic({
+          level: 'error',
+          step: 'Check WhatsApp status',
+          message,
+          endpoint: res.url || API_ENDPOINTS.META_STATUS,
+          httpStatus: res.status,
+          sessionTokenPresent: true,
+        });
+        return;
+      }
+
+      setWhatsappStatus(data);
+      if (data.connected) {
+        setWaError(null);
+        recordWhatsAppDiagnostic({
+          level: 'success',
+          step: 'Verify WhatsApp connection',
+          message: `Connected${data.phone ? `: ${data.phone}` : ''}`,
+          endpoint: res.url || API_ENDPOINTS.META_STATUS,
+          httpStatus: res.status,
+          sessionTokenPresent: true,
+        });
+      } else if (data.error) {
+        setWaError(`WhatsApp not connected: ${data.error}`);
+        recordWhatsAppDiagnostic({
+          level: 'error',
+          step: 'Verify WhatsApp connection',
+          message: data.error,
+          endpoint: res.url || API_ENDPOINTS.META_STATUS,
+          httpStatus: res.status,
+          sessionTokenPresent: true,
+        });
+      } else {
+        recordWhatsAppDiagnostic({
+          level: 'info',
+          step: 'Check WhatsApp status',
+          message: 'No WhatsApp Business account is connected to this workspace yet.',
+          endpoint: res.url || API_ENDPOINTS.META_STATUS,
+          httpStatus: res.status,
+          sessionTokenPresent: true,
+        });
       }
     } catch (err) {
-      console.error('Error fetching WhatsApp status:', err);
+      const message = err instanceof Error ? err.message : 'Network error while checking WhatsApp status';
+      setWaError(message);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Check WhatsApp status',
+        message,
+        endpoint: API_ENDPOINTS.META_STATUS,
+        sessionTokenPresent: true,
+      });
     }
-  }, []);
+  }, [recordWhatsAppDiagnostic]);
 
   // Check URL params for OAuth callback result
   useEffect(() => {
     const waParam = searchParams.get('whatsapp');
     if (waParam === 'connected') {
+      recordWhatsAppDiagnostic({
+        level: 'success',
+        step: 'Return from Meta signup',
+        message: 'Meta returned to Chati and reported signup completion. Checking the saved phone connection now.',
+      });
       fetchWhatsappStatus();
     } else if (waParam === 'error') {
       const reason = searchParams.get('reason') || 'Unknown error';
       setWaError(`WhatsApp connection failed: ${reason}`);
-      setTimeout(() => setWaError(null), 8000);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Return from Meta signup',
+        message: reason,
+      });
     }
-  }, [searchParams, fetchWhatsappStatus]);
+  }, [searchParams, fetchWhatsappStatus, recordWhatsAppDiagnostic]);
 
   useEffect(() => {
     if (user?.id) {
@@ -71,24 +177,66 @@ export default function Dashboard() {
   const handleConnectWhatsApp = async () => {
     const token = localStorage.getItem('auth_token');
     if (!token) {
-      setWaError('Please sign in again before connecting WhatsApp.');
+      const message = 'Please sign in again before connecting WhatsApp. No Chati login token was found in this browser.';
+      setWaError(message);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Start Meta signup',
+        message,
+        endpoint: API_ENDPOINTS.META_AUTH_URL,
+        sessionTokenPresent: false,
+      });
       return;
     }
     setWhatsappLoading(true);
     setWaError(null);
+    recordWhatsAppDiagnostic({
+      level: 'info',
+      step: 'Start Meta signup',
+      message: 'Requesting a secure Meta signup link from Chati.',
+      endpoint: API_ENDPOINTS.META_AUTH_URL,
+      sessionTokenPresent: true,
+    });
     try {
       const res = await fetch(API_ENDPOINTS.META_AUTH_URL, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Failed to get auth URL');
+        const message = data.error || `Meta signup link request failed (HTTP ${res.status})`;
+        setWaError(message);
+        recordWhatsAppDiagnostic({
+          level: 'error',
+          step: 'Request Meta signup link',
+          message,
+          endpoint: res.url || API_ENDPOINTS.META_AUTH_URL,
+          httpStatus: res.status,
+          sessionTokenPresent: true,
+        });
+        setWhatsappLoading(false);
+        return;
       }
-      const { url } = await res.json();
+      const { url } = data;
       if (!url) throw new Error('Meta did not return a signup link');
+      recordWhatsAppDiagnostic({
+        level: 'success',
+        step: 'Request Meta signup link',
+        message: 'Chati returned a secure signup link. Redirecting to Meta.',
+        endpoint: res.url || API_ENDPOINTS.META_AUTH_URL,
+        httpStatus: res.status,
+        sessionTokenPresent: true,
+      });
       window.location.assign(url);
     } catch (err: any) {
-      setWaError(err.message || 'Failed to start WhatsApp connection');
+      const message = err.message || 'Failed to start WhatsApp connection';
+      setWaError(message);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Start Meta signup',
+        message,
+        endpoint: API_ENDPOINTS.META_AUTH_URL,
+        sessionTokenPresent: true,
+      });
       setWhatsappLoading(false);
     }
   };
@@ -107,13 +255,28 @@ export default function Dashboard() {
       });
       if (res.ok) {
         setWhatsappStatus({ connected: false });
+        recordWhatsAppDiagnostic({
+          level: 'success',
+          step: 'Disconnect WhatsApp',
+          message: 'WhatsApp was disconnected from this workspace.',
+          endpoint: res.url || API_ENDPOINTS.META_DISCONNECT,
+          httpStatus: res.status,
+          sessionTokenPresent: true,
+        });
       } else {
         const err = await res.json();
         throw new Error(err.error || 'Failed to disconnect');
       }
     } catch (err: any) {
-      setWaError(err.message || 'Failed to disconnect WhatsApp');
-      setTimeout(() => setWaError(null), 5000);
+      const message = err.message || 'Failed to disconnect WhatsApp';
+      setWaError(message);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Disconnect WhatsApp',
+        message,
+        endpoint: API_ENDPOINTS.META_DISCONNECT,
+        sessionTokenPresent: !!localStorage.getItem('auth_token'),
+      });
     } finally {
       setWhatsappLoading(false);
     }
@@ -244,6 +407,74 @@ export default function Dashboard() {
                   You'll be redirected to Meta/Facebook to authorize and select your WhatsApp Business account.
                 </p>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div>
+              <CardTitle className="text-base">WhatsApp connection diagnostics</CardTitle>
+              <p className="mt-1 text-sm text-gray-500">
+                Recent signup and connection checks. Your login token is never shown or saved here.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void fetchWhatsappStatus()}
+                disabled={whatsappLoading}
+              >
+                Check status
+              </Button>
+              {whatsappDiagnostics.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setWhatsappDiagnostics([]);
+                    localStorage.removeItem(WHATSAPP_DIAGNOSTICS_KEY);
+                  }}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {whatsappDiagnostics.length === 0 ? (
+              <p className="text-sm text-gray-500">No WhatsApp connection attempts recorded in this browser yet.</p>
+            ) : (
+              <ol className="max-h-96 space-y-3 overflow-y-auto">
+                {whatsappDiagnostics.map(diagnostic => (
+                  <li
+                    key={diagnostic.id}
+                    className={`rounded-md border p-3 ${
+                      diagnostic.level === 'error'
+                        ? 'border-red-200 bg-red-50'
+                        : diagnostic.level === 'success'
+                          ? 'border-green-200 bg-green-50'
+                          : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm font-semibold text-gray-900">{diagnostic.step}</span>
+                      <time className="text-xs text-gray-500" dateTime={diagnostic.time}>
+                        {new Date(diagnostic.time).toLocaleString()}
+                      </time>
+                    </div>
+                    <p className="mt-1 break-words text-sm text-gray-700">{diagnostic.message}</p>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                      {diagnostic.httpStatus !== undefined && <span>HTTP {diagnostic.httpStatus}</span>}
+                      {diagnostic.sessionTokenPresent !== undefined && (
+                        <span>Login token: {diagnostic.sessionTokenPresent ? 'present' : 'missing'}</span>
+                      )}
+                      {diagnostic.endpoint && <span className="break-all">Request: {diagnostic.endpoint}</span>}
+                    </div>
+                  </li>
+                ))}
+              </ol>
             )}
           </CardContent>
         </Card>
