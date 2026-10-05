@@ -3973,6 +3973,23 @@ app.get("/api/meta/status", async (req, res) => {
       // it from the token's own scopes so verification still works.
       const effectiveWabaId = wabaId || debug.wabaIds?.[0];
 
+      const messagingGrants = (debug.granularScopes || [])
+        .filter(scope => scope.scope === 'whatsapp_business_messaging');
+      const hasMessagingPermission = messagingGrants.length > 0
+        ? messagingGrants.some(scope => !scope.targetIds.length
+          || scope.targetIds.some(id => String(id) === String(effectiveWabaId)))
+        : (debug.scopes || []).includes('whatsapp_business_messaging');
+      if (!hasMessagingPermission) {
+        return res.json({
+          connected: false,
+          error: `Meta token can read this account but does not grant whatsapp_business_messaging for WABA ${effectiveWabaId || 'unknown'}. Reconnect in Chati and approve messaging access; also confirm Advanced Access is approved in Meta App Review.`,
+          code: 'missing_messaging_permission',
+          phone: displayPhone || null,
+          wabaId: effectiveWabaId || null,
+          phoneNumberId: phoneNumberId || null,
+        });
+      }
+
       // Verify the phone number is actually registered & verified under this WABA.
       const phoneNumbers = effectiveWabaId ? await getPhoneNumbersByWaba({ wabaId: effectiveWabaId, accessToken }) : [];
       const phone = phoneNumbers.find(p => String(p.id) === String(phoneNumberId));
