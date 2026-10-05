@@ -117,15 +117,31 @@ export async function sendTextMessage({ accessToken, phoneNumberId, to, body }) 
     body: JSON.stringify(payload),
   });
 
-  const json = await response.json();
+  const json = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    const metaError = json.error || {};
     console.error('[wa-api] Send failed:', {
       status: response.status,
-      error: json.error?.message || json.error,
-      code: json.error?.code,
+      error: metaError.message || json,
+      type: metaError.type,
+      code: metaError.code,
+      subcode: metaError.error_subcode,
+      details: metaError.error_data?.details,
+      userTitle: metaError.error_user_title,
+      userMessage: metaError.error_user_msg,
+      fbtraceId: metaError.fbtrace_id,
     });
-    throw new Error(json.error?.message || `HTTP ${response.status}`);
+    const error = new Error(metaError.message || `HTTP ${response.status}`);
+    error.meta = {
+      status: response.status,
+      type: metaError.type,
+      code: metaError.code,
+      subcode: metaError.error_subcode,
+      details: metaError.error_data?.details,
+      fbtraceId: metaError.fbtrace_id,
+    };
+    throw error;
   }
 
   console.log('[wa-api] Message sent, wa_id:', json.messages?.[0]?.id);
@@ -165,15 +181,31 @@ export async function sendMediaMessage({ accessToken, phoneNumberId, to, type = 
     body: JSON.stringify(payload),
   });
 
-  const json = await response.json();
+  const json = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    const metaError = json.error || {};
     console.error('[wa-api] Media send failed:', {
       status: response.status,
-      error: json.error?.message || json.error,
-      code: json.error?.code,
+      error: metaError.message || json,
+      type: metaError.type,
+      code: metaError.code,
+      subcode: metaError.error_subcode,
+      details: metaError.error_data?.details,
+      userTitle: metaError.error_user_title,
+      userMessage: metaError.error_user_msg,
+      fbtraceId: metaError.fbtrace_id,
     });
-    throw new Error(json.error?.message || `HTTP ${response.status}`);
+    const error = new Error(metaError.message || `HTTP ${response.status}`);
+    error.meta = {
+      status: response.status,
+      type: metaError.type,
+      code: metaError.code,
+      subcode: metaError.error_subcode,
+      details: metaError.error_data?.details,
+      fbtraceId: metaError.fbtrace_id,
+    };
+    throw error;
   }
 
   console.log('[wa-api] Media sent, wa_id:', json.messages?.[0]?.id);
@@ -308,7 +340,8 @@ export async function registerPhoneNumber({ phoneNumberId, pin, accessToken }) {
  * to discover the phone_number_id when the signup postMessage omits it.
  */
 export async function getPhoneNumbersByWaba({ wabaId, accessToken }) {
-  const url = `${GRAPH_API_BASE}/${wabaId}/phone_numbers`;
+  const fields = 'id,display_phone_number,verified_name,quality_rating,status,code_verification_status';
+  const url = `${GRAPH_API_BASE}/${wabaId}/phone_numbers?fields=${fields}`;
   const response = await fetch(url, {
     method: 'GET',
     headers: { 'Authorization': `Bearer ${accessToken}` },
@@ -329,6 +362,7 @@ export async function getPhoneNumbersByWaba({ wabaId, accessToken }) {
     displayPhoneNumber: p.display_phone_number,
     verifiedName: p.verified_name,
     qualityRating: p.quality_rating,
+    status: p.status,
     codeVerificationStatus: p.code_verification_status,
   }));
 }

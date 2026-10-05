@@ -9,6 +9,7 @@ import { parseMetaWebhook, verifyWebhook, sendTextMessage, sendMediaMessage, nor
 // otherwise falls back to Twilio.
 async function sendWhatsAppResponse({ userCreds, userTwilioClient, twilioFromNumber, to, body, mediaUrl }) {
   const cleanTo = normalizeNumber(to);
+  let wabaSendError = null;
 
   if (userCreds?.wabaAccessToken && userCreds?.wabaPhoneNumberId) {
     try {
@@ -31,7 +32,11 @@ async function sendWhatsAppResponse({ userCreds, userTwilioClient, twilioFromNum
       console.log('[send] ✅ Sent via WABA (Meta Cloud API)');
       return;
     } catch (err) {
-      console.error('[send] WABA send failed, trying Twilio fallback:', err.message);
+      wabaSendError = err;
+      console.error('[send] WABA send failed, trying Twilio fallback:', {
+        error: err.message,
+        ...(err.meta || {}),
+      });
     }
   }
 
@@ -58,6 +63,10 @@ async function sendWhatsAppResponse({ userCreds, userTwilioClient, twilioFromNum
       console.error('[send] Twilio send failed:', err.message);
     }
   } else {
+    if (wabaSendError) {
+      console.error('[send] Delivery failed: Twilio fallback is not configured');
+      throw wabaSendError;
+    }
     console.warn('[send] ⚠️ No messaging provider configured (neither WABA nor Twilio)');
   }
 }
@@ -67,7 +76,7 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
 import crypto from "crypto";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, clearWabaCredentials, deleteUserCredentials, getAllUsers, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listStores as pgListStores, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById } from "./db-postgres.js";
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, clearWabaCredentials, deleteUserCredentials, getAllUsers, getAdminUsersSummary, getAdminStaffSummary, createMetaOAuthState, consumeMetaOAuthState, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listStores as pgListStores, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -138,7 +147,7 @@ const BYPASS_CLAUDE =
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
 
 // Meta (WhatsApp Cloud API / Embedded Signup) OAuth configuration
-const META_APP_ID = stripQuotes(process.env.META_APP_ID);
+const META_APP_ID = '4017634811813689';
 const META_APP_SECRET = stripQuotes(process.env.META_APP_SECRET);
 const META_CLIENT_TOKEN = stripQuotes(process.env.META_CLIENT_TOKEN);
 // A real app access token is `APP_ID|APP_SECRET`. The client token (META_CLIENT_TOKEN)
@@ -148,10 +157,55 @@ const META_APP_ACCESS_TOKEN =
 // Fallback: if META_APP_ACCESS_TOKEN is set directly in env, use that instead
 const META_APP_ACCESS_TOKEN_OVERRIDE = stripQuotes(process.env.META_APP_ACCESS_TOKEN || '');
 const EFFECTIVE_APP_ACCESS_TOKEN = META_APP_ACCESS_TOKEN_OVERRIDE || META_APP_ACCESS_TOKEN;
-const META_CONFIG_ID = stripQuotes(process.env.META_CONFIG_ID);
+const META_CONFIG_ID = '934205155739241';
 const META_VERIFY_TOKEN = stripQuotes(process.env.META_VERIFY_TOKEN);
-const META_AUTH_REDIRECT_URI = stripQuotes(process.env.META_AUTH_REDIRECT_URI);
+const META_AUTH_REDIRECT_URI = 'https://web-production-5ba8e.up.railway.app/auth/meta/callback';
 const APP_BASE_URL = stripQuotes(process.env.APP_BASE_URL) || "http://localhost:3000";
+
+async function authenticateMetaUser(req, res) {
+  const authorization = req.headers.authorization || '';
+  if (!authorization.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Authentication required' });
+    return null;
+  }
+
+  try {
+    const decoded = jwt.verify(authorization.slice(7), JWT_SECRET);
+    if (!decoded.userId) throw new Error('Invalid session');
+    const user = await getUserById(decoded.userId);
+    if (!user || (user.status && user.status !== 'active')) {
+      res.status(401).json({ error: 'User session is no longer active' });
+      return null;
+    }
+    return user.id;
+  } catch {
+    res.status(401).json({ error: 'Invalid or expired authentication token' });
+    return null;
+  }
+}
+
+function metaDashboardRedirect(res, query) {
+  const url = new URL('/dashboard', APP_BASE_URL);
+  Object.entries(query).forEach(([key, value]) => {
+    if (value) url.searchParams.set(key, value);
+  });
+  return res.redirect(url.toString());
+}
+
+async function consumeMetaConnectState(stateToken) {
+  if (typeof stateToken !== 'string' || !stateToken) {
+    throw new Error('Missing or invalid WhatsApp connection state');
+  }
+  const payload = jwt.verify(stateToken, JWT_SECRET);
+  if (payload.purpose !== 'whatsapp-connect' || !payload.userId || !payload.nonce) {
+    throw new Error('Invalid WhatsApp connection state');
+  }
+  const userId = await consumeMetaOAuthState(payload.nonce);
+  if (!userId || userId !== payload.userId) {
+    throw new Error('WhatsApp connection link expired or was already used. Start again from the dashboard.');
+  }
+  return userId;
+}
 
 console.log("[config] Environment check:");
 console.log("- CLAUDE_API_KEY:", CLAUDE_API_KEY ? `Set (${CLAUDE_API_KEY.substring(0, 10)}...)` : "MISSING");
@@ -164,7 +218,7 @@ console.log("- META_APP_ACCESS_TOKEN:", META_APP_ACCESS_TOKEN ? `Set (${META_APP
 console.log("- EFFECTIVE_APP_ACCESS_TOKEN:", EFFECTIVE_APP_ACCESS_TOKEN ? `Set (${EFFECTIVE_APP_ACCESS_TOKEN.substring(0, 15)}...)` : "MISSING");
 console.log("- META_CONFIG_ID:", META_CONFIG_ID ? "Set" : "MISSING");
 console.log("- META_VERIFY_TOKEN:", META_VERIFY_TOKEN ? "Set" : "MISSING");
-console.log("- META_AUTH_REDIRECT_URI:", META_AUTH_REDIRECT_URI || "MISSING");
+console.log("- META_AUTH_REDIRECT_URI:", META_AUTH_REDIRECT_URI);
 console.log("- BYPASS_CLAUDE:", BYPASS_CLAUDE);
 console.log("- JWT_SECRET:", JWT_SECRET !== "your-secret-key-change-in-production" ? "Set" : "Using default (CHANGE THIS)");
 
@@ -442,14 +496,20 @@ app.get("/webhook", (req, res) => {
 });
 
 app.post("/webhook", async (req, res) => {
-  let incomingMsg, from, to;
+  let incomingMsg, from, to, metaPhoneNumberId;
 
   // Detect Meta WhatsApp Cloud API webhook format (JSON)
   const metaPayload = parseMetaWebhook(req.body);
+  if (req.body?.object === 'whatsapp_business_account' && !metaPayload) {
+    const changes = (req.body.entry || []).flatMap(entry => entry.changes || []);
+    console.log('[webhook] Acknowledged Meta non-message event:', changes.map(change => change.field));
+    return res.sendStatus(200);
+  }
   if (metaPayload) {
     incomingMsg = metaPayload.body;
     from = metaPayload.from;
     to = metaPayload.to;
+    metaPhoneNumberId = metaPayload.metaPhoneNumberId;
     console.log("[webhook] Meta webhook parsed:", { from, to, body: incomingMsg?.substring(0, 100) });
     res.sendStatus(200); // Meta expects plain 200 OK
   } else {
@@ -468,7 +528,11 @@ app.post("/webhook", async (req, res) => {
   setTimeout(async () => {
     try {
       // Get user credentials based on store phone number (Twilio 'To')
-      const userCreds = await getUserByPhoneNumber(to);
+      // Meta sends both the visible display number and its internal phone-number
+      // ID. Credentials are mapped to the ID during signup, so resolve by that
+      // first and retain the display-number lookup for legacy mappings.
+      const userCreds = (metaPhoneNumberId ? await getUserByPhoneNumber(metaPhoneNumberId) : null)
+        || await getUserByPhoneNumber(to);
       // Load per-user business settings from Postgres (fallback to global defaults)
       const bizSettings = (userCreds?.userId ? await pgGetBusinessSettings(userCreds.userId) : null) || businessSettings;
       
@@ -3097,60 +3161,48 @@ app.get("/api/admin/users", async (req, res) => {
   }
   
   try {
-    const dbUsers = await getAllUsers();
-    const allUsers = [];
-    
-    for (const dbUser of dbUsers) {
-      // Get conversations count for this user
-      const conversations = await listConversations(dbUser.id);
-      
-      // Get credentials for phone number
-      const credentials = await getUserCredentials(dbUser.id);
-      
-      // Get business settings
-      const settings = await pgGetBusinessSettings(dbUser.id);
-      
-      // Get store settings for store ID
-      const storeSettings = await pgGetStoreSettings(dbUser.id);
-      
-      // Get orders and bookings count
-      const orders = await listOrders(dbUser.id);
-      const bookings = await listBookings(dbUser.id);
-      
-      // Get products count
-      const products = await listProducts(dbUser.id);
-      
-      allUsers.push({
-        userId: dbUser.id,
-        email: dbUser.email,
-        name: dbUser.name,
-        role: dbUser.role,
-        storeName: settings?.businessName || settings?.businessDescription || 'No business name',
-        storePhone: credentials?.twilioPhoneNumber || credentials?.wabaPhoneNumberId || 'No phone',
-        storeId: storeSettings?.storeId || dbUser.id.slice(0, 8),
-        ordersCount: orders.length,
-        bookingsCount: bookings.length,
-        isCurrent: dbUser.id === requestingUserId,
-        enabledFeatures: dbUser.enabled_features || ['conversations', 'store', 'bookings', 'staff', 'settings', 'billing'],
-        limits: dbUser.limits || {
-          maxConversations: 100,
-          maxProducts: 50,
-        },
-        currentCounts: {
-          conversations: conversations.length,
-          products: products.length,
-        },
-        payDate: dbUser.pay_date || null,
-        package: dbUser.package || 'starter',
-        status: dbUser.status || 'active',
-        promoCode: dbUser.promo_code || null,
-      });
+    const allUsers = await getAdminUsersSummary();
+    for (const adminUser of allUsers) {
+      adminUser.isCurrent = adminUser.userId === requestingUserId;
+      adminUser.currentCounts = {
+        conversations: adminUser.conversationCount,
+        products: adminUser.productCount,
+      };
+      delete adminUser.conversationCount;
+      delete adminUser.productCount;
+      adminUser.credentials = {
+        hasCredentials: adminUser.hasCredentials,
+        twilioPhoneNumber: adminUser.twilioPhoneNumber,
+        wabaPhoneNumberId: adminUser.wabaPhoneNumberId,
+        wabaBusinessId: adminUser.wabaBusinessId,
+        wabaDisplayPhone: adminUser.wabaDisplayPhone,
+        bypassClaude: adminUser.bypassClaude,
+        waStatus: { connected: false },
+      };
+      delete adminUser.hasCredentials;
+      delete adminUser.twilioPhoneNumber;
+      delete adminUser.wabaPhoneNumberId;
+      delete adminUser.wabaBusinessId;
+      delete adminUser.wabaDisplayPhone;
+      delete adminUser.bypassClaude;
     }
     
     res.json(allUsers);
   } catch (error) {
     console.error('[admin] Error fetching users:', error);
     res.status(500).json({ error: 'Failed to fetch users' });
+  }
+});
+
+app.get("/api/admin/staff", async (req, res) => {
+  if (req.headers['x-user-role'] !== 'admin') {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  try {
+    res.json(await getAdminStaffSummary());
+  } catch (error) {
+    console.error('[admin] Error fetching staff summary:', error);
+    res.status(500).json({ error: 'Failed to fetch staff' });
   }
 });
 
@@ -3610,130 +3662,189 @@ app.get("/api/auth/me", async (req, res) => {
 });
 
 // ========================================
-// META OAUTH / EMBEDDED SIGNUP CALLBACK
+// META HOSTED EMBEDDED SIGNUP CALLBACK
 // ========================================
-// Meta redirects the customer's browser here with ?code=...&state=<userId>.
-// We exchange the code server-side, subscribe to the WABA, register the phone
-// number, save the credentials, then redirect back to the frontend dashboard.
+// Meta's hosted onboarding page returns an authorization code to this URL.
+// The state embedded in redirect_uri is signed, short-lived, and single-use.
 app.get("/auth/meta/callback", async (req, res) => {
-  const { code, state, error, error_description } = req.query;
+  const { code, state, error, error_description: errorDescription } = req.query;
 
-  if (error) {
-    console.error('[meta-oauth] Meta returned an error:', error, error_description);
-    return res.redirect(`${APP_BASE_URL}/dashboard?whatsapp=error&reason=${encodeURIComponent(error_description || error)}`);
-  }
-
-  if (!code) {
-    // Meta probes the redirect URI during Embedded Signup config validation with
-    // a GET request that has no `code`. Return 200 so validation passes.
-    console.log('[meta-oauth] Callback requested without auth code (likely validation probe), returning 200');
+  if (!code && !state && !error) {
+    // Meta may probe the callback URL while checking its configuration.
     return res.status(200).send('OK');
   }
 
-  const userId = state || null;
+  let userId;
+  try {
+    userId = await consumeMetaConnectState(state);
+  } catch (stateError) {
+    console.warn('[meta-oauth] Rejected callback state:', stateError.message);
+    return metaDashboardRedirect(res, {
+      whatsapp: 'error',
+      reason: 'The WhatsApp connection link expired or was invalid. Please start again from the dashboard.',
+    });
+  }
+
+  if (error) {
+    console.info('[meta-oauth] Customer cancelled or Meta returned an error:', error);
+    return metaDashboardRedirect(res, {
+      whatsapp: 'error',
+      reason: errorDescription || error,
+    });
+  }
+  if (typeof code !== 'string' || !code) {
+    return metaDashboardRedirect(res, {
+      whatsapp: 'error',
+      reason: 'Meta did not return a signup authorization code. Please try again.',
+    });
+  }
 
   try {
-    // Step 1: Exchange the authorization code for a customer-scoped BISU token.
+    if (!META_APP_SECRET || !EFFECTIVE_APP_ACCESS_TOKEN) {
+      throw new Error('Meta App Secret is missing from the backend configuration');
+    }
+
+    // Exchange the short-lived Hosted Embedded Signup code server-side.
     const { accessToken } = await exchangeCodeForToken({
       appId: META_APP_ID,
       appSecret: META_APP_SECRET,
       code,
-      redirectUri: META_AUTH_REDIRECT_URI,
+      redirectUri: (() => {
+        const redirectUri = new URL(META_AUTH_REDIRECT_URI);
+        redirectUri.searchParams.set('state', state);
+        return redirectUri.toString();
+      })(),
     });
 
-    // Step 2: Discover the WABA IDs the token can access.
     const debug = await debugToken({
       accessToken,
       appAccessToken: EFFECTIVE_APP_ACCESS_TOKEN,
     });
+    if (debug.is_valid !== true || String(debug.app_id) !== String(META_APP_ID)) {
+      throw new Error('Meta returned an invalid token for this app');
+    }
     const wabaId = debug.wabaIds?.[0];
     if (!wabaId) {
-      throw new Error('No WhatsApp Business Account found in token scopes');
+      throw new Error('No WhatsApp Business Account was granted to this app. Complete the Meta signup and grant both WhatsApp permissions.');
+    }
+    const wabaScopes = new Set(
+      (debug.granularScopes || [])
+        .filter(scope => scope.targetIds.some(id => String(id) === String(wabaId)))
+        .map(scope => scope.scope),
+    );
+    if (!wabaScopes.has('whatsapp_business_management') || !wabaScopes.has('whatsapp_business_messaging')) {
+      throw new Error('The Meta signup did not grant both WhatsApp Business permissions. Please reconnect and approve the requested access.');
     }
 
-    // Step 3: Subscribe our app to the customer's WABA for webhooks.
-    await subscribeAppToWaba({ wabaId, accessToken });
-
-    // Step 4: Register the business phone number (required to send messages).
     const phoneNumbers = await getPhoneNumbersByWaba({ wabaId, accessToken });
     const phone = phoneNumbers?.[0];
-    let phoneNumberId = phone?.id || null;
-    const displayPhone = phone?.displayPhoneNumber || null;
-    if (phoneNumberId) {
-      try {
-        await registerPhoneNumber({ phoneNumberId, pin: '000000', accessToken });
-      } catch (err) {
-        console.warn('[meta-oauth] Phone registration skipped:', err.message);
-      }
+    if (!phone?.id) {
+      throw new Error('Meta did not return a phone number for the selected WhatsApp Business Account');
+    }
+    const currentPhoneOwner = await getUserByPhoneNumber(phone.id);
+    if (currentPhoneOwner && currentPhoneOwner.userId !== userId) {
+      throw new Error('This WhatsApp number is already connected to another Chati workspace. Disconnect it there before reconnecting.');
     }
 
-    // Step 5: Persist the credentials so the app can send/receive messages.
-    if (userId) {
-      await saveUserCredentials(userId, {
-        wabaAccessToken: accessToken,
-        wabaPhoneNumberId: phoneNumberId,
-        wabaBusinessId: wabaId,
-        wabaVerifyToken: META_VERIFY_TOKEN,
-        wabaDisplayPhone: displayPhone,
+    // Subscribe this app to the customer's WABA so inbound messages reach us.
+    await subscribeAppToWaba({ wabaId, accessToken });
+
+    // Register only when the phone is not already connected. Never use a shared
+    // default PIN; each new number receives an unpredictable six-digit PIN.
+    const existingCredentials = await getUserCredentials(userId) || {};
+    let registrationPin = existingCredentials.wabaRegistrationPin || '';
+    if (phone.status !== 'CONNECTED') {
+      if (!registrationPin) {
+        registrationPin = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+      }
+      await registerPhoneNumber({
+        phoneNumberId: phone.id,
+        pin: registrationPin,
+        accessToken,
       });
-      if (phoneNumberId) {
-        await mapPhoneToUser(phoneNumberId, userId);
-      }
-      console.log('[meta-oauth] Credentials saved for user', userId, 'waba:', wabaId, 'phone:', displayPhone, 'phoneId:', phoneNumberId);
     }
 
-    const query = [
-      'whatsapp=connected',
-      displayPhone ? `wa_phone=${encodeURIComponent(displayPhone)}` : '',
-    ].filter(Boolean).join('&');
+    await saveUserCredentials(userId, {
+      ...existingCredentials,
+      wabaAccessToken: accessToken,
+      wabaPhoneNumberId: phone.id,
+      wabaBusinessId: wabaId,
+      wabaVerifyToken: META_VERIFY_TOKEN,
+      wabaDisplayPhone: phone.displayPhoneNumber || '',
+      wabaRegistrationPin: registrationPin,
+    });
+    await mapPhoneToUser(phone.id, userId);
+    const savedCredentials = await getUserCredentials(userId);
+    if (!savedCredentials?.wabaAccessToken || savedCredentials.wabaPhoneNumberId !== phone.id) {
+      throw new Error('WhatsApp connected with Meta, but the account details could not be saved. Please try again or contact support.');
+    }
 
-    return res.redirect(`${APP_BASE_URL}/dashboard?${query}`);
+    console.log('[meta-oauth] WhatsApp connected for user', userId, 'WABA:', wabaId, 'phone:', phone.displayPhoneNumber);
+    return metaDashboardRedirect(res, {
+      whatsapp: 'connected',
+      wa_phone: phone.displayPhoneNumber || '',
+    });
   } catch (err) {
     console.error('[meta-oauth] Callback processing failed:', err.message);
-    return res.redirect(`${APP_BASE_URL}/dashboard?whatsapp=error&reason=${encodeURIComponent(err.message)}`);
+    return metaDashboardRedirect(res, {
+      whatsapp: 'error',
+      reason: err.message || 'WhatsApp connection failed. Please try again.',
+    });
   }
 });
 
 // ========================================
-// META WHATSAPP EMBEDDED SIGNUP API
+// META WHATSAPP HOSTED EMBEDDED SIGNUP API
 // ========================================
+app.get("/api/meta/auth-url", async (req, res) => {
+  const userId = await authenticateMetaUser(req, res);
+  if (!userId) return;
 
-// Returns the Meta Embedded Signup OAuth URL for the authenticated user.
-// The frontend redirects the browser to this URL to start the flow.
-app.get("/api/meta/auth-url", (req, res) => {
-  const userId = req.headers['x-user-id'];
-
-  if (!userId) {
-    return res.status(401).json({ error: 'User ID required' });
+  if (JWT_SECRET === 'your-secret-key-change-in-production') {
+    return res.status(500).json({ error: 'WhatsApp signup is disabled until a strong JWT_SECRET is configured on the backend.' });
+  }
+  if (!META_APP_ID || !META_CONFIG_ID || !META_AUTH_REDIRECT_URI || !META_APP_SECRET) {
+    return res.status(500).json({ error: 'Meta integration is missing required server configuration.' });
   }
 
-  if (!META_APP_ID || !META_CONFIG_ID || !META_AUTH_REDIRECT_URI) {
-    return res.status(500).json({ error: 'Meta integration not configured. Set META_APP_ID, META_CONFIG_ID, and META_AUTH_REDIRECT_URI.' });
+  try {
+    const nonce = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    await createMetaOAuthState(nonce, userId, expiresAt);
+    const state = jwt.sign(
+      { purpose: 'whatsapp-connect', userId, nonce },
+      JWT_SECRET,
+      { expiresIn: '15m' },
+    );
+
+    // This redirect URI is the backend endpoint supplied in Meta's Hosted ES
+    // configuration. Include signed state so the callback can identify the
+    // dashboard account without trusting a client-provided user ID.
+    const redirectUri = new URL(META_AUTH_REDIRECT_URI);
+    redirectUri.searchParams.set('state', state);
+
+    const signupUrl = new URL('https://business.facebook.com/messaging/whatsapp/onboard/');
+    signupUrl.searchParams.set('app_id', META_APP_ID);
+    signupUrl.searchParams.set('config_id', META_CONFIG_ID);
+    signupUrl.searchParams.set('extras', JSON.stringify({
+      version: 'v4',
+      sessionInfoVersion: '3',
+      featureType: 'whatsapp_business_app_onboarding',
+    }));
+    signupUrl.searchParams.set('redirect_uri', redirectUri.toString());
+
+    res.json({ url: signupUrl.toString() });
+  } catch (err) {
+    console.error('[meta-auth-url] Could not create signup state:', err.message);
+    res.status(500).json({ error: 'Could not start WhatsApp signup. Please try again.' });
   }
-
-  const params = new URLSearchParams({
-    client_id: META_APP_ID,
-    redirect_uri: META_AUTH_REDIRECT_URI,
-    state: userId,
-    config_id: META_CONFIG_ID,
-    response_type: 'code',
-    override_default_response_type: 'true',
-  });
-
-  const authUrl = `https://www.facebook.com/${GRAPH_API_VERSION}/dialog/oauth?${params.toString()}`;
-
-  console.log('[meta-auth-url] Generated Embedded Signup URL for user', userId);
-  res.json({ url: authUrl });
 });
 
 // Returns the WhatsApp connection status for the authenticated user.
 app.get("/api/meta/status", async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User ID required' });
-    }
+    const userId = await authenticateMetaUser(req, res);
+    if (!userId) return;
 
     const creds = await getUserCredentials(userId);
 
@@ -3751,14 +3862,15 @@ app.get("/api/meta/status", async (req, res) => {
     try {
       const debug = await debugToken({
         accessToken,
-        appAccessToken: META_APP_ACCESS_TOKEN,
+        appAccessToken: EFFECTIVE_APP_ACCESS_TOKEN,
       });
 
-      const tokenValid = debug && debug.is_valid !== false;
+      const tokenValid = debug?.is_valid === true
+        && String(debug.app_id) === String(META_APP_ID);
       if (!tokenValid) {
         return res.json({
           connected: false,
-          error: 'The saved WhatsApp access token is not a valid Meta token. Check the token in the Users page (real tokens start with "EAA").',
+          error: 'The saved WhatsApp access token is invalid or belongs to a different Meta app. Reconnect the account.',
           code: 'invalid_token',
         });
       }
@@ -3769,7 +3881,7 @@ app.get("/api/meta/status", async (req, res) => {
 
       // Verify the phone number is actually registered & verified under this WABA.
       const phoneNumbers = effectiveWabaId ? await getPhoneNumbersByWaba({ wabaId: effectiveWabaId, accessToken }) : [];
-      const phone = phoneNumbers.find(p => String(p.id) === String(phoneNumberId)) || phoneNumbers[0];
+      const phone = phoneNumbers.find(p => String(p.id) === String(phoneNumberId));
       const verificationStatus = phone?.codeVerificationStatus;
 
       if (!phone) {
@@ -3785,6 +3897,15 @@ app.get("/api/meta/status", async (req, res) => {
           connected: false,
           error: `WhatsApp phone number is not verified (status: ${verificationStatus}). Complete verification in Meta Business Manager.`,
           code: 'phone_not_verified',
+          phone: phone.displayPhoneNumber,
+        });
+      }
+
+      if (phone.status !== 'CONNECTED') {
+        return res.json({
+          connected: false,
+          error: `WhatsApp phone number is not connected to the Cloud API yet (status: ${phone.status || 'unknown'}).`,
+          code: 'phone_not_connected',
           phone: phone.displayPhoneNumber,
         });
       }
@@ -3812,11 +3933,8 @@ app.get("/api/meta/status", async (req, res) => {
 // Registers a WhatsApp phone number with the two-step verification PIN.
 app.post("/api/meta/register", async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User ID required' });
-    }
+    const userId = await authenticateMetaUser(req, res);
+    if (!userId) return;
 
     const creds = await getUserCredentials(userId);
     if (!creds || !creds.wabaAccessToken || !creds.wabaPhoneNumberId) {
@@ -3824,7 +3942,7 @@ app.post("/api/meta/register", async (req, res) => {
     }
 
     const { pin } = req.body || {};
-    if (pin && !/^\d{6}$/.test(pin)) {
+    if (!pin || !/^\d{6}$/.test(pin)) {
       return res.status(400).json({ error: 'PIN must be 6 digits' });
     }
 
@@ -3844,11 +3962,8 @@ app.post("/api/meta/register", async (req, res) => {
 // Disconnects WhatsApp for the authenticated user (clears WABA credentials).
 app.post("/api/meta/disconnect", async (req, res) => {
   try {
-    const userId = req.headers['x-user-id'];
-
-    if (!userId) {
-      return res.status(401).json({ error: 'User ID required' });
-    }
+    const userId = await authenticateMetaUser(req, res);
+    if (!userId) return;
 
     await clearWabaCredentials(userId);
     console.log('[meta-disconnect] WhatsApp disconnected for user', userId);
@@ -3905,6 +4020,7 @@ app.put("/api/user/credentials", async (req, res) => {
     const wabaBusinessId = pick('wabaBusinessId');
     const wabaVerifyToken = pick('wabaVerifyToken');
     const wabaDisplayPhone = pick('wabaDisplayPhone');
+    const wabaRegistrationPin = existing.wabaRegistrationPin || '';
     const businessContext = pick('businessContext', existing.businessContext ?? undefined);
     const bypassClaude = body.bypassClaude !== undefined ? !!body.bypassClaude : existing.bypassClaude;
 
@@ -3919,6 +4035,7 @@ app.put("/api/user/credentials", async (req, res) => {
       wabaBusinessId,
       wabaVerifyToken,
       wabaDisplayPhone,
+      wabaRegistrationPin,
       businessContext,
       bypassClaude
     });

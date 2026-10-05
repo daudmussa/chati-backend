@@ -28,10 +28,11 @@ export default function Dashboard() {
   const [waError, setWaError] = useState<string | null>(null);
 
   const fetchWhatsappStatus = useCallback(async () => {
-    if (!user?.id) return;
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
     try {
       const res = await fetch(API_ENDPOINTS.META_STATUS, {
-        headers: { 'x-user-id': user.id }
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
@@ -44,7 +45,7 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Error fetching WhatsApp status:', err);
     }
-  }, [user?.id]);
+  }, []);
 
   // Check URL params for OAuth callback result
   useEffect(() => {
@@ -53,7 +54,7 @@ export default function Dashboard() {
       fetchWhatsappStatus();
     } else if (waParam === 'error') {
       const reason = searchParams.get('reason') || 'Unknown error';
-      setWaError(`WhatsApp connection failed: ${decodeURIComponent(reason)}`);
+      setWaError(`WhatsApp connection failed: ${reason}`);
       setTimeout(() => setWaError(null), 8000);
     }
   }, [searchParams, fetchWhatsappStatus]);
@@ -68,19 +69,24 @@ export default function Dashboard() {
   }, [user?.id, fetchWhatsappStatus]);
 
   const handleConnectWhatsApp = async () => {
-    if (!user?.id) return;
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      setWaError('Please sign in again before connecting WhatsApp.');
+      return;
+    }
     setWhatsappLoading(true);
     setWaError(null);
     try {
       const res = await fetch(API_ENDPOINTS.META_AUTH_URL, {
-        headers: { 'x-user-id': user.id }
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || 'Failed to get auth URL');
       }
       const { url } = await res.json();
-      window.location.href = url;
+      if (!url) throw new Error('Meta did not return a signup link');
+      window.location.assign(url);
     } catch (err: any) {
       setWaError(err.message || 'Failed to start WhatsApp connection');
       setWhatsappLoading(false);
@@ -88,12 +94,16 @@ export default function Dashboard() {
   };
 
   const handleDisconnectWhatsApp = async () => {
-    if (!user?.id) return;
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      setWaError('Please sign in again before disconnecting WhatsApp.');
+      return;
+    }
     setWhatsappLoading(true);
     try {
       const res = await fetch(API_ENDPOINTS.META_DISCONNECT, {
         method: 'POST',
-        headers: { 'x-user-id': user.id }
+        headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
         setWhatsappStatus({ connected: false });
@@ -257,12 +267,12 @@ export default function Dashboard() {
                   >
                     Subscribe Now
                   </Button>
-                  <Button
+                  {/* <Button
                     variant="outline"
                     onClick={() => navigate('/payments/settings')}
                   >
                     Configure Payment
-                  </Button>
+                  </Button> */}
                 </div>
                 <div className="bg-white rounded-lg p-4 space-y-2 border border-red-200">
                   <p className="font-semibold text-red-900 mb-2">Need help? Contact us:</p>

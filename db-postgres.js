@@ -134,6 +134,10 @@ export async function initSchema() {
     ALTER TABLE user_credentials 
     ADD COLUMN IF NOT EXISTS waba_display_phone TEXT;
   `);
+  await p.query(`
+    ALTER TABLE user_credentials
+    ADD COLUMN IF NOT EXISTS waba_registration_pin TEXT;
+  `);
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_credentials (
@@ -147,6 +151,7 @@ export async function initSchema() {
       waba_business_id TEXT,
       waba_verify_token TEXT,
       waba_display_phone TEXT,
+      waba_registration_pin TEXT,
       business_context TEXT,
       bypass_claude BOOLEAN DEFAULT FALSE,
       updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -156,6 +161,13 @@ export async function initSchema() {
     CREATE TABLE IF NOT EXISTS phone_user_mapping (
       phone_number TEXT PRIMARY KEY,
       user_id TEXT NOT NULL
+    );
+  `);
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS meta_oauth_states (
+      state_id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at TIMESTAMPTZ NOT NULL
     );
   `);
   await p.query(`
@@ -407,6 +419,27 @@ export async function initSchema() {
   console.log('[postgres] schema initialized');
 }
 
+export async function createMetaOAuthState(stateId, userId, expiresAt) {
+  const p = ensurePool();
+  if (!p) throw new Error('Database is not available');
+  await p.query('DELETE FROM meta_oauth_states WHERE expires_at <= NOW()');
+  await p.query(
+    'INSERT INTO meta_oauth_states (state_id, user_id, expires_at) VALUES ($1, $2, $3)',
+    [stateId, userId, expiresAt],
+  );
+}
+
+export async function consumeMetaOAuthState(stateId) {
+  const p = ensurePool();
+  if (!p || !stateId) return null;
+  const { rows } = await p.query(`
+    DELETE FROM meta_oauth_states
+    WHERE state_id = $1 AND expires_at > NOW()
+    RETURNING user_id AS "userId"
+  `, [stateId]);
+  return rows[0]?.userId || null;
+}
+
 export async function saveUserCredentials(userId, credentials) {
   const p = ensurePool();
   if (!p) return;
@@ -414,9 +447,9 @@ export async function saveUserCredentials(userId, credentials) {
     INSERT INTO user_credentials (
       user_id, claude_api_key, twilio_account_sid, twilio_auth_token,
       twilio_phone_number, waba_access_token, waba_phone_number_id,
-      waba_business_id, waba_verify_token, waba_display_phone,
+      waba_business_id, waba_verify_token, waba_display_phone, waba_registration_pin,
       business_context, bypass_claude, updated_at
-    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
+    ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NOW())
     ON CONFLICT (user_id) DO UPDATE SET
       claude_api_key = EXCLUDED.claude_api_key,
       twilio_account_sid = EXCLUDED.twilio_account_sid,
@@ -427,6 +460,7 @@ export async function saveUserCredentials(userId, credentials) {
       waba_business_id = EXCLUDED.waba_business_id,
       waba_verify_token = EXCLUDED.waba_verify_token,
       waba_display_phone = EXCLUDED.waba_display_phone,
+      waba_registration_pin = EXCLUDED.waba_registration_pin,
       business_context = EXCLUDED.business_context,
       bypass_claude = EXCLUDED.bypass_claude,
       updated_at = NOW();
@@ -441,6 +475,7 @@ export async function saveUserCredentials(userId, credentials) {
     credentials.wabaBusinessId || '',
     credentials.wabaVerifyToken || '',
     credentials.wabaDisplayPhone || '',
+    encrypt(credentials.wabaRegistrationPin || ''),
     credentials.businessContext,
     !!credentials.bypassClaude,
   ]);
@@ -463,10 +498,15 @@ export async function getUserCredentials(userId) {
     wabaBusinessId: r.waba_business_id,
     wabaVerifyToken: r.waba_verify_token,
     wabaDisplayPhone: r.waba_display_phone,
+    wabaRegistrationPin: decrypt(r.waba_registration_pin),
     businessContext: r.business_context,
     bypassClaude: !!r.bypass_claude,
     updatedAt: r.updated_at,
   };
+}
+
+export function normalizePhoneNumber(phoneNumber) {
+  return String(phoneNumber || '').replace(/^whatsapp:/, '').replace(/\D/g, '');
 }
 
 export async function mapPhoneToUser(phoneNumber, userId) {
@@ -476,18 +516,24 @@ export async function mapPhoneToUser(phoneNumber, userId) {
     INSERT INTO phone_user_mapping (phone_number, user_id)
     VALUES ($1,$2)
     ON CONFLICT (phone_number) DO UPDATE SET user_id = EXCLUDED.user_id;
-  `, [phoneNumber.replace(/^whatsapp:/, ''), userId]);
+  `, [normalizePhoneNumber(phoneNumber), userId]);
 }
 
 export async function getUserByPhoneNumber(phoneNumber) {
   const p = ensurePool();
   if (!p) return null;
-  const normalized = phoneNumber.replace(/^whatsapp:/, '');
-  const { rows } = await p.query(`
+  const normalized = normalizePhoneNumber(phoneNumber);
+  let { rows } = await p.query(`
     SELECT uc.* FROM user_credentials uc
     JOIN phone_user_mapping pm ON uc.user_id = pm.user_id
-    WHERE pm.phone_number = $1
+    WHERE regexp_replace(pm.phone_number, '\\D', '', 'g') = $1
   `, [normalized]);
+  if (!rows[0] && normalized) {
+    ({ rows } = await p.query(`
+      SELECT * FROM user_credentials uc
+      WHERE regexp_replace(uc.waba_phone_number_id, '\\D', '', 'g') = $1
+    `, [normalized]));
+  }
   const r = rows[0];
   if (!r) return null;
   return {
@@ -501,6 +547,7 @@ export async function getUserByPhoneNumber(phoneNumber) {
     wabaBusinessId: r.waba_business_id,
     wabaVerifyToken: r.waba_verify_token,
     wabaDisplayPhone: r.waba_display_phone,
+    wabaRegistrationPin: decrypt(r.waba_registration_pin),
     businessContext: r.business_context,
     bypassClaude: !!r.bypass_claude,
   };
@@ -520,6 +567,7 @@ export async function clearWabaCredentials(userId) {
       waba_business_id = NULL,
       waba_verify_token = NULL,
       waba_display_phone = NULL,
+      waba_registration_pin = NULL,
       updated_at = NOW()
     WHERE user_id = $1
   `, [userId]);
@@ -542,6 +590,70 @@ export async function getAllUsers() {
   const { rows } = await p.query(`
     SELECT id, email, name, role, enabled_features, limits, pay_date, package, status, promo_code, payments_enabled, created_at 
     FROM users 
+    ORDER BY created_at DESC
+  `);
+  return rows;
+}
+
+// Compact admin listing: counts and display fields only, without loading full
+// conversations, orders, bookings, or products for every account.
+export async function getAdminUsersSummary() {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(`
+    WITH order_counts AS (
+      SELECT user_id, COUNT(*)::int AS total FROM orders GROUP BY user_id
+    ), booking_counts AS (
+      SELECT user_id, COUNT(*)::int AS total FROM bookings GROUP BY user_id
+    ), conversation_counts AS (
+      SELECT user_id, COUNT(*)::int AS total FROM conversations GROUP BY user_id
+    ), product_counts AS (
+      SELECT user_id, COUNT(*)::int AS total FROM products GROUP BY user_id
+    )
+    SELECT
+      u.id AS "userId", u.email, u.name, u.role,
+      COALESCE(NULLIF(bs.business_name, ''), NULLIF(bs.business_description, ''), u.name, 'No business name') AS "storeName",
+      COALESCE(NULLIF(uc.twilio_phone_number, ''), NULLIF(uc.waba_phone_number_id, ''), 'No phone') AS "storePhone",
+      COALESCE(ss.store_id, LEFT(u.id, 8)) AS "storeId",
+      COALESCE(oc.total, 0) AS "ordersCount",
+      COALESCE(bc.total, 0) AS "bookingsCount",
+      COALESCE(cc.total, 0) AS "conversationCount",
+      COALESCE(pc.total, 0) AS "productCount",
+      (uc.user_id IS NOT NULL AND (
+        COALESCE(uc.claude_api_key, '') <> '' OR COALESCE(uc.twilio_account_sid, '') <> '' OR
+        COALESCE(uc.twilio_auth_token, '') <> '' OR COALESCE(uc.twilio_phone_number, '') <> '' OR
+        COALESCE(uc.waba_access_token, '') <> '' OR COALESCE(uc.waba_phone_number_id, '') <> ''
+      )) AS "hasCredentials",
+      COALESCE(uc.waba_phone_number_id, '') AS "wabaPhoneNumberId",
+      COALESCE(uc.waba_business_id, '') AS "wabaBusinessId",
+      COALESCE(uc.waba_display_phone, '') AS "wabaDisplayPhone",
+      COALESCE(uc.twilio_phone_number, '') AS "twilioPhoneNumber",
+      COALESCE(uc.bypass_claude, FALSE) AS "bypassClaude",
+      COALESCE(u.enabled_features, '["conversations", "store", "bookings", "staff", "settings", "billing"]'::jsonb) AS "enabledFeatures",
+      COALESCE(u.limits, '{"maxConversations":100,"maxProducts":50}'::jsonb) AS limits,
+      u.pay_date AS "payDate", COALESCE(u.package, 'starter') AS package,
+      COALESCE(u.status, 'active') AS status, u.promo_code AS "promoCode",
+      COALESCE(u.payments_enabled, FALSE) AS "paymentsEnabled"
+    FROM users u
+    LEFT JOIN business_settings bs ON bs.user_id = u.id
+    LEFT JOIN user_credentials uc ON uc.user_id = u.id
+    LEFT JOIN store_settings ss ON ss.user_id = u.id
+    LEFT JOIN order_counts oc ON oc.user_id = u.id
+    LEFT JOIN booking_counts bc ON bc.user_id = u.id
+    LEFT JOIN conversation_counts cc ON cc.user_id = u.id
+    LEFT JOIN product_counts pc ON pc.user_id = u.id
+    ORDER BY u.created_at DESC
+  `);
+  return rows;
+}
+
+export async function getAdminStaffSummary() {
+  const p = ensurePool();
+  if (!p) return [];
+  const { rows } = await p.query(`
+    SELECT id, name, promo_code AS "promoCode", user_id AS "userId"
+    FROM staff
+    WHERE promo_code IS NOT NULL AND promo_code <> ''
     ORDER BY created_at DESC
   `);
   return rows;

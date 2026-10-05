@@ -105,45 +105,13 @@ export default function Admin() {
 
   const fetchAllStaff = async () => {
     try {
-      const usersResponse = await fetch(API_ENDPOINTS.ADMIN_USERS, {
+      const response = await fetch(API_ENDPOINTS.ADMIN_STAFF, {
         headers: {
           "x-user-id": user?.id || "",
           "x-user-role": user?.role || ""
         }
       });
-      
-      if (!usersResponse.ok) return;
-      
-      const allUsersData = await usersResponse.json();
-      const staffList: Array<{id: string; name: string; promoCode: string; userId: string}> = [];
-      
-      for (const userData of allUsersData) {
-        try {
-          const response = await fetch(API_ENDPOINTS.STAFF, {
-            headers: {
-              "x-user-id": userData.userId
-            }
-          });
-          
-          if (response.ok) {
-            const userStaff = await response.json();
-            userStaff.forEach((staff: any) => {
-              if (staff.promoCode) {
-                staffList.push({
-                  id: staff.id,
-                  name: staff.name,
-                  promoCode: staff.promoCode,
-                  userId: userData.userId
-                });
-              }
-            });
-          }
-        } catch (error) {
-          console.error("Error fetching staff for user:", userData.userId, error);
-        }
-      }
-      
-      setAllStaff(staffList);
+      if (response.ok) setAllStaff(await response.json());
     } catch (error) {
       console.error("Error fetching all staff:", error);
     }
@@ -215,39 +183,9 @@ export default function Admin() {
         console.log('[Admin] Users data:', data);
         console.log('[Admin] First user payDate:', data[0]?.payDate);
         
-        // Fetch credentials for each user (skip WhatsApp status fetch for now - load on demand)
-        const usersWithCredentials = await Promise.all(
-          data.map(async (userData: UserData) => {
-            try {
-              const credResponse = await fetch(API_ENDPOINTS.USER_CREDENTIALS, {
-                headers: {
-                  'x-user-id': userData.userId
-                }
-              });
-              
-              if (credResponse.ok) {
-                const credData = await credResponse.json();
-                return {
-                  ...userData,
-                  credentials: {
-                    hasCredentials: credData.hasCredentials || false,
-                    twilioPhoneNumber: credData.twilioPhoneNumber || '',
-                    wabaPhoneNumberId: credData.wabaPhoneNumberId || '',
-                    wabaBusinessId: credData.wabaBusinessId || '',
-                    wabaDisplayPhone: credData.wabaDisplayPhone || '',
-                    bypassClaude: credData.bypassClaude || false,
-                    waStatus: { connected: false }
-                  }
-                };
-              }
-            } catch (error) {
-              console.error('Failed to fetch credentials for user:', userData.userId, error);
-            }
-            return userData;
-          })
-        );
-        
-        setUsers(usersWithCredentials);
+        // Admin summary includes display-safe credential metadata; load WhatsApp
+        // connectivity only when an account is expanded.
+        setUsers(data);
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
         console.error('[Admin] Error response:', errorData);
