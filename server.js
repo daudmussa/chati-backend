@@ -34,6 +34,9 @@ async function sendWhatsAppResponse({ userCreds, userTwilioClient, twilioFromNum
     } catch (err) {
       wabaSendError = err;
       console.error('[send] WABA send failed, trying Twilio fallback:', {
+        wabaUserId: userCreds?.userId || null,
+        wabaId: userCreds?.wabaBusinessId || null,
+        phoneNumberId: userCreds?.wabaPhoneNumberId || null,
         error: err.message,
         ...(err.meta || {}),
       });
@@ -3987,6 +3990,8 @@ app.get("/api/meta/status", async (req, res) => {
           phone: displayPhone || null,
           wabaId: effectiveWabaId || null,
           phoneNumberId: phoneNumberId || null,
+          tokenType: debug.type || null,
+          grantedPermissions: debug.granularScopes?.map(scope => scope.scope) || debug.scopes || [],
         });
       }
 
@@ -4026,6 +4031,10 @@ app.get("/api/meta/status", async (req, res) => {
         phone: displayPhone || phone?.displayPhoneNumber || null,
         wabaId: effectiveWabaId || null,
         phoneNumberId: phoneNumberId || phone?.id || null,
+        tokenType: debug.type || null,
+        messagingPermissionGranted: hasMessagingPermission,
+        grantedPermissions: debug.granularScopes?.map(scope => scope.scope) || debug.scopes || [],
+        phoneStatus: phone.status || null,
       });
     } catch (verifyErr) {
       // Most likely the token is invalid/expired so the Meta call itself failed.

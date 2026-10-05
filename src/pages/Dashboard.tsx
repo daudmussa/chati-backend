@@ -108,7 +108,16 @@ export default function Dashboard() {
 
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [whatsappStatus, setWhatsappStatus] = useState<{ connected: boolean; phone?: string | null; wabaId?: string | null }>({ connected: false });
+  const [whatsappStatus, setWhatsappStatus] = useState<{
+    connected: boolean;
+    phone?: string | null;
+    wabaId?: string | null;
+    phoneNumberId?: string | null;
+    tokenType?: string | null;
+    messagingPermissionGranted?: boolean;
+    grantedPermissions?: string[];
+    phoneStatus?: string | null;
+  }>({ connected: false });
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [waError, setWaError] = useState<string | null>(null);
   const [whatsappDiagnostics, setWhatsappDiagnostics] = useState<WhatsAppDiagnostic[]>(loadWhatsAppDiagnostics);
@@ -176,7 +185,13 @@ export default function Dashboard() {
         recordWhatsAppDiagnostic({
           level: 'success',
           step: 'Verify WhatsApp connection',
-          message: `Connected${data.phone ? `: ${data.phone}` : ''}`,
+          message: [
+            `Connected${data.phone ? `: ${data.phone}` : ''}`,
+            data.wabaId ? `WABA ${data.wabaId}` : '',
+            data.phoneNumberId ? `phone ID ${data.phoneNumberId}` : '',
+            data.messagingPermissionGranted ? 'messaging permission granted' : '',
+            data.tokenType ? `token type ${data.tokenType}` : '',
+          ].filter(Boolean).join(' · '),
           endpoint: res.url || API_ENDPOINTS.META_STATUS,
           httpStatus: res.status,
           sessionTokenPresent: true,
@@ -271,7 +286,12 @@ export default function Dashboard() {
         return;
       }
 
-      setWhatsappStatus({ connected: true, phone: data.phone, wabaId: data.wabaId });
+      setWhatsappStatus({
+        connected: true,
+        phone: data.phone,
+        wabaId: data.wabaId,
+        phoneNumberId: data.phoneNumberId,
+      });
       setWaError(null);
       recordWhatsAppDiagnostic({
         level: 'success',
@@ -680,6 +700,17 @@ export default function Dashboard() {
                   <p className="text-xs text-gray-400">
                     WhatsApp Business Account ID: {whatsappStatus.wabaId || '—'}
                   </p>
+                  {whatsappStatus.phoneNumberId && (
+                    <p className="text-xs text-gray-400">
+                      WhatsApp phone number ID: {whatsappStatus.phoneNumberId}
+                    </p>
+                  )}
+                  {whatsappStatus.messagingPermissionGranted !== undefined && (
+                    <p className="text-xs text-gray-500">
+                      Meta messaging permission: {whatsappStatus.messagingPermissionGranted ? 'Granted' : 'Missing'}
+                      {whatsappStatus.tokenType ? ` · Token type: ${whatsappStatus.tokenType}` : ''}
+                    </p>
+                  )}
                 </div>
                 <Button
                   variant="outline"
