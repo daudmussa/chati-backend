@@ -3840,6 +3840,100 @@ app.get("/api/meta/auth-url", async (req, res) => {
   }
 });
 
+// Return the public Facebook Login for Business values used by the browser SDK.
+app.get("/api/meta/signup-config", async (req, res) => {
+  const userId = await authenticateMetaUser(req, res);
+  if (!userId) return;
+  if (!META_APP_ID || !META_CONFIG_ID) {
+    return res.status(500).json({ error: 'Meta Embedded Signup is not configured.' });
+  }
+  res.json({ appId: META_APP_ID, configId: META_CONFIG_ID, graphApiVersion: GRAPH_API_VERSION });
+});
+
+// Exchange the Embedded Signup code and attach the selected assets to the
+// authenticated Chati workspace. The browser never sends a user ID for this.
+app.post("/api/meta/complete-signup", async (req, res) => {
+  const userId = await authenticateMetaUser(req, res);
+  if (!userId) return;
+
+  const { code, wabaId, phoneNumberId, event } = req.body || {};
+  if (typeof code !== 'string' || !code || typeof wabaId !== 'string' || !wabaId
+    || typeof phoneNumberId !== 'string' || !phoneNumberId) {
+    return res.status(400).json({ error: 'Meta did not return the signup code, WABA ID, and phone number ID. Retry the signup and finish all Meta steps.' });
+  }
+
+  try {
+    if (!META_APP_SECRET || !EFFECTIVE_APP_ACCESS_TOKEN) {
+      throw new Error('Meta App Secret is missing from the backend configuration');
+    }
+    const { accessToken } = await exchangeCodeForToken({
+      appId: META_APP_ID,
+      appSecret: META_APP_SECRET,
+      code,
+    });
+    const debug = await debugToken({ accessToken, appAccessToken: EFFECTIVE_APP_ACCESS_TOKEN });
+    if (debug.is_valid !== true || String(debug.app_id) !== String(META_APP_ID)) {
+      throw new Error('Meta returned an invalid token for this app');
+    }
+    const wabaScopes = new Set(
+      (debug.granularScopes || [])
+        .filter(scope => scope.targetIds.some(id => String(id) === String(wabaId)))
+        .map(scope => scope.scope),
+    );
+    if (!wabaScopes.has('whatsapp_business_management') || !wabaScopes.has('whatsapp_business_messaging')) {
+      throw new Error('The Meta signup did not grant both WhatsApp Business permissions for the selected account.');
+    }
+
+    const phoneNumbers = await getPhoneNumbersByWaba({ wabaId, accessToken });
+    const phone = phoneNumbers.find(item => String(item.id) === String(phoneNumberId));
+    if (!phone) {
+      throw new Error('The selected phone number was not found under the WABA granted by Meta.');
+    }
+    const currentOwner = await getUserByPhoneNumber(phone.id);
+    if (currentOwner && currentOwner.userId !== userId) {
+      throw new Error('This WhatsApp number is already connected to another Chati workspace. Disconnect it there first.');
+    }
+
+    await subscribeAppToWaba({ wabaId, accessToken });
+    const existingCredentials = await getUserCredentials(userId) || {};
+    let registrationPin = existingCredentials.wabaRegistrationPin || '';
+    const isWhatsAppBusinessAppOnboarding = event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING';
+    if (!isWhatsAppBusinessAppOnboarding && phone.status !== 'CONNECTED') {
+      if (!registrationPin) {
+        registrationPin = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+      }
+      await registerPhoneNumber({ phoneNumberId: phone.id, pin: registrationPin, accessToken });
+    }
+
+    await saveUserCredentials(userId, {
+      ...existingCredentials,
+      wabaAccessToken: accessToken,
+      wabaPhoneNumberId: phone.id,
+      wabaBusinessId: wabaId,
+      wabaVerifyToken: META_VERIFY_TOKEN,
+      wabaDisplayPhone: phone.displayPhoneNumber || '',
+      wabaRegistrationPin: registrationPin,
+    });
+    await mapPhoneToUser(phone.id, userId);
+    const saved = await getUserCredentials(userId);
+    if (!saved?.wabaAccessToken || String(saved.wabaPhoneNumberId) !== String(phone.id)) {
+      throw new Error('Meta granted access, but Chati could not save the WhatsApp account to this workspace.');
+    }
+
+    console.log('[meta-signup] WhatsApp saved for user', userId, 'WABA:', wabaId, 'phone:', phone.displayPhoneNumber, 'event:', event);
+    res.json({
+      connected: true,
+      phone: phone.displayPhoneNumber || null,
+      wabaId,
+      phoneNumberId: phone.id,
+      status: phone.status || null,
+    });
+  } catch (err) {
+    console.error('[meta-signup] Completion failed for user', userId, ':', err.message);
+    res.status(400).json({ error: err.message || 'Could not finish WhatsApp signup.' });
+  }
+});
+
 // Returns the WhatsApp connection status for the authenticated user.
 app.get("/api/meta/status", async (req, res) => {
   try {

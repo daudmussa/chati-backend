@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquare, Send, Users, Calendar, CheckCircle, AlertCircle, Phone, Mail, Link, Unlink } from 'lucide-react';
@@ -21,6 +21,69 @@ type WhatsAppDiagnostic = {
 };
 
 const WHATSAPP_DIAGNOSTICS_KEY = 'whatsapp_connection_diagnostics';
+
+type FacebookLoginResponse = {
+  authResponse?: { code?: string };
+  status?: string;
+};
+
+type FacebookSdk = {
+  init: (options: { appId: string; autoLogAppEvents: boolean; xfbml: boolean; version: string }) => void;
+  login: (
+    callback: (response: FacebookLoginResponse) => void,
+    options: Record<string, unknown>,
+  ) => void;
+};
+
+type MetaSignupConfig = { appId: string; configId: string; graphApiVersion: string };
+
+type MetaSignupSession = {
+  wabaId: string;
+  phoneNumberId: string;
+  event: string;
+};
+
+declare global {
+  interface Window {
+    FB?: FacebookSdk;
+    fbAsyncInit?: () => void;
+  }
+}
+
+let facebookSdkAppId = '';
+
+function loadFacebookSdk(appId: string, graphApiVersion: string): Promise<FacebookSdk> {
+  if (window.FB && facebookSdkAppId === appId) return Promise.resolve(window.FB);
+  if (window.FB) {
+    window.FB.init({ appId, autoLogAppEvents: true, xfbml: true, version: graphApiVersion });
+    facebookSdkAppId = appId;
+    return Promise.resolve(window.FB);
+  }
+
+  return new Promise((resolve, reject) => {
+    window.fbAsyncInit = () => {
+      if (!window.FB) {
+        reject(new Error('Facebook SDK loaded without initializing. Refresh and try again.'));
+        return;
+      }
+      window.FB.init({ appId, autoLogAppEvents: true, xfbml: true, version: graphApiVersion });
+      facebookSdkAppId = appId;
+      resolve(window.FB);
+    };
+
+    let script = document.getElementById('facebook-jssdk') as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = 'facebook-jssdk';
+      script.src = 'https://connect.facebook.net/en_US/sdk.js';
+      script.async = true;
+      script.defer = true;
+      script.crossOrigin = 'anonymous';
+      script.onerror = () => reject(new Error('Could not load Facebook Login. Check the browser network/ad-blocker and retry.'));
+      document.head.appendChild(script);
+    }
+  });
+}
 
 function loadWhatsAppDiagnostics(): WhatsAppDiagnostic[] {
   try {
@@ -49,6 +112,13 @@ export default function Dashboard() {
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [waError, setWaError] = useState<string | null>(null);
   const [whatsappDiagnostics, setWhatsappDiagnostics] = useState<WhatsAppDiagnostic[]>(loadWhatsAppDiagnostics);
+  const [whatsappSignupReady, setWhatsappSignupReady] = useState(false);
+  const [whatsappSignupMode, setWhatsappSignupMode] = useState<'cloud_api' | 'business_app'>('cloud_api');
+  const signupConfigRef = useRef<MetaSignupConfig | null>(null);
+  const signupCodeRef = useRef<string | null>(null);
+  const signupSessionRef = useRef<MetaSignupSession | null>(null);
+  const signupCompletionStartedRef = useRef(false);
+  const completeSignupRef = useRef<(code: string, session: MetaSignupSession) => Promise<void>>(async () => undefined);
 
   const recordWhatsAppDiagnostic = useCallback((entry: Omit<WhatsAppDiagnostic, 'id' | 'time'>) => {
     const diagnostic: WhatsAppDiagnostic = {
@@ -144,6 +214,198 @@ export default function Dashboard() {
     }
   }, [recordWhatsAppDiagnostic]);
 
+  const completeMetaSignup = useCallback(async (code: string, session: MetaSignupSession) => {
+    if (signupCompletionStartedRef.current) return;
+    signupCompletionStartedRef.current = true;
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      const message = 'Your Chati login expired before Meta signup could be saved. Sign in again and reconnect.';
+      setWaError(message);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Save Meta signup',
+        message,
+        endpoint: API_ENDPOINTS.META_COMPLETE_SIGNUP,
+        sessionTokenPresent: false,
+      });
+      signupCompletionStartedRef.current = false;
+      setWhatsappLoading(false);
+      return;
+    }
+
+    setWhatsappLoading(true);
+    recordWhatsAppDiagnostic({
+      level: 'info',
+      step: 'Save Meta signup',
+      message: `Meta returned a signup code and selected WhatsApp assets (${session.event}). Exchanging the code and saving this workspace now.`,
+      endpoint: API_ENDPOINTS.META_COMPLETE_SIGNUP,
+      sessionTokenPresent: true,
+    });
+
+    try {
+      const res = await fetch(API_ENDPOINTS.META_COMPLETE_SIGNUP, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code,
+          wabaId: session.wabaId,
+          phoneNumberId: session.phoneNumberId,
+          event: session.event,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const message = data.error || `Chati could not save the Meta signup (HTTP ${res.status})`;
+        setWaError(message);
+        recordWhatsAppDiagnostic({
+          level: 'error',
+          step: 'Save Meta signup',
+          message,
+          endpoint: res.url || API_ENDPOINTS.META_COMPLETE_SIGNUP,
+          httpStatus: res.status,
+          sessionTokenPresent: true,
+        });
+        return;
+      }
+
+      setWhatsappStatus({ connected: true, phone: data.phone, wabaId: data.wabaId });
+      setWaError(null);
+      recordWhatsAppDiagnostic({
+        level: 'success',
+        step: 'Save Meta signup',
+        message: `WhatsApp account saved to this workspace${data.phone ? ` (${data.phone})` : ''}.`,
+        endpoint: res.url || API_ENDPOINTS.META_COMPLETE_SIGNUP,
+        httpStatus: res.status,
+        sessionTokenPresent: true,
+      });
+      await fetchWhatsappStatus();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Network error while saving the Meta signup';
+      setWaError(message);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Save Meta signup',
+        message,
+        endpoint: API_ENDPOINTS.META_COMPLETE_SIGNUP,
+        sessionTokenPresent: true,
+      });
+    } finally {
+      signupCodeRef.current = null;
+      signupSessionRef.current = null;
+      signupCompletionStartedRef.current = false;
+      setWhatsappLoading(false);
+    }
+  }, [fetchWhatsappStatus, recordWhatsAppDiagnostic]);
+
+  completeSignupRef.current = completeMetaSignup;
+
+  const prepareWhatsAppSignup = useCallback(async () => {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+    try {
+      const res = await fetch(API_ENDPOINTS.META_SIGNUP_CONFIG, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const config = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(config.error || `Could not load Meta signup settings (HTTP ${res.status})`);
+      }
+      if (!config.appId || !config.configId || !config.graphApiVersion) {
+        throw new Error('Meta signup settings are incomplete. Check the backend app/configuration IDs.');
+      }
+      const sdk = await loadFacebookSdk(config.appId, config.graphApiVersion);
+      signupConfigRef.current = config;
+      if (!sdk) throw new Error('Facebook Login SDK is unavailable.');
+      setWhatsappSignupReady(true);
+      recordWhatsAppDiagnostic({
+        level: 'success',
+        step: 'Prepare Meta signup',
+        message: 'Meta Embedded Signup v4 is ready in this dashboard.',
+        endpoint: res.url || API_ENDPOINTS.META_SIGNUP_CONFIG,
+        httpStatus: res.status,
+        sessionTokenPresent: true,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not prepare Meta signup';
+      setWaError(message);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Prepare Meta signup',
+        message,
+        endpoint: API_ENDPOINTS.META_SIGNUP_CONFIG,
+        sessionTokenPresent: true,
+      });
+    }
+  }, [recordWhatsAppDiagnostic]);
+
+  useEffect(() => {
+    if (user?.id) void prepareWhatsAppSignup();
+  }, [user?.id, prepareWhatsAppSignup]);
+
+  useEffect(() => {
+    const handleMetaSignupMessage = (messageEvent: MessageEvent) => {
+      let hostname = '';
+      try {
+        hostname = new URL(messageEvent.origin).hostname;
+      } catch {
+        return;
+      }
+      if (hostname !== 'facebook.com' && !hostname.endsWith('.facebook.com')) return;
+
+      try {
+        const payload = typeof messageEvent.data === 'string'
+          ? JSON.parse(messageEvent.data)
+          : messageEvent.data;
+        if (payload?.type !== 'WA_EMBEDDED_SIGNUP') return;
+
+        const eventName = String(payload.event || payload.data?.event || 'UNKNOWN');
+        const data = payload.data || {};
+        if (eventName === 'ERROR') {
+          const message = data.error_message || data.error || 'Meta reported an error in the signup flow.';
+          setWaError(message);
+          setWhatsappLoading(false);
+          signupCodeRef.current = null;
+          signupSessionRef.current = null;
+          recordWhatsAppDiagnostic({ level: 'error', step: 'Meta signup flow', message });
+          return;
+        }
+
+        const wabaId = String(data.waba_id || data.wabaId || '');
+        const phoneNumberId = String(data.phone_number_id || data.phoneNumberId || '');
+        if (!wabaId || !phoneNumberId) {
+          const message = eventName === 'FINISH_ONLY_WABA'
+            ? 'Meta created or selected a WhatsApp Business Account, but no phone number was selected. Restart signup and complete phone setup.'
+            : 'Meta returned a completion event without the WABA ID and phone number ID. Check the selected Meta flow/configuration.';
+          setWaError(message);
+          setWhatsappLoading(false);
+          recordWhatsAppDiagnostic({ level: 'error', step: 'Read Meta signup result', message });
+          return;
+        }
+
+        const session: MetaSignupSession = { wabaId, phoneNumberId, event: eventName };
+        signupSessionRef.current = session;
+        recordWhatsAppDiagnostic({
+          level: 'success',
+          step: 'Read Meta signup result',
+          message: `Meta selected a WABA and phone number (${eventName}); waiting for its authorization code.`,
+        });
+        if (signupCodeRef.current) {
+          void completeSignupRef.current(signupCodeRef.current, session);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Could not read Meta signup result';
+        setWaError(message);
+        recordWhatsAppDiagnostic({ level: 'error', step: 'Read Meta signup result', message });
+      }
+    };
+
+    window.addEventListener('message', handleMetaSignupMessage);
+    return () => window.removeEventListener('message', handleMetaSignupMessage);
+  }, [recordWhatsAppDiagnostic]);
+
   // Check URL params for OAuth callback result
   useEffect(() => {
     const waParam = searchParams.get('whatsapp');
@@ -174,7 +436,7 @@ export default function Dashboard() {
     }
   }, [user?.id, fetchWhatsappStatus]);
 
-  const handleConnectWhatsApp = async () => {
+  const handleConnectWhatsApp = () => {
     const token = localStorage.getItem('auth_token');
     if (!token) {
       const message = 'Please sign in again before connecting WhatsApp. No Chati login token was found in this browser.';
@@ -188,45 +450,84 @@ export default function Dashboard() {
       });
       return;
     }
+    const config = signupConfigRef.current;
+    const sdk = window.FB;
+    if (!config || !sdk || !whatsappSignupReady) {
+      const message = 'Meta Embedded Signup is still loading. Wait a moment and retry.';
+      setWaError(message);
+      recordWhatsAppDiagnostic({
+        level: 'error',
+        step: 'Start Meta signup',
+        message,
+        endpoint: API_ENDPOINTS.META_SIGNUP_CONFIG,
+        sessionTokenPresent: true,
+      });
+      return;
+    }
+
+    signupCodeRef.current = null;
+    signupSessionRef.current = null;
+    signupCompletionStartedRef.current = false;
     setWhatsappLoading(true);
     setWaError(null);
     recordWhatsAppDiagnostic({
       level: 'info',
       step: 'Start Meta signup',
-      message: 'Requesting a secure Meta signup link from Chati.',
-      endpoint: API_ENDPOINTS.META_AUTH_URL,
+      message: whatsappSignupMode === 'cloud_api'
+        ? 'Opening Cloud API signup for a new or virtual number.'
+        : 'Opening coexistence signup for an existing WhatsApp Business app number.',
+      endpoint: API_ENDPOINTS.META_SIGNUP_CONFIG,
       sessionTokenPresent: true,
     });
     try {
-      const res = await fetch(API_ENDPOINTS.META_AUTH_URL, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const message = data.error || `Meta signup link request failed (HTTP ${res.status})`;
-        setWaError(message);
+      sdk.login((response) => {
+        const code = response.authResponse?.code;
+        if (!code) {
+          const message = `Meta did not return an authorization code${response.status ? ` (status: ${response.status})` : ''}. The flow may have been cancelled or blocked.`;
+          setWaError(message);
+          setWhatsappLoading(false);
+          recordWhatsAppDiagnostic({
+            level: 'error',
+            step: 'Meta authorization',
+            message,
+            endpoint: 'Facebook Login for Business SDK',
+            sessionTokenPresent: !!localStorage.getItem('auth_token'),
+          });
+          return;
+        }
+
+        signupCodeRef.current = code;
         recordWhatsAppDiagnostic({
-          level: 'error',
-          step: 'Request Meta signup link',
-          message,
-          endpoint: res.url || API_ENDPOINTS.META_AUTH_URL,
-          httpStatus: res.status,
-          sessionTokenPresent: true,
+          level: 'success',
+          step: 'Meta authorization',
+          message: 'Meta returned a short-lived authorization code. Waiting for the selected WhatsApp account details.',
+          endpoint: 'Facebook Login for Business SDK',
+          sessionTokenPresent: !!localStorage.getItem('auth_token'),
         });
-        setWhatsappLoading(false);
-        return;
-      }
-      const { url } = data;
-      if (!url) throw new Error('Meta did not return a signup link');
-      recordWhatsAppDiagnostic({
-        level: 'success',
-        step: 'Request Meta signup link',
-        message: 'Chati returned a secure signup link. Redirecting to Meta.',
-        endpoint: res.url || API_ENDPOINTS.META_AUTH_URL,
-        httpStatus: res.status,
-        sessionTokenPresent: true,
+        if (signupSessionRef.current) {
+          void completeSignupRef.current(code, signupSessionRef.current);
+        } else {
+          window.setTimeout(() => {
+            if (signupCodeRef.current === code && !signupSessionRef.current && !signupCompletionStartedRef.current) {
+              const message = 'Meta returned an authorization code but no WhatsApp account/phone details. Confirm the Embedded Signup configuration returns session information and retry.';
+              setWaError(message);
+              setWhatsappLoading(false);
+              recordWhatsAppDiagnostic({ level: 'error', step: 'Read Meta signup result', message });
+            }
+          }, 8000);
+        }
+      }, {
+        config_id: config.configId,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: whatsappSignupMode === 'business_app'
+          ? {
+            version: 'v4',
+            sessionInfoVersion: '3',
+            featureType: 'whatsapp_business_app_onboarding',
+          }
+          : { version: 'v4', sessionInfoVersion: '3' },
       });
-      window.location.assign(url);
     } catch (err: any) {
       const message = err.message || 'Failed to start WhatsApp connection';
       setWaError(message);
@@ -234,7 +535,7 @@ export default function Dashboard() {
         level: 'error',
         step: 'Start Meta signup',
         message,
-        endpoint: API_ENDPOINTS.META_AUTH_URL,
+        endpoint: 'Facebook Login for Business SDK',
         sessionTokenPresent: true,
       });
       setWhatsappLoading(false);
@@ -395,13 +696,28 @@ export default function Dashboard() {
                 <p className="text-sm text-gray-600">
                   Connect your WhatsApp Business account to start chatting with customers through your AI assistant.
                 </p>
+                <label className="block max-w-xl space-y-1 text-sm">
+                  <span className="font-medium text-gray-700">Number setup</span>
+                  <select
+                    value={whatsappSignupMode}
+                    onChange={event => setWhatsappSignupMode(event.target.value as 'cloud_api' | 'business_app')}
+                    disabled={whatsappLoading || !whatsappSignupReady}
+                    className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-gray-900"
+                  >
+                    <option value="cloud_api">New or virtual number — WhatsApp Cloud API</option>
+                    <option value="business_app">Existing number in WhatsApp Business app — coexistence</option>
+                  </select>
+                  <span className="block text-xs text-gray-500">
+                    Virtual numbers must be able to receive Meta’s verification code by SMS or voice. Coexistence is only for a number already active in the WhatsApp Business app.
+                  </span>
+                </label>
                 <Button
                   onClick={handleConnectWhatsApp}
-                  disabled={whatsappLoading}
+                  disabled={whatsappLoading || !whatsappSignupReady}
                   className="bg-[#25D366] hover:bg-[#20BD5A] text-white"
                 >
                   <Link className="w-4 h-4 mr-2" />
-                  {whatsappLoading ? 'Redirecting...' : 'Connect WhatsApp'}
+                  {whatsappLoading ? 'Connecting...' : whatsappSignupReady ? 'Connect WhatsApp' : 'Loading Meta...'}
                 </Button>
                 <p className="text-xs text-gray-400">
                   You'll be redirected to Meta/Facebook to authorize and select your WhatsApp Business account.
