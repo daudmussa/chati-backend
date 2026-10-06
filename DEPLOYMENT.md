@@ -32,7 +32,11 @@ This guide will help you deploy your Chati Solutions backend to a cloud platform
      PORT=3000
      BYPASS_CLAUDE=0
      BUSINESS_CONTEXT=Your business description
+     BAILEYS_SESSION_ENCRYPTION_KEY=<64-character-random-hex-secret>
+     BAILEYS_MAX_CONNECTIONS_PER_USER=5
      ```
+
+   Generate the Baileys key locally with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`, then add its output as a Railway variable. Keep it unchanged after deployment; saved linked-device sessions are encrypted with it. The Baileys connection manager initially runs in the API process, so keep this Railway service at one replica to avoid multiple processes trying to own the same WhatsApp sessions.
 
 4. **Deploy**:
    - Railway will auto-detect Node.js and deploy

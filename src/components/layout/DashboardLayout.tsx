@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { 
   LayoutDashboard, 
   MessageSquare, 
+  Megaphone,
   Settings, 
   CreditCard, 
   LogOut,
@@ -42,6 +43,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, featureId: null },
     { name: 'Conversations', href: '/conversations', icon: MessageSquare, featureId: 'conversations' },
+    { name: 'Bulk WhatsApp', href: '/bulk-messaging', icon: Megaphone, featureId: null },
     { name: 'Store', href: '/store', icon: ShoppingBag, featureId: 'store' },
     { name: 'Bookings', href: '/bookings', icon: CalendarCheck, featureId: 'bookings' },
     ...(user?.paymentsEnabled ? [
