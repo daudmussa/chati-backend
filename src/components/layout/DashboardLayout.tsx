@@ -2,23 +2,7 @@ import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { 
-  LayoutDashboard, 
-  MessageSquare, 
-  Megaphone,
-  Settings, 
-  CreditCard, 
-  LogOut,
-  Menu,
-  X,
-  ShoppingBag,
-  CalendarCheck,
-  Shield,
-  Users,
-  DollarSign,
-  ChevronDown,
-  History
-} from 'lucide-react';
+import { LayoutDashboard, Megaphone, LogOut, Menu, Shield, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
@@ -31,37 +15,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  const isPaymentsActive = location.pathname.startsWith('/payments');
-  const [paymentsOpen, setPaymentsOpen] = useState(isPaymentsActive);
-
-  const paymentsChildren = [
-    { name: 'Payment History', href: '/payments', icon: History },
-    { name: 'Payment Items', href: '/payments/items', icon: CreditCard },
-    { name: 'Payment Settings', href: '/payments/settings', icon: Settings },
-  ];
-
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, featureId: null },
-    { name: 'Conversations', href: '/conversations', icon: MessageSquare, featureId: 'conversations' },
     { name: 'Bulk WhatsApp', href: '/bulk-messaging', icon: Megaphone, featureId: null },
-    { name: 'Store', href: '/store', icon: ShoppingBag, featureId: 'store' },
-    { name: 'Bookings', href: '/bookings', icon: CalendarCheck, featureId: 'bookings' },
-    ...(user?.paymentsEnabled ? [
-      { name: 'Payments', href: '/payments', icon: DollarSign, featureId: null, children: paymentsChildren }
-    ] : []),
-    { name: 'AI Settings', href: '/settings', icon: Settings, featureId: 'settings' },
-    { name: 'Billing', href: '/billing', icon: CreditCard, featureId: 'billing' },
     ...(user?.role === 'admin' ? [
-      { name: 'Staff', href: '/staff', icon: Users, featureId: null },
       { name: 'Admin', href: '/admin', icon: Shield, featureId: null }
     ] : []),
   ];
-
-  // Filter navigation based on user's enabled features
-  const filteredNavigation = navigation.filter(item => {
-    if (!item.featureId) return true;
-    return user?.enabledFeatures?.includes(item.featureId) ?? true;
-  });
 
   const handleLogout = () => {
     logout();
@@ -89,7 +49,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-6 border-b border-gray-200">
             <div className="flex items-center gap-2">
-              <img src="/logo.png" alt="Chati Solutions" className="h-8 w-auto object-contain" />
+              <span className="text-lg font-bold text-gray-900">WhatsApp Bulk</span>
             </div>
             <button
               onClick={() => setSidebarOpen(false)}
@@ -101,54 +61,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1">
-            {filteredNavigation.map((item) => {
-              if (item.children) {
-                const isParentActive = location.pathname.startsWith(item.href);
-                return (
-                  <div key={item.name}>
-                    <button
-                      onClick={() => setPaymentsOpen(!paymentsOpen)}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                        isParentActive
-                          ? "bg-[#25D366] text-white"
-                          : "text-gray-700 hover:bg-gray-100"
-                      )}
-                    >
-                      <item.icon className="w-5 h-5" />
-                      <span className="flex-1 text-left">{item.name}</span>
-                      <ChevronDown className={cn(
-                        "w-4 h-4 transition-transform",
-                        paymentsOpen && "rotate-180"
-                      )} />
-                    </button>
-                    {paymentsOpen && (
-                      <div className="ml-4 mt-1 space-y-1">
-                        {item.children.map((child: any) => {
-                          const isChildActive = location.pathname === child.href;
-                          return (
-                            <Link
-                              key={child.name}
-                              to={child.href}
-                              onClick={() => setSidebarOpen(false)}
-                              className={cn(
-                                "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                                isChildActive
-                                  ? "bg-[#25D366] text-white"
-                                  : "text-gray-700 hover:bg-gray-100"
-                              )}
-                            >
-                              <child.icon className="w-4 h-4" />
-                              {child.name}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-
+            {navigation.map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link
@@ -174,12 +87,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
                 <span className="text-sm font-semibold text-gray-600">
-                  {user?.businessName?.charAt(0) || 'U'}
+                  {user?.name?.charAt(0) || 'U'}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {user?.businessName || 'Business'}
+                  {user?.name || 'User'}
                 </p>
                 <p className="text-xs text-gray-500 truncate">
                   {user?.email || 'user@example.com'}

@@ -57,19 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log('[AuthContext] User paymentsEnabled:', userData.paymentsEnabled);
           console.log('[AuthContext] User limits:', userData.limits);
           
-          // Fetch business name
-          try {
-            const settingsRes = await fetch(API_ENDPOINTS.BUSINESS_SETTINGS, {
-              headers: { 'x-user-id': userData.id }
-            });
-            if (settingsRes.ok) {
-              const settings = await settingsRes.json();
-              userData.businessName = settings.businessName || userData.name;
-            }
-          } catch (err) {
-            console.log('Could not fetch business name');
-          }
-          
+          userData.businessName = userData.businessName || userData.name;
           setUser(userData);
         } else {
           localStorage.removeItem('auth_token');

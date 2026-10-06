@@ -79,21 +79,37 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
 import crypto from "crypto";
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, clearWabaCredentials, deleteUserCredentials, getAllUsers, getAdminUsersSummary, getAdminStaffSummary, createMetaOAuthState, consumeMetaOAuthState, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listStores as pgListStores, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById, upsertBulkContacts, listBulkContacts, optOutBulkContact, createBulkCampaignDraft, listBulkCampaigns } from "./db-postgres.js";
 import { createBaileysConnection, listBaileysConnections, getBaileysConnectionQr, disconnectBaileysConnection, initializeBaileysConnections } from './server/baileys-service.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 console.log("[startup] Loading env...");
 // Override Railway's broken internal DATABASE_URL (postgres.railway.internal)
 // with the working public proxy from .env
 dotenv.config({ override: true });
 dotenv.config({ path: '.env.railway' });
+const INITIAL_ADMIN_EMAIL = (process.env.INITIAL_ADMIN_EMAIL || '').trim().toLowerCase();
 
 console.log("[startup] Env loaded, checking DATABASE_URL...");
 console.log("- DATABASE_URL exists?", !!process.env.DATABASE_URL);
 console.log("[startup] Initializing app...");
 // Initialize Postgres schema (if DATABASE_URL is set)
 await initSchema();
+if (INITIAL_ADMIN_EMAIL) {
+  const pool = ensurePool();
+  if (pool) {
+    const promoted = await pool.query(
+      `UPDATE users SET role = 'admin', updated_at = NOW()
+       WHERE LOWER(email) = $1 AND role <> 'admin' RETURNING id`,
+      [INITIAL_ADMIN_EMAIL],
+    );
+    if (promoted.rowCount) console.log('[admin] Initial administrator role ensured.');
+  }
+}
 await initializeBaileysConnections();
 console.log("[debug] Raw process.env check:");
 console.log("- process.env.CLAUDE_API_KEY exists?", !!process.env.CLAUDE_API_KEY);
@@ -119,6 +135,23 @@ app.use((req, res, next) => {
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, 'dist'), { index: false }));
+
+// This branch is the standalone WhatsApp Bulk app. Keep its public API surface
+// limited to auth, consent-aware campaigns, Baileys connections, and user admin.
+app.use((req, res, next) => {
+  if (req.path === '/api' || req.path.startsWith('/api/')) {
+    const allowed = /^\/api\/auth\/(signup|login|me)$/.test(req.path)
+      || req.path.startsWith('/api/bulk/')
+      || req.path.startsWith('/api/baileys/')
+      || req.path.startsWith('/api/whatsapp/admin/');
+    if (!allowed) return res.status(404).json({ error: 'Not found' });
+  }
+  if (req.path.startsWith('/auth/meta') || req.path.startsWith('/webhook')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  next();
+});
 
 // Configure multer for file uploads (memory storage for Bunny CDN)
 const upload = multer({ 
@@ -149,7 +182,10 @@ const TWILIO_PHONE_NUMBER = stripQuotes(process.env.TWILIO_PHONE_NUMBER);
 const BUSINESS_CONTEXT = stripQuotes(process.env.BUSINESS_CONTEXT) || "";
 const BYPASS_CLAUDE =
   process.env.BYPASS_CLAUDE === "1" || process.env.BYPASS_CLAUDE === "true";
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_SECRET = stripQuotes(process.env.JWT_SECRET) || "your-secret-key-change-in-production";
+if (process.env.NODE_ENV === 'production' && JWT_SECRET === 'your-secret-key-change-in-production') {
+  throw new Error('Set a private JWT_SECRET before running the production WhatsApp Bulk app.');
+}
 
 // Meta (WhatsApp Cloud API / Embedded Signup) OAuth configuration
 const META_APP_ID = '4017634811813689';
@@ -212,34 +248,21 @@ async function consumeMetaConnectState(stateToken) {
   return userId;
 }
 
-console.log("[config] Environment check:");
-console.log("- CLAUDE_API_KEY:", CLAUDE_API_KEY ? `Set (${CLAUDE_API_KEY.substring(0, 10)}...)` : "MISSING");
-console.log("- TWILIO_ACCOUNT_SID:", TWILIO_ACCOUNT_SID ? `Set (${TWILIO_ACCOUNT_SID.substring(0, 10)}...)` : "MISSING");
-console.log("- TWILIO_AUTH_TOKEN:", TWILIO_AUTH_TOKEN ? "Set" : "MISSING");
-console.log("- TWILIO_PHONE_NUMBER:", TWILIO_PHONE_NUMBER || "MISSING");
-console.log("- META_APP_ID:", META_APP_ID ? "Set" : "MISSING");
-console.log("- META_APP_SECRET:", META_APP_SECRET ? "Set" : "MISSING");
-console.log("- META_APP_ACCESS_TOKEN:", META_APP_ACCESS_TOKEN ? `Set (${META_APP_ACCESS_TOKEN.substring(0, 15)}...)` : "MISSING");
-console.log("- EFFECTIVE_APP_ACCESS_TOKEN:", EFFECTIVE_APP_ACCESS_TOKEN ? `Set (${EFFECTIVE_APP_ACCESS_TOKEN.substring(0, 15)}...)` : "MISSING");
-console.log("- META_CONFIG_ID:", META_CONFIG_ID ? "Set" : "MISSING");
-console.log("- META_VERIFY_TOKEN:", META_VERIFY_TOKEN ? "Set" : "MISSING");
-console.log("- META_AUTH_REDIRECT_URI:", META_AUTH_REDIRECT_URI);
-console.log("- BYPASS_CLAUDE:", BYPASS_CLAUDE);
-console.log("- JWT_SECRET:", JWT_SECRET !== "your-secret-key-change-in-production" ? "Set" : "Using default (CHANGE THIS)");
+console.log('[config] Production WhatsApp Bulk API initialized.');
+console.log('[config] Baileys encryption key configured:', Boolean(process.env.BAILEYS_SESSION_ENCRYPTION_KEY));
 
 // Bunny.net Storage Service (inline implementation)
 class BunnyStorage {
   constructor() {
-    // Fallback to hardcoded values if env vars not available (temporary for Railway issue)
-    this.storageZone = process.env.BUNNY_STORAGE_ZONE || 'chati-storage';
-    this.apiKey = process.env.BUNNY_API_KEY || 'a5528ae7-6dcc-45f5-8408d7fd897c-5c24-4dee';
-    this.cdnUrl = process.env.BUNNY_CDN_URL || 'https://chati-storage.b-cdn.net';
+    this.storageZone = process.env.BUNNY_STORAGE_ZONE || '';
+    this.apiKey = process.env.BUNNY_API_KEY || '';
+    this.cdnUrl = process.env.BUNNY_CDN_URL || '';
     this.storageUrl = `https://storage.bunnycdn.com/${this.storageZone}`;
     this.isConfigured = !!(this.storageZone && this.apiKey && this.cdnUrl);
     
     console.log('[Bunny Storage] Configuration:');
     console.log('  - Storage Zone:', this.storageZone);
-    console.log('  - API Key:', this.apiKey ? `${this.apiKey.substring(0, 10)}...` : 'NOT SET');
+    console.log('  - API Key configured:', !!this.apiKey);
     console.log('  - CDN URL:', this.cdnUrl);
     console.log('  - Is Configured:', this.isConfigured);
   }
@@ -3501,7 +3524,14 @@ app.post("/api/auth/signup", async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 10);
     
     // Create user
-    const user = await createUser(email, passwordHash, name || email.split('@')[0], promoCode);
+    let user = await createUser(email, passwordHash, name || email.split('@')[0], promoCode);
+    if (INITIAL_ADMIN_EMAIL && email.trim().toLowerCase() === INITIAL_ADMIN_EMAIL) {
+      const pool = ensurePool();
+      if (pool) {
+        await pool.query("UPDATE users SET role = 'admin', updated_at = NOW() WHERE id = $1", [user.id]);
+        user = { ...user, role: 'admin' };
+      }
+    }
     
     console.log('[auth] User created:', user.id, 'with name:', user.name);
     
@@ -4359,13 +4389,8 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Root endpoint
 app.get("/", (req, res) => {
-  res.json({ 
-    message: "Chati Solutions API", 
-    status: "running",
-    version: "1.0.0"
-  });
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 // Endpoint used by the Cart page to send an SMS/WhatsApp
@@ -5552,6 +5577,65 @@ app.delete('/api/baileys/connections/:id', async (req, res) => {
   }
 });
 
+async function authenticateWhatsAppAdmin(req, res) {
+  const userId = await authenticateMetaUser(req, res);
+  if (!userId) return null;
+  const user = await getUserById(userId);
+  if (user?.role !== 'admin') {
+    res.status(403).json({ error: 'Admin access required.' });
+    return null;
+  }
+  return userId;
+}
+
+app.get('/api/whatsapp/admin/users', async (req, res) => {
+  try {
+    const userId = await authenticateWhatsAppAdmin(req, res);
+    if (!userId) return;
+    const pool = ensurePool();
+    if (!pool) return res.status(503).json({ error: 'Database unavailable.' });
+    const { rows } = await pool.query(
+      `SELECT id, email, name, role, status, created_at AS "createdAt"
+       FROM users ORDER BY created_at DESC`,
+    );
+    res.json({ users: rows });
+  } catch (error) {
+    console.error('[whatsapp-admin] User list error:', error);
+    res.status(500).json({ error: 'Could not load users.' });
+  }
+});
+
+app.patch('/api/whatsapp/admin/users/:userId/role', async (req, res) => {
+  try {
+    const adminId = await authenticateWhatsAppAdmin(req, res);
+    if (!adminId) return;
+    const { userId } = req.params;
+    const { role } = req.body || {};
+    if (!['admin', 'user'].includes(role)) return res.status(400).json({ error: 'Role must be admin or user.' });
+    if (adminId === userId && role !== 'admin') return res.status(400).json({ error: 'You cannot remove your own administrator role.' });
+
+    const pool = ensurePool();
+    if (!pool) return res.status(503).json({ error: 'Database unavailable.' });
+    if (role === 'user') {
+      const { rows: admins } = await pool.query("SELECT COUNT(*)::int AS count FROM users WHERE role = 'admin' AND status = 'active'");
+      const target = await getUserById(userId);
+      if (target?.role === 'admin' && admins[0].count <= 1) {
+        return res.status(409).json({ error: 'The workspace must retain at least one administrator.' });
+      }
+    }
+    const { rows } = await pool.query(
+      `UPDATE users SET role = $1, updated_at = NOW()
+       WHERE id = $2 RETURNING id, email, name, role, status, created_at AS "createdAt"`,
+      [role, userId],
+    );
+    if (!rows[0]) return res.status(404).json({ error: 'User not found.' });
+    res.json({ user: rows[0] });
+  } catch (error) {
+    console.error('[whatsapp-admin] Role update error:', error);
+    res.status(500).json({ error: 'Could not update user role.' });
+  }
+});
+
 // Global error handlers
 process.on("uncaughtException", (err) => {
   console.error("Uncaught Exception:", err);
@@ -5588,6 +5672,14 @@ app.post("/api/admin/promote", async (req, res) => {
     console.error('[admin] Promotion error:', error);
     res.status(500).json({ error: 'Failed to promote user' });
   }
+});
+
+// SPA fallback for the standalone dashboard routes.
+app.get(/.*/, (req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/health') return next();
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'), error => {
+    if (error) next(error);
+  });
 });
 
 console.log("[startup] About to call app.listen()...");

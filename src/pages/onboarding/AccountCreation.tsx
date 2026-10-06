@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOnboarding } from '@/contexts/OnboardingContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,12 +11,10 @@ export default function AccountCreation() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [promoCode, setPromoCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
   const { signup } = useAuth();
-  const { setCurrentStep } = useOnboarding();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,9 +33,8 @@ export default function AccountCreation() {
 
     setLoading(true);
     try {
-      await signup(email, password, name, promoCode);
-      setCurrentStep(2);
-      navigate('/onboarding/ai-setup');
+      await signup(email, password, name);
+      navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to create account. Please try again.');
     } finally {
@@ -50,18 +46,11 @@ export default function AccountCreation() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-3 text-center">
-          <Link to="/" className="mx-auto flex items-center justify-center hover:opacity-80 transition-opacity">
-            <img src="/icon.png" alt="Chati Solutions" className="w-16 h-16 object-contain" />
+          <Link to="/" className="mx-auto flex items-center justify-center rounded-2xl bg-green-50 p-4 hover:opacity-80 transition-opacity">
+            <MessageSquare className="h-9 w-9 text-[#25D366]" aria-hidden="true" />
           </Link>
-          <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
-          <CardDescription>
-            Start automating your WhatsApp responses with AI
-          </CardDescription>
-          <div className="flex items-center justify-center gap-2 pt-2">
-            <div className="w-8 h-1 bg-[#25D366] rounded-full" />
-            <div className="w-8 h-1 bg-gray-200 rounded-full" />
-            <div className="w-8 h-1 bg-gray-200 rounded-full" />
-          </div>
+          <CardTitle className="text-2xl font-bold">Create your account</CardTitle>
+          <CardDescription>Create an account to manage your connected numbers and WhatsApp campaigns.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -73,15 +62,6 @@ export default function AccountCreation() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="promoCode">Promo Code (Optional)</Label>
-              <Input
-                id="promoCode"
-                placeholder="Enter promo code"
-                value={promoCode}
-                onChange={(e) => setPromoCode(e.target.value)}
               />
             </div>
             <div className="space-y-2">

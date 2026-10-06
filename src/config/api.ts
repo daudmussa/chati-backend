@@ -1,5 +1,5 @@
 // Configuration for API endpoints
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:3000' : '');
 
 export const API_ENDPOINTS = {
   // Authentication
@@ -42,6 +42,8 @@ export const API_ENDPOINTS = {
   BAILEYS_CONNECTIONS: `${API_BASE_URL}/api/baileys/connections`,
   BAILEYS_CONNECTION_QR: (id: string) => `${API_BASE_URL}/api/baileys/connections/${encodeURIComponent(id)}/qr`,
   BAILEYS_DISCONNECT: (id: string) => `${API_BASE_URL}/api/baileys/connections/${encodeURIComponent(id)}`,
+  WHATSAPP_ADMIN_USERS: `${API_BASE_URL}/api/whatsapp/admin/users`,
+  WHATSAPP_ADMIN_USER_ROLE: (id: string) => `${API_BASE_URL}/api/whatsapp/admin/users/${encodeURIComponent(id)}/role`,
   
   // Bookings
   BOOKINGS: `${API_BASE_URL}/api/bookings`,

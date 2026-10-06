@@ -1,39 +1,14 @@
 import { Suspense } from "react";
-import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { OnboardingProvider } from "./contexts/OnboardingContext";
 import { Toaster } from "./components/ui/toaster";
-import FloatingWhatsApp from "./components/FloatingWhatsApp";
 
-// Pages
-import Landing from "./pages/Landing";
 import SignIn from "./pages/SignIn";
 import AccountCreation from "./pages/onboarding/AccountCreation";
-import AISetup from "./pages/onboarding/AISetup";
-import Confirmation from "./pages/onboarding/Confirmation";
-import Dashboard from "./pages/Dashboard";
-import Conversations from "./pages/Conversations";
+import WhatsAppDashboard from "./pages/WhatsAppDashboard";
 import BulkMessaging from "./pages/BulkMessaging";
-import Settings from "./pages/Settings";
-import Billing from "./pages/Billing";
-import PaymentSettings from "./pages/PaymentSettings";
-import PaymentItems from "./pages/PaymentItems";
-import Payments from "./pages/Payments";
-import Store from "./pages/Store";
-import Bookings from "./pages/Bookings";
-import Staff from "./pages/Staff";
-import Admin from "./pages/Admin";
-import CustomerStore from "./pages/CustomerStore";
-import ShopLanding from "./pages/ShopLanding";
-import Cart from "./pages/Cart";
-import CustomerPaymentItems from "./pages/CustomerPaymentItems";
-import Contact from "./pages/Contact";
-import Terms from "./pages/Terms";
-import Pricing from "./pages/Pricing";
-import Features from "./pages/Features";
-import About from "./pages/About";
-import TestUpload from "./pages/TestUpload";
+import WhatsAppAdmin from "./pages/WhatsAppAdmin";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, loading } = useAuth();
@@ -45,78 +20,38 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return isAuthenticated ? <>{children}</> : <Navigate to="/signin" />;
 }
 
-function FeatureProtectedRoute({ children, featureId }: { children: React.ReactNode; featureId: string }) {
+function AdminRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, loading } = useAuth();
-  
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/signin" />;
-  }
-  
-  // Check if user has access to this feature
-  const hasFeature = user?.enabledFeatures?.includes(featureId);
-  
-  if (!hasFeature) {
-    // Redirect to dashboard with a message (you could also show an error toast here)
-    return <Navigate to="/dashboard" replace />;
-  }
-  
-  return <>{children}</>;
+  if (!isAuthenticated) return <Navigate to="/signin" replace />;
+  return user?.role === 'admin' ? <>{children}</> : <Navigate to="/dashboard" replace />;
+}
+
+function HomeRedirect() {
+  const { isAuthenticated, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  return <Navigate to={isAuthenticated ? '/dashboard' : '/signin'} replace />;
 }
 
 function App() {
-  const location = useLocation();
-  
-  // Hide WhatsApp button on admin, dashboard, shop, and cart pages
-  const hideWhatsApp = 
-    location.pathname === '/admin' || 
-    location.pathname === '/dashboard' ||
-    location.pathname === '/cart' ||
-    location.pathname === '/shop' ||
-    location.pathname.startsWith('/shop/');
-  
   return (
     <HelmetProvider>
       <AuthProvider>
-        <OnboardingProvider>
-          <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
-            <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/signin" element={<SignIn />} />
-              <Route path="/onboarding/account" element={<AccountCreation />} />
-              <Route path="/onboarding/ai-setup" element={<ProtectedRoute><AISetup /></ProtectedRoute>} />
-              <Route path="/onboarding/confirmation" element={<ProtectedRoute><Confirmation /></ProtectedRoute>} />
-              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-              <Route path="/conversations" element={<FeatureProtectedRoute featureId="conversations"><Conversations /></FeatureProtectedRoute>} />
-              <Route path="/bulk-messaging" element={<ProtectedRoute><BulkMessaging /></ProtectedRoute>} />
-              <Route path="/settings" element={<FeatureProtectedRoute featureId="settings"><Settings /></FeatureProtectedRoute>} />
-              <Route path="/billing" element={<FeatureProtectedRoute featureId="billing"><Billing /></FeatureProtectedRoute>} />
-              <Route path="/payments/items" element={<ProtectedRoute><PaymentItems /></ProtectedRoute>} />
-              <Route path="/payments/settings" element={<ProtectedRoute><PaymentSettings /></ProtectedRoute>} />
-              <Route path="/payments" element={<ProtectedRoute><Payments /></ProtectedRoute>} />
-              <Route path="/store" element={<FeatureProtectedRoute featureId="store"><Store /></FeatureProtectedRoute>} />
-              <Route path="/bookings" element={<FeatureProtectedRoute featureId="bookings"><Bookings /></FeatureProtectedRoute>} />
-              <Route path="/staff" element={<ProtectedRoute><Staff /></ProtectedRoute>} />
-              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-              <Route path="/test-upload" element={<ProtectedRoute><TestUpload /></ProtectedRoute>} />
-              {/* Public customer-facing pages */}
-              <Route path="/shop" element={<ShopLanding />} />
-              <Route path="/shop/:storeName" element={<CustomerStore />} />
-              <Route path="/shop/:storeName/payments" element={<CustomerPaymentItems />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/pricing" element={<Pricing />} />
-              <Route path="/features" element={<Features />} />
-            </Routes>
-          </Suspense>
-          {!hideWhatsApp && <FloatingWhatsApp />}
-          <Toaster />
-        </OnboardingProvider>
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+          <Routes>
+            <Route path="/" element={<HomeRedirect />} />
+            <Route path="/signin" element={<SignIn />} />
+            <Route path="/signup" element={<AccountCreation />} />
+            <Route path="/onboarding/account" element={<Navigate to="/signup" replace />} />
+            <Route path="/dashboard" element={<ProtectedRoute><WhatsAppDashboard /></ProtectedRoute>} />
+            <Route path="/bulk-messaging" element={<ProtectedRoute><BulkMessaging /></ProtectedRoute>} />
+            <Route path="/admin" element={<AdminRoute><WhatsAppAdmin /></AdminRoute>} />
+            <Route path="*" element={<HomeRedirect />} />
+          </Routes>
+        </Suspense>
+        <Toaster />
       </AuthProvider>
     </HelmetProvider>
   );

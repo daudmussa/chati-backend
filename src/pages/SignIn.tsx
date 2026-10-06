@@ -45,13 +45,11 @@ export default function SignIn() {
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 flex items-center justify-center p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="space-y-3 text-center">
-          <Link to="/" className="mx-auto flex items-center justify-center hover:opacity-80 transition-opacity">
-            <img src="/icon.png" alt="Chati Solutions" className="w-16 h-16 object-contain" />
+          <Link to="/" className="mx-auto flex items-center justify-center rounded-2xl bg-green-50 p-4 hover:opacity-80 transition-opacity">
+            <MessageSquare className="h-9 w-9 text-[#25D366]" aria-hidden="true" />
           </Link>
-          <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
-          <CardDescription>
-            Welcome back! Sign in to your account
-          </CardDescription>
+          <CardTitle className="text-2xl font-bold">Sign in to WhatsApp Bulk</CardTitle>
+          <CardDescription>Manage your connected numbers and opted-in campaigns.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -92,7 +90,7 @@ export default function SignIn() {
           </form>
 
           <div className="mt-6 text-center">
-            <Link to="/onboarding/account" className="text-sm text-gray-600 hover:text-gray-900">
+            <Link to="/signup" className="text-sm text-gray-600 hover:text-gray-900">
               Don't have an account? <span className="text-[#25D366] font-semibold">Sign Up</span>
             </Link>
           </div>

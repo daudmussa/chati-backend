@@ -1,28 +1,27 @@
-# Build stage
-FROM node:22-alpine AS builder
+# Build the React dashboard
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
+RUN npm ci
 
-# Install production dependencies (ignores lock mismatches)
-RUN npm install --omit=dev
+COPY . ./
+RUN npm run build
 
-# Production stage
+# Run the API and serve the built dashboard from the same Railway service
 FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy dependencies from builder
-COPY --from=builder /app/node_modules ./node_modules
+COPY package*.json ./
+RUN npm ci --omit=dev
 
-# Copy application files
 COPY server/ ./server/
 COPY server.js ./
 COPY db-credentials.js ./
 COPY db-postgres.js ./
-COPY package*.json ./
+COPY --from=frontend-builder /app/dist ./dist
 
 # Expose port
 EXPOSE 3000

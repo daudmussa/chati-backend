@@ -1,8 +1,8 @@
 # WhatsApp bulk messaging: implementation direction
 
-## Existing deployment
+## Isolated deployment
 
-The clone is a React/Vite app served with a Node/Express API. The API already uses Railway PostgreSQL and Bunny storage, so contact lists, campaigns, media URLs, and message outcomes can share the existing backend and database. A sending process should eventually run as a separate Railway worker service using the same repository and database; keep the existing web/API service responsive while campaigns run.
+The `whatsapp-bulk` branch is a standalone WhatsApp Bulk app. Deploy it into its own Railway project with its own PostgreSQL service; it must not share the Chati project/database. One Node service builds and serves the React dashboard and its API. The UI is limited to signup/sign-in, a WhatsApp campaign dashboard, Bulk WhatsApp, and admin user management.
 
 ## Provider choice and constraints
 
@@ -15,9 +15,9 @@ The clone is a React/Vite app served with a Node/Express API. The API already us
 
 ## Target architecture
 
-1. **Web app/API:** authenticated users manage connected numbers, opted-in contacts, campaign drafts, and per-recipient results.
-2. **PostgreSQL:** durable accounts/connections, encrypted Baileys auth state, consent records and opt-outs, campaign queue, individual attempts, provider message IDs, and reported statuses.
-3. **Railway connection manager:** currently runs in the API process and owns the long-lived Baileys sessions. Keep this service at one replica to avoid duplicate WhatsApp connections. When moving to a dedicated worker or multiple replicas, add a database lease so only one process owns each session.
+1. **Railway project:** contains this app's Node service and its own PostgreSQL service. The app never uses the original project's `DATABASE_URL`.
+2. **Node service:** serves the standalone dashboard/API and owns the long-lived Baileys sessions. Keep it at one replica to avoid duplicate WhatsApp connections. If campaign load later warrants a worker service, add a database lease before running multiple processes.
+3. **PostgreSQL:** durable accounts/connections, encrypted Baileys auth state, consent records and opt-outs, campaign drafts/queue, individual attempts, provider message IDs, and reported statuses.
 4. **Media:** use existing Bunny storage for publicly reachable image URLs; store the URL on the campaign and send it through the provider adapter.
 5. **Provider adapter:** define common connect/status/send-text/send-image/disconnect methods. The Baileys adapter and any approved provider adapter remain separate implementations, so campaign/contact storage is not tied to one vendor.
 
@@ -27,13 +27,8 @@ Keep “queued,” “submitted/sent,” “delivered,” “read,” and “fai
 
 ## First implementation slice
 
-The backend foundation adds per-user contacts with recorded consent source and opt-out suppression, plus campaign drafts linked only to active opted-in contacts. Baileys QR connection management creates per-user linked-device sessions and persists their encrypted auth state in PostgreSQL. Drafts are not sent yet; next, verify a real BBNSMS line with a one-recipient text/image test before enabling the campaign worker.
+The standalone UI has login/signup, the WhatsApp dashboard, Bulk WhatsApp, and admin/user management. Contacts require an explicit opt-in confirmation and recorded consent source; opt-outs are suppressed. Baileys QR connection management persists encrypted linked-device sessions in the new project's PostgreSQL. Campaigns remain drafts until the one-recipient text/image test is verified.
 
-## Decisions needed before connecting numbers or enabling sends
+## Initial setup
 
-1. Confirm whether you intend to buy BBNSMS **dedicated monthly US/Canada lines** (recommended for long-lived linked accounts) or one-time OTP activations.
-2. Confirm the intended sender-number country. BBNSMS currently lists dedicated lines only for the US and Canada; its one-time activation inventory spans more countries.
-3. Ask BBNSMS whether its dedicated lines support WhatsApp Business/mobile registration and companion-device linking, and whether they offer a private API for provisioning/inbound SMS. The public site does not document that API.
-4. Confirm the initial product scope: one workspace (your own use) or campaigns available to all accounts in this clone.
-
-All campaign recipients should have explicitly opted in, with consent source recorded; stop/opt-out requests must suppress future campaign sends.
+Create the first admin with `INITIAL_ADMIN_EMAIL` set before signup. Store separate stable `JWT_SECRET`, `ENCRYPTION_KEY`, and `BAILEYS_SESSION_ENCRYPTION_KEY` values in the new Railway project's variables. Do not copy the old project's database URL or secrets. All campaign recipients should have explicitly opted in, with consent source recorded; stop/opt-out requests must suppress future sends.
