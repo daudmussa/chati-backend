@@ -14,7 +14,6 @@ import AISetup from "./pages/onboarding/AISetup";
 import Confirmation from "./pages/onboarding/Confirmation";
 import Dashboard from "./pages/Dashboard";
 import Conversations from "./pages/Conversations";
-import BulkMessaging from "./pages/BulkMessaging";
 import Settings from "./pages/Settings";
 import Billing from "./pages/Billing";
 import PaymentSettings from "./pages/PaymentSettings";
@@ -91,7 +90,6 @@ function App() {
               <Route path="/onboarding/confirmation" element={<ProtectedRoute><Confirmation /></ProtectedRoute>} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/conversations" element={<FeatureProtectedRoute featureId="conversations"><Conversations /></FeatureProtectedRoute>} />
-              <Route path="/bulk-messaging" element={<ProtectedRoute><BulkMessaging /></ProtectedRoute>} />
               <Route path="/settings" element={<FeatureProtectedRoute featureId="settings"><Settings /></FeatureProtectedRoute>} />
               <Route path="/billing" element={<FeatureProtectedRoute featureId="billing"><Billing /></FeatureProtectedRoute>} />
               <Route path="/payments/items" element={<ProtectedRoute><PaymentItems /></ProtectedRoute>} />

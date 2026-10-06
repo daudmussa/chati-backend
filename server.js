@@ -79,8 +79,7 @@ import multer from "multer";
 import nodemailer from "nodemailer";
 import sharp from "sharp";
 import crypto from "crypto";
-import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, clearWabaCredentials, deleteUserCredentials, getAllUsers, getAdminUsersSummary, getAdminStaffSummary, createMetaOAuthState, consumeMetaOAuthState, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listStores as pgListStores, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById, upsertBulkContacts, listBulkContacts, optOutBulkContact, createBulkCampaignDraft, listBulkCampaigns } from "./db-postgres.js";
-import { createBaileysConnection, listBaileysConnections, getBaileysConnectionQr, disconnectBaileysConnection, initializeBaileysConnections } from './server/baileys-service.js';
+import { initSchema, saveUserCredentials, getUserCredentials, getUserByPhoneNumber, mapPhoneToUser, clearWabaCredentials, deleteUserCredentials, getAllUsers, getAdminUsersSummary, getAdminStaffSummary, createMetaOAuthState, consumeMetaOAuthState, getBusinessSettings as pgGetBusinessSettings, saveBusinessSettings as pgSaveBusinessSettings, upsertConversation, addMessage, listConversations, createUser, getUserByEmail, getUserById, ensurePool, updateUserFeatures, updateUserLimits, updateUserSubscription, deleteUser, getStoreSettings as pgGetStoreSettings, saveStoreSettings as pgSaveStoreSettings, getStoreByName as pgGetStoreByName, listStores as pgListStores, listProducts, getProductsByStore, saveProduct, deleteProduct, listOrders, createOrder, updateOrderStatus, deleteOrder, getBookingSettings, setBookingStatus, listServices, saveService, deleteService, listBookings, createBooking, updateBooking, updateBookingStatus, listStaff, getStaffById, createStaff, updateStaff, deleteStaff, listCategories, getCategoryById, saveCategory, deleteCategory, savePaymentSettings as pgSavePaymentSettings, getPaymentSettings as pgGetPaymentSettings, createPaymentTransaction, updatePaymentTransaction, getPaymentTransactionsByUserId, getPaymentTransactionByReference, getPaymentStatsByUserId, updateUserPaymentsEnabled, updateBookingPaymentStatus, getBookingById, createPaymentItem, getPaymentItemsByUserId, getPaymentItemById, updatePaymentItem, deletePaymentItem, setBookingPaymentRequired, updateStorePaymentRequired, updateOrderPaymentStatus, getOrderById } from "./db-postgres.js";
 
 
 console.log("[startup] Loading env...");
@@ -94,7 +93,6 @@ console.log("- DATABASE_URL exists?", !!process.env.DATABASE_URL);
 console.log("[startup] Initializing app...");
 // Initialize Postgres schema (if DATABASE_URL is set)
 await initSchema();
-await initializeBaileysConnections();
 console.log("[debug] Raw process.env check:");
 console.log("- process.env.CLAUDE_API_KEY exists?", !!process.env.CLAUDE_API_KEY);
 console.log("- process.env.TWILIO_ACCOUNT_SID exists?", !!process.env.TWILIO_ACCOUNT_SID);
@@ -5364,193 +5362,6 @@ function getPlanConfig(planType) {
   };
   return plans[planType] || null;
 }
-
-function normalizeBulkPhoneNumber(input) {
-  if (typeof input !== 'string') return null;
-  let digits = input.trim().replace(/\D/g, '');
-  if (digits.startsWith('00')) digits = digits.slice(2);
-  if (digits.length < 8 || digits.length > 15 || digits.startsWith('0')) return null;
-  return `+${digits}`;
-}
-
-// Consent-aware bulk messaging foundation. These endpoints only import contacts
-// and create drafts; a provider worker must be configured before anything sends.
-app.get('/api/bulk/contacts', async (req, res) => {
-  try {
-    const userId = await authenticateMetaUser(req, res);
-    if (!userId) return;
-    const contacts = await listBulkContacts(userId);
-    res.json({ contacts });
-  } catch (error) {
-    console.error('[bulk] Contact list error:', error);
-    res.status(500).json({ error: 'Failed to load contacts' });
-  }
-});
-
-app.post('/api/bulk/contacts/import', async (req, res) => {
-  try {
-    const userId = await authenticateMetaUser(req, res);
-    if (!userId) return;
-    const { contacts, consentConfirmed } = req.body || {};
-    if (consentConfirmed !== true) {
-      return res.status(400).json({ error: 'Confirm that every imported contact explicitly opted in to WhatsApp messages.' });
-    }
-    if (!Array.isArray(contacts) || contacts.length === 0 || contacts.length > 500) {
-      return res.status(400).json({ error: 'Provide between 1 and 500 contacts per import.' });
-    }
-
-    const normalized = [];
-    const seen = new Set();
-    const errors = [];
-    contacts.forEach((contact, index) => {
-      const phoneNumber = normalizeBulkPhoneNumber(contact?.phoneNumber || contact?.phone || '');
-      const consentSource = typeof contact?.consentSource === 'string' ? contact.consentSource.trim() : '';
-      if (!phoneNumber) errors.push({ index, error: 'Enter a valid international phone number including its country code.' });
-      else if (contact?.optedIn !== true) errors.push({ index, error: 'Contact must be marked as opted in.' });
-      else if (consentSource.length < 3 || consentSource.length > 500) errors.push({ index, error: 'Provide a consent source (3–500 characters).' });
-      else if (seen.has(phoneNumber)) errors.push({ index, error: 'Duplicate phone number in this import.' });
-      else {
-        seen.add(phoneNumber);
-        normalized.push({
-          phoneNumber,
-          displayName: typeof contact?.name === 'string' ? contact.name.trim().slice(0, 120) : '',
-          consentSource,
-        });
-      }
-    });
-    if (errors.length) return res.status(400).json({ error: 'Some contacts need correction.', details: errors });
-
-    const saved = await upsertBulkContacts(userId, normalized);
-    res.status(201).json({ contacts: saved, count: saved.length });
-  } catch (error) {
-    console.error('[bulk] Contact import error:', error);
-    res.status(500).json({ error: 'Failed to import contacts' });
-  }
-});
-
-app.post('/api/bulk/contacts/opt-out', async (req, res) => {
-  try {
-    const userId = await authenticateMetaUser(req, res);
-    if (!userId) return;
-    const phoneNumber = normalizeBulkPhoneNumber(req.body?.phoneNumber || req.body?.phone || '');
-    if (!phoneNumber) return res.status(400).json({ error: 'Enter a valid international phone number.' });
-    const optedOut = await optOutBulkContact(userId, phoneNumber);
-    if (!optedOut) return res.status(404).json({ error: 'Contact not found.' });
-    res.json({ success: true, phoneNumber, optedOut: true });
-  } catch (error) {
-    console.error('[bulk] Contact opt-out error:', error);
-    res.status(500).json({ error: 'Failed to update contact suppression' });
-  }
-});
-
-app.get('/api/bulk/campaigns', async (req, res) => {
-  try {
-    const userId = await authenticateMetaUser(req, res);
-    if (!userId) return;
-    const campaigns = await listBulkCampaigns(userId);
-    res.json({ campaigns });
-  } catch (error) {
-    console.error('[bulk] Campaign list error:', error);
-    res.status(500).json({ error: 'Failed to load campaigns' });
-  }
-});
-
-app.post('/api/bulk/campaigns', async (req, res) => {
-  try {
-    const userId = await authenticateMetaUser(req, res);
-    if (!userId) return;
-    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
-    const messageText = typeof req.body?.messageText === 'string' ? req.body.messageText.trim() : '';
-    const imageUrl = typeof req.body?.imageUrl === 'string' ? req.body.imageUrl.trim() : '';
-    const contactIds = Array.isArray(req.body?.contactIds) ? [...new Set(req.body.contactIds)] : [];
-    if (!name || name.length > 100) return res.status(400).json({ error: 'Campaign name is required and must be 100 characters or fewer.' });
-    if (messageText.length > 4096) return res.status(400).json({ error: 'Message text must be 4,096 characters or fewer.' });
-    if (!messageText && !imageUrl) return res.status(400).json({ error: 'Add message text or an image URL.' });
-    if (imageUrl) {
-      try {
-        if (new URL(imageUrl).protocol !== 'https:') throw new Error('HTTPS required');
-      } catch {
-        return res.status(400).json({ error: 'Image URL must be a valid public HTTPS URL.' });
-      }
-    }
-    if (contactIds.length === 0 || contactIds.length > 500 || contactIds.some(id => typeof id !== 'string')) {
-      return res.status(400).json({ error: 'Select between 1 and 500 eligible contacts.' });
-    }
-
-    const campaign = await createBulkCampaignDraft(userId, { name, messageText, imageUrl, contactIds });
-    res.status(201).json({ campaign });
-  } catch (error) {
-    if (error.code === 'INELIGIBLE_CONTACTS') {
-      return res.status(400).json({ error: error.message });
-    }
-    console.error('[bulk] Campaign draft error:', error);
-    res.status(500).json({ error: 'Failed to create campaign draft' });
-  }
-});
-
-app.get('/api/baileys/connections', async (req, res) => {
-  try {
-    const userId = await authenticateMetaUser(req, res);
-    if (!userId) return;
-    res.setHeader('Cache-Control', 'no-store');
-    const connections = await listBaileysConnections(userId);
-    res.json({ connections });
-  } catch (error) {
-    console.error('[baileys] Connection list error:', error);
-    res.status(500).json({ error: 'Failed to load WhatsApp connections' });
-  }
-});
-
-app.post('/api/baileys/connections', async (req, res) => {
-  try {
-    const userId = await authenticateMetaUser(req, res);
-    if (!userId) return;
-    const phoneNumber = normalizeBulkPhoneNumber(req.body?.phoneNumber || '');
-    if (!phoneNumber) return res.status(400).json({ error: 'Enter the BBNSMS number in international format, including its country code.' });
-    const connection = await createBaileysConnection(userId, phoneNumber);
-    res.setHeader('Cache-Control', 'no-store');
-    res.status(201).json({ connection });
-  } catch (error) {
-    if (error.code === 'BAILEYS_ENCRYPTION_NOT_CONFIGURED') {
-      return res.status(503).json({ error: error.message });
-    }
-    if (error.code === 'BAILEYS_CONNECTION_LIMIT' || error.code === 'BAILEYS_NUMBER_EXISTS') {
-      return res.status(409).json({ error: error.message });
-    }
-    if (error.code === 'BAILEYS_DATABASE_UNAVAILABLE') {
-      return res.status(503).json({ error: error.message });
-    }
-    console.error('[baileys] Create connection error:', error);
-    res.status(500).json({ error: 'Could not start the WhatsApp connection' });
-  }
-});
-
-app.get('/api/baileys/connections/:id/qr', async (req, res) => {
-  try {
-    const userId = await authenticateMetaUser(req, res);
-    if (!userId) return;
-    res.setHeader('Cache-Control', 'no-store, private');
-    const qr = await getBaileysConnectionQr(userId, req.params.id);
-    if (!qr) return res.status(404).json({ error: 'WhatsApp connection not found.' });
-    res.json(qr);
-  } catch (error) {
-    console.error('[baileys] QR fetch error:', error);
-    res.status(500).json({ error: 'Could not load the WhatsApp QR code' });
-  }
-});
-
-app.delete('/api/baileys/connections/:id', async (req, res) => {
-  try {
-    const userId = await authenticateMetaUser(req, res);
-    if (!userId) return;
-    const disconnected = await disconnectBaileysConnection(userId, req.params.id);
-    if (!disconnected) return res.status(404).json({ error: 'WhatsApp connection not found.' });
-    res.json({ success: true });
-  } catch (error) {
-    console.error('[baileys] Disconnect error:', error);
-    res.status(500).json({ error: 'Could not disconnect the WhatsApp number' });
-  }
-});
 
 // Global error handlers
 process.on("uncaughtException", (err) => {

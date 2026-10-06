@@ -33,15 +33,6 @@ export const API_ENDPOINTS = {
   
   // Conversations
   CONVERSATIONS: `${API_BASE_URL}/api/conversations`,
-
-  // Consent-aware WhatsApp bulk campaigns
-  BULK_CONTACTS: `${API_BASE_URL}/api/bulk/contacts`,
-  BULK_CONTACT_IMPORT: `${API_BASE_URL}/api/bulk/contacts/import`,
-  BULK_CONTACT_OPTOUT: `${API_BASE_URL}/api/bulk/contacts/opt-out`,
-  BULK_CAMPAIGNS: `${API_BASE_URL}/api/bulk/campaigns`,
-  BAILEYS_CONNECTIONS: `${API_BASE_URL}/api/baileys/connections`,
-  BAILEYS_CONNECTION_QR: (id: string) => `${API_BASE_URL}/api/baileys/connections/${encodeURIComponent(id)}/qr`,
-  BAILEYS_DISCONNECT: (id: string) => `${API_BASE_URL}/api/baileys/connections/${encodeURIComponent(id)}`,
   
   // Bookings
   BOOKINGS: `${API_BASE_URL}/api/bookings`,
