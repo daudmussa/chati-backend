@@ -113,6 +113,26 @@ export async function initSchema() {
     ADD COLUMN IF NOT EXISTS payments_enabled BOOLEAN DEFAULT FALSE;
   `);
   
+  // Create credentials before applying incremental columns on a fresh database.
+  await p.query(`
+    CREATE TABLE IF NOT EXISTS user_credentials (
+      user_id TEXT PRIMARY KEY,
+      claude_api_key TEXT,
+      twilio_account_sid TEXT,
+      twilio_auth_token TEXT,
+      twilio_phone_number TEXT,
+      waba_access_token TEXT,
+      waba_phone_number_id TEXT,
+      waba_business_id TEXT,
+      waba_verify_token TEXT,
+      waba_display_phone TEXT,
+      waba_registration_pin TEXT,
+      business_context TEXT,
+      bypass_claude BOOLEAN DEFAULT FALSE,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
   // Migration: Add waba (WhatsApp Cloud API) columns to user_credentials
   await p.query(`
     ALTER TABLE user_credentials 
@@ -139,24 +159,6 @@ export async function initSchema() {
     ADD COLUMN IF NOT EXISTS waba_registration_pin TEXT;
   `);
 
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS user_credentials (
-      user_id TEXT PRIMARY KEY,
-      claude_api_key TEXT,
-      twilio_account_sid TEXT,
-      twilio_auth_token TEXT,
-      twilio_phone_number TEXT,
-      waba_access_token TEXT,
-      waba_phone_number_id TEXT,
-      waba_business_id TEXT,
-      waba_verify_token TEXT,
-      waba_display_phone TEXT,
-      waba_registration_pin TEXT,
-      business_context TEXT,
-      bypass_claude BOOLEAN DEFAULT FALSE,
-      updated_at TIMESTAMPTZ DEFAULT NOW()
-    );
-  `);
   await p.query(`
     CREATE TABLE IF NOT EXISTS phone_user_mapping (
       phone_number TEXT PRIMARY KEY,

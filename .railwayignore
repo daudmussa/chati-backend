@@ -1,0 +1,13 @@
+.git
+.env*
+node_modules
+dist
+dist-ssr
+build
+coverage
+data
+*.db
+*.db-journal
+*.zip
+cloudflared.exe
+NATURAL_LANGUAGE_BOOKING.md
